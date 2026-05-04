@@ -1,0 +1,8 @@
+BasedOnStyle: Google
+
+AccessModifierOffset: -4
+IndentWidth: 4
+TabWidth: 4
+ColumnLimit: 120
+
+AllowShortFunctionsOnASingleLine: None

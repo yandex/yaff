@@ -1,0 +1,107 @@
+syntax = "proto2";
+
+import "yaff/proto/options.proto";
+
+package test;
+
+message FlatMessage {
+    optional uint64 SomeValue1 = 1;
+    optional uint64 SomeValue2 = 2;
+    optional uint64 SomeValue3 = 3;
+    optional uint64 SomeValue4 = 4;
+    optional uint64 SomeValue5 = 5;
+    optional uint64 SomeValue6 = 6;
+    optional uint64 SomeValue7 = 7;
+    optional uint64 SomeValue8 = 8;
+    optional uint64 SomeValue9 = 9;
+    optional uint64 SomeValue10 = 10;
+};
+
+message SimpleMessage {
+    optional sfixed32 SignedField = 1;
+    optional uint32 SmallField = 2 [default = 0xAF];
+    optional uint64 LargeField = 3 [default = 0x6789];
+};
+
+message SimpleFixedMessage {
+    option (yaff.proto.message) = {layout: LAYOUT_FIXED};
+
+    optional uint64 Scalar1 = 1;
+    optional int64 Scalar2 = 2;
+    optional uint32 Scalar3 = 3;
+    optional uint32 Scalar4 = 4;
+    optional uint64 Scalar5 = 5 [default = 0xA];
+};
+
+message StaticFixedMessage {
+    option (yaff.proto.message) = {layout: LAYOUT_FIXED};
+
+    optional uint64 Scalar = 1;
+    optional SimpleMessage Nested = 2;
+};
+
+message StaticFlatMessage {
+    option (yaff.proto.message) = {layout: LAYOUT_FLAT};
+
+    optional uint64 Scalar = 1;
+    optional uint32 OtherScalar = 2 [default = 0x5];
+    optional SimpleMessage Nested = 3;
+};
+
+message StaticSparseMessage {
+    option (yaff.proto.message) = {layout: LAYOUT_SPARSE};
+
+    optional uint64 Scalar = 1;
+    optional SimpleMessage Nested = 2;
+};
+
+message FloatMessage {
+    optional float FloatField = 1 [default = 0.1234];
+    optional double DoubleField = 2 [default = 0.000001];
+};
+
+message NestedMessage {
+    optional SimpleMessage Nested1 = 1;
+    optional uint64 ScalarField = 2;
+    optional SimpleMessage Nested2 = 3;
+};
+
+message NestedUnused {
+    message TMessage {
+        optional int32 SomeField = 1;
+    }
+};
+
+message ArrayMessage {
+    repeated uint64 IntegerVec = 1;
+    repeated string StringVec = 2;
+    repeated FlatMessage MessageVec = 3;
+    repeated bool BoolVec = 4;
+    repeated StaticFixedMessage FixedMessageVec = 5;
+};
+
+message UnionMessage {
+    optional uint32 SomeValue = 1;
+    oneof Union {
+        SimpleMessage Nested1 = 2;
+        string StringVec = 3;
+        SimpleMessage Nested2 = 4;
+        int32 MediumField = 5 [default = -1];
+        uint64 LargeField = 6;
+    }
+}
+
+message OneOfMix {
+    optional uint64 Field1 = 1 [(yaff.proto.field) = {id: 1}];
+    optional uint64 Field2 = 2 [(yaff.proto.field) = {id: 3}];
+    oneof Shared {
+        uint64 Field3 = 3 [(yaff.proto.field) = {id: 2}];
+        uint64 Field4 = 4 [(yaff.proto.field) = {id: 4}];
+    }
+}
+
+message GappedMessage {
+    optional uint64 Field1 = 1;
+    optional uint64 Field3 = 3;
+    optional uint64 Field5 = 5;
+}

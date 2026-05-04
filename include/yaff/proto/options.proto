@@ -1,0 +1,99 @@
+package yaff.proto;
+
+import "google/protobuf/descriptor.proto";
+
+message Message {
+    // A way to represent a message in memory.
+    enum Layout {
+        LAYOUT_UNKNOWN = 0;
+        // LAYOUT_FIXED is similar to packed struct in C++ is a layout
+        // without the possibility of schema mutation;
+        //
+        // Useful for representing fixed entities:
+        // a key-value pair, ui128 as two ui64, etc.
+        //
+        // Since the size of such a structure never changes,
+        // the field that has FIXED layout can be inlined in repeated fields.
+        LAYOUT_FIXED = 1;
+        // LAYOUT_FLAT is minimal add on over FIXED layout
+        // that adds the ability to mutate schema.
+        //
+        // Adds an overhead: 2 bytes for each message
+        // and one additional read and branch when accessing the field.
+        LAYOUT_FLAT = 2;
+        // LAYOUT_SPARSE is layout suitable for sparse data
+        // when many fields are not initialized.
+        //
+        // This layout has a large overhead: 2 bytes for each field,
+        // 6 bytes for message, adds three additional reads and two branches.
+        //
+        // Similar to flatbuffers table layout.
+        LAYOUT_SPARSE = 3;
+        // LAYOUT_DYNAMIC allows dynamically switch between layouts,
+        // while being optimized in such a way as to impose
+        // no additional overhead if a FLAT layout is dynamically selected.
+        LAYOUT_DYNAMIC = 4;
+    }
+
+    message ReservedField {
+        // Identifier of reserved field.
+        optional uint64 id = 1;
+
+        // Protobuf type of reserved field.
+        // It is used to determine the size of gap to be left in some layouts.
+        //
+        // When deleting complex types, TYPE_MESSAGE/TYPE_ENUM is used,
+        // which allows you to delete the description of the type being deleted.
+        optional google.protobuf.FieldDescriptorProto.Type type = 2;
+
+        // Protobuf label of reserved field.
+        // It is used to determine repeated fields.
+        // An empty value is interpreted as LABEL_OPTIONAL.
+        optional google.protobuf.FieldDescriptorProto.Label label = 3 [default = LABEL_OPTIONAL];
+    }
+
+    // Identifier of YaFF slice.
+    // It is used for filtering fields and messages during code generation.
+    //
+    // Allows you to generate multiple YaFF slices
+    // from a single protobuf message.
+    optional string slice_name = 1;
+
+    // A list of fields removed from schema.
+    // It contains the necessary information about the gaps for some layouts.
+    repeated ReservedField reserved_fields = 2;
+
+    // Allows statically set the layout for the message.
+    // Layout determines the representation of the message in buffer and,
+    // as a result, the size, efficiency of working with message
+    // and supported features.
+    optional Layout layout = 3 [default = LAYOUT_DYNAMIC];
+
+    // Disables YaFF generation for the message.
+    // It can be used to reduce the size of generated files.
+    optional bool ignore = 4;
+}
+
+message Field {
+    // Allows you to override the field identifier in protobuf schema.
+    // It can be used both in default mode and for field numbering in slices.
+    optional uint64 id = 1;
+
+    // Identifier of YaFF slice.
+    // It is used for filtering fields and messages during code generation.
+    //
+    // Allows you to generate multiple YaFF slices
+    // from a single protobuf schema.
+    optional string slice_name = 2;
+}
+
+// Extensions from 12000 to 12100
+extend google.protobuf.FieldOptions {
+    // Contains YaFF meta information about the field.
+    repeated Field field = 12000;
+}
+
+extend google.protobuf.MessageOptions {
+    // Contains YaFF meta information about the message.
+    repeated Message message = 12050;
+}

@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package test;
+
+message ImplicitMessage {
+    string StringField = 1;
+    int64 SignedField = 2;
+    uint64 UnsignedField = 3;
+};
