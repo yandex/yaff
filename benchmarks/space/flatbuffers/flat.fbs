@@ -1,0 +1,62 @@
+namespace NFlatBuffersBench;
+
+table TFlat5 {
+    v0:uint64 = null;
+    v1:uint64 = null;
+    v2:uint64 = null;
+    v3:uint64 = null;
+    v4:uint64 = null;
+}
+
+table TFlat50 {
+    v0:uint64 = null;
+    v1:uint64 = null;
+    v2:uint64 = null;
+    v3:uint64 = null;
+    v4:uint64 = null;
+    v5:uint64 = null;
+    v6:uint64 = null;
+    v7:uint64 = null;
+    v8:uint64 = null;
+    v9:uint64 = null;
+    v10:uint64 = null;
+    v11:uint64 = null;
+    v12:uint64 = null;
+    v13:uint64 = null;
+    v14:uint64 = null;
+    v15:uint64 = null;
+    v16:uint64 = null;
+    v17:uint64 = null;
+    v18:uint64 = null;
+    v19:uint64 = null;
+    v20:uint64 = null;
+    v21:uint64 = null;
+    v22:uint64 = null;
+    v23:uint64 = null;
+    v24:uint64 = null;
+    v25:uint64 = null;
+    v26:uint64 = null;
+    v27:uint64 = null;
+    v28:uint64 = null;
+    v29:uint64 = null;
+    v30:uint64 = null;
+    v31:uint64 = null;
+    v32:uint64 = null;
+    v33:uint64 = null;
+    v34:uint64 = null;
+    v35:uint64 = null;
+    v36:uint64 = null;
+    v37:uint64 = null;
+    v38:uint64 = null;
+    v39:uint64 = null;
+    v40:uint64 = null;
+    v41:uint64 = null;
+    v42:uint64 = null;
+    v43:uint64 = null;
+    v44:uint64 = null;
+    v45:uint64 = null;
+    v46:uint64 = null;
+    v47:uint64 = null;
+    v48:uint64 = null;
+    v49:uint64 = null;
+}

@@ -1,0 +1,62 @@
+package NYaFFBench;
+
+message TFlat5 {
+    optional uint64 v0 = 1;
+    optional uint64 v1 = 2;
+    optional uint64 v2 = 3;
+    optional uint64 v3 = 4;
+    optional uint64 v4 = 5;
+}
+
+message TFlat50 {
+    optional uint64 v0 = 1;
+    optional uint64 v1 = 2;
+    optional uint64 v2 = 3;
+    optional uint64 v3 = 4;
+    optional uint64 v4 = 5;
+    optional uint64 v5 = 6;
+    optional uint64 v6 = 7;
+    optional uint64 v7 = 8;
+    optional uint64 v8 = 9;
+    optional uint64 v9 = 10;
+    optional uint64 v10 = 11;
+    optional uint64 v11 = 12;
+    optional uint64 v12 = 13;
+    optional uint64 v13 = 14;
+    optional uint64 v14 = 15;
+    optional uint64 v15 = 16;
+    optional uint64 v16 = 17;
+    optional uint64 v17 = 18;
+    optional uint64 v18 = 19;
+    optional uint64 v19 = 20;
+    optional uint64 v20 = 21;
+    optional uint64 v21 = 22;
+    optional uint64 v22 = 23;
+    optional uint64 v23 = 24;
+    optional uint64 v24 = 25;
+    optional uint64 v25 = 26;
+    optional uint64 v26 = 27;
+    optional uint64 v27 = 28;
+    optional uint64 v28 = 29;
+    optional uint64 v29 = 30;
+    optional uint64 v30 = 31;
+    optional uint64 v31 = 32;
+    optional uint64 v32 = 33;
+    optional uint64 v33 = 34;
+    optional uint64 v34 = 35;
+    optional uint64 v35 = 36;
+    optional uint64 v36 = 37;
+    optional uint64 v37 = 38;
+    optional uint64 v38 = 39;
+    optional uint64 v39 = 40;
+    optional uint64 v40 = 41;
+    optional uint64 v41 = 42;
+    optional uint64 v42 = 43;
+    optional uint64 v43 = 44;
+    optional uint64 v44 = 45;
+    optional uint64 v45 = 46;
+    optional uint64 v46 = 47;
+    optional uint64 v47 = 48;
+    optional uint64 v48 = 49;
+    optional uint64 v49 = 50;
+}

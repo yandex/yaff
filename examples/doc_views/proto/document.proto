@@ -1,0 +1,82 @@
+syntax = "proto2";
+
+package NDocument;
+
+import "yaff/proto/options.proto";
+
+enum ECategory {
+    CATEGORY_UNKNOWN = 0;
+    CATEGORY_NEWS = 1;
+    CATEGORY_COMMERCE = 2;
+    CATEGORY_ENTERTAINMENT = 3;
+}
+
+message TDocument {
+    // "light_view": fast checks during early ranking stages.
+    option (yaff.proto.message) = {
+        slice_name: "light_view"
+    };
+
+    // "full_view": detailed data for late ranking stages.
+    option (yaff.proto.message) = {
+        slice_name: "full_view"
+    };
+
+    message TQualityScores {
+        option (yaff.proto.message) = {
+            slice_name: "full_view"
+        };
+
+        optional double relevance = 1 [
+            (yaff.proto.field) = {slice_name: "full_view", id: 1}
+        ];
+
+        optional double freshness = 2 [
+            (yaff.proto.field) = {slice_name: "full_view", id: 2}
+        ];
+
+        optional double user_engagement = 3 [
+            (yaff.proto.field) = {slice_name: "full_view", id: 3}
+        ];
+    }
+
+    // Shared: present in both views.
+    optional uint64 doc_id = 1 [
+        (yaff.proto.field) = {slice_name: "light_view", id: 1},
+        (yaff.proto.field) = {slice_name: "full_view", id: 1}
+    ];
+
+    // Light view fields: cheap to read, used for early filtering.
+    optional ECategory category = 2 [
+        (yaff.proto.field) = {slice_name: "light_view", id: 2}
+    ];
+
+    optional uint64 bid_micros = 3 [
+        (yaff.proto.field) = {slice_name: "light_view", id: 3}
+    ];
+
+    optional uint32 region_id = 4 [
+        (yaff.proto.field) = {slice_name: "light_view", id: 4}
+    ];
+
+    optional bool is_active = 5 [
+        (yaff.proto.field) = {slice_name: "light_view", id: 5}
+    ];
+
+    // Full view fields: expensive data for late-stage ranking.
+    optional string title = 6 [
+        (yaff.proto.field) = {slice_name: "full_view", id: 2}
+    ];
+
+    repeated double embedding = 7 [
+        (yaff.proto.field) = {slice_name: "full_view", id: 3}
+    ];
+
+    optional TQualityScores quality = 8 [
+        (yaff.proto.field) = {slice_name: "full_view", id: 4}
+    ];
+
+    repeated string keywords = 9 [
+        (yaff.proto.field) = {slice_name: "full_view", id: 5}
+    ];
+}

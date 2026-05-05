@@ -1,0 +1,38 @@
+package NYaFFBench;
+
+// Check bench/access/flatbuffers/hierarchical.fbs to see comments about this benchmark structures.
+message TLeaf {
+    optional uint64 a = 1;
+    optional uint64 b = 2;
+    optional uint64 c = 3;
+    optional uint64 d = 4;
+    optional uint64 e = 5;
+    optional uint64 f = 6;
+    optional uint64 g = 7;
+    optional uint64 h = 8;
+    optional int64 i = 9;
+}
+
+message TIntermediate {
+    optional uint64 v0 = 1;
+    optional uint64 v1 = 2;
+    optional uint64 v2 = 3;
+    optional uint64 v3 = 4;
+    optional uint64 v4 = 5;
+    optional uint64 v5 = 6;
+    optional uint64 v6 = 7;
+    optional uint64 v7 = 8;
+    optional TLeaf leaf = 9;
+}
+
+message TRoot {
+    optional uint64 i = 1;
+    optional uint64 ii = 2;
+    optional uint64 iii = 3;
+    optional uint64 iv = 4;
+    optional uint64 v = 5;
+    optional uint64 vi = 6;
+    optional uint64 vii = 7;
+    optional uint64 viii = 8;
+    optional TIntermediate intermediate = 9;
+};
