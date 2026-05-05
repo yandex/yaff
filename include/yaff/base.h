@@ -73,15 +73,15 @@ enum class EType : int32_t {
     TYPE_ENUM = 8,
     TYPE_STRING = 9,
     TYPE_VECTOR = 10,
-    TYPE_TABLE = 11,
+    TYPE_MESSAGE = 11,
 };
 
-enum class ETableLayout : int32_t {
-    TABLE_LAYOUT_UNKNOWN = 0,
-    TABLE_LAYOUT_FIXED = 1,
-    TABLE_LAYOUT_FLAT = 2,
-    TABLE_LAYOUT_SPARSE = 3,
-    TABLE_LAYOUT_DYNAMIC = 4,
+enum class EMessageLayout : int32_t {
+    MESSAGE_LAYOUT_UNKNOWN = 0,
+    MESSAGE_LAYOUT_FIXED = 1,
+    MESSAGE_LAYOUT_FLAT = 2,
+    MESSAGE_LAYOUT_SPARSE = 3,
+    MESSAGE_LAYOUT_DYNAMIC = 4,
 };
 
 enum class EPresence : int32_t {

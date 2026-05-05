@@ -1,7 +1,7 @@
 #pragma once
 
 #include "builder.h"
-#include "table.h"
+#include "message.h"
 #include "vector.h"
 
 namespace NYaFF::NExp {

@@ -11,11 +11,13 @@ public:
     bool Check(const NIR::TIR& base, const NIR::TIR& patched) &&;
 
 private:
-    struct TCheckedTablesHash {
-        inline size_t operator()(const std::pair<const NIR::TTableDef*, const NIR::TTableDef*>& p) const noexcept {
+    struct TCheckedMessagesHash {
+        inline size_t operator()(const std::pair<const NIR::TMessageDef*, const NIR::TMessageDef*>& p) const noexcept {
             return std::hash<const void*>{}(p.first) ^ std::hash<const void*>{}(p.second);
         }
     };
+    using TCheckedMessagesSet =
+        std::unordered_set<std::pair<const NIR::TMessageDef*, const NIR::TMessageDef*>, TCheckedMessagesHash>;
 
     static std::string ConcatNames(const std::string& base, const std::string& name);
     static std::string GetTypeDefault(const NIR::TType& type);
@@ -23,12 +25,12 @@ private:
 
     void MarkCritical();
 
-    void CheckTable(const NIR::TTableDef& base, const NIR::TTableDef& patched);
-    void CheckField(const std::string& tableName, const NIR::TTableDef::TFieldDef& base,
-                    const NIR::TTableDef::TFieldDef& patched);
+    void CheckMessage(const NIR::TMessageDef& base, const NIR::TMessageDef& patched);
+    void CheckField(const std::string& msgName, const NIR::TMessageDef::TFieldDef& base,
+                    const NIR::TMessageDef::TFieldDef& patched);
     void CheckTypes(const std::string& fieldName, const NIR::TType& base, const NIR::TType& patched);
 
-    std::unordered_set<std::pair<const NIR::TTableDef*, const NIR::TTableDef*>, TCheckedTablesHash> CheckedTables_;
+    TCheckedMessagesSet CheckedMessages_;
     std::unique_ptr<IErrorHandler> Errors_;
 
     bool HasCriticalErrors_;
@@ -39,30 +41,30 @@ TIRCompatibilityChecker::TIRCompatibilityChecker(std::unique_ptr<IErrorHandler> 
 }
 
 bool TIRCompatibilityChecker::Check(const NIR::TIR& lhs, const NIR::TIR& rhs) && {
-    for (const auto& [lhsName, lhsTable] : lhs.Tables.Table) {
-        const auto* rhsTable = FindKey(rhs.Tables.Table, lhsName);
-        if (!rhsTable) {
-            Errors_->Warning(EErrorType::COMPAT_TABLE_REMOVED, lhsName, "table has been removed in new schema");
+    for (const auto& [lhsName, lhsMessage] : lhs.Messages.Symbols) {
+        const auto* rhsMessage = FindKey(rhs.Messages.Symbols, lhsName);
+        if (!rhsMessage) {
+            Errors_->Warning(EErrorType::COMPAT_MESSAGE_REMOVED, lhsName, "message has been removed in new schema");
             continue;
         }
-        CheckTable(lhsTable, *rhsTable);
+        CheckMessage(lhsMessage, *rhsMessage);
     }
     return !HasCriticalErrors_;
 }
 
-void TIRCompatibilityChecker::CheckTable(const NIR::TTableDef& base, const NIR::TTableDef& patched) {
-    auto [_, emplace] = CheckedTables_.emplace(std::make_pair(&base, &patched));
+void TIRCompatibilityChecker::CheckMessage(const NIR::TMessageDef& base, const NIR::TMessageDef& patched) {
+    auto [_, emplace] = CheckedMessages_.emplace(std::make_pair(&base, &patched));
     if (!emplace) {
         return;
     }
 
     if (base.Name != patched.Name) {
-        Errors_->Warning(EErrorType::COMPAT_TABLE_NAME_CHANGED, base.Name,
-                         "table name changed to '" + patched.Name + "'");
+        Errors_->Warning(EErrorType::COMPAT_MESSAGE_NAME_CHANGED, base.Name,
+                         "message name changed to '" + patched.Name + "'");
     }
 
     if (base.Layout != patched.Layout) {
-        Errors_->Error(EErrorType::COMPAT_TABLE_LAYOUT_CHANGED, base.Name, "table layout changed");
+        Errors_->Error(EErrorType::COMPAT_MESSAGE_LAYOUT_CHANGED, base.Name, "message layout changed");
         MarkCritical();
     }
 
@@ -72,12 +74,12 @@ void TIRCompatibilityChecker::CheckTable(const NIR::TTableDef& base, const NIR::
     }
 }
 
-void TIRCompatibilityChecker::CheckField(const std::string& tableName, const NIR::TTableDef::TFieldDef& base,
-                                         const NIR::TTableDef::TFieldDef& patched) {
+void TIRCompatibilityChecker::CheckField(const std::string& msgName, const NIR::TMessageDef::TFieldDef& base,
+                                         const NIR::TMessageDef::TFieldDef& patched) {
     YAFF_REQUIRE(base.Id == patched.Id);
 
     const std::string fieldName = (!base.Deprecated ? base.Name : "Deprecated" + std::to_string(base.Id));
-    const std::string fullName = ConcatNames(tableName, fieldName);
+    const std::string fullName = ConcatNames(msgName, fieldName);
 
     if (base.Deprecated && !patched.Deprecated) {
         Errors_->Warning(EErrorType::COMPAT_DEPRECATED_REMOVE, fullName, "deprecated field reused as non-deprecated");
@@ -107,8 +109,9 @@ void TIRCompatibilityChecker::CheckTypes(const std::string& fieldName, const NIR
         MarkCritical();
     }
 
-    if (base.Type == EType::TYPE_TABLE && base.TableDef && patched.TableDef && base.TableDef != patched.TableDef) {
-        CheckTable(*base.TableDef, *patched.TableDef);
+    if (base.Type == EType::TYPE_MESSAGE && base.MessageDef && patched.MessageDef &&
+        base.MessageDef != patched.MessageDef) {
+        CheckMessage(*base.MessageDef, *patched.MessageDef);
     }
 
     if (base.Type == EType::TYPE_VECTOR && base.ElementType && patched.ElementType &&

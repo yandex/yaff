@@ -4,7 +4,7 @@
 
 namespace NYaFF::NReflect {
 
-struct TTableDescriptor;
+struct TMessageDescriptor;
 struct TEnumDescriptor;
 
 struct TTypeDescriptor {
@@ -12,7 +12,7 @@ struct TTypeDescriptor {
 
     union {
         const TTypeDescriptor* Element = nullptr;
-        const TTableDescriptor* Table;
+        const TMessageDescriptor* Message;
         const TEnumDescriptor* Enum;
     } Descriptor;
 
@@ -44,9 +44,9 @@ struct TFieldDescriptor {
     const TFieldOffset FlatOffset = 0;
 };
 
-struct TTableDescriptor {
+struct TMessageDescriptor {
     const char* Name = nullptr;
-    const ETableLayout Layout = ETableLayout::TABLE_LAYOUT_UNKNOWN;
+    const EMessageLayout Layout = EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
 
     const uint16_t FieldCount = 0;
     const TFieldDescriptor* Fields = nullptr;
@@ -67,12 +67,12 @@ struct TEnumDescriptor {
 inline size_t InlineSize(EType type);
 inline size_t InlineSize(const TTypeDescriptor& type);
 
-inline size_t FixedTableSize(const TTableDescriptor& table) {
-    YAFF_REQUIRE(table.Layout == ETableLayout::TABLE_LAYOUT_FIXED);
-    if (table.FieldCount == 0) {
+inline size_t FixedMessageSize(const TMessageDescriptor& msg) {
+    YAFF_REQUIRE(msg.Layout == EMessageLayout::MESSAGE_LAYOUT_FIXED);
+    if (msg.FieldCount == 0) {
         return 0;
     }
-    const auto& last = table.Fields[table.FieldCount - 1];
+    const auto& last = msg.Fields[msg.FieldCount - 1];
     return last.FlatOffset + InlineSize(*last.Type);
 }
 
@@ -98,23 +98,23 @@ inline size_t InlineSize(EType type) {
         case EType::TYPE_STRING:
         case EType::TYPE_VECTOR:
             return sizeof(TOffset);
-        case EType::TYPE_TABLE:
-            YAFF_THROW("incomplete table type");
+        case EType::TYPE_MESSAGE:
+            YAFF_THROW("incomplete message type");
     }
 }
 
 inline size_t InlineSize(const TTypeDescriptor& type) {
-    if (type.Type == EType::TYPE_TABLE) {
+    if (type.Type == EType::TYPE_MESSAGE) {
         if (type.Inline) {
-            YAFF_REQUIRE(type.Descriptor.Table);
-            return FixedTableSize(*type.Descriptor.Table);
+            YAFF_REQUIRE(type.Descriptor.Message);
+            return FixedMessageSize(*type.Descriptor.Message);
         }
         return sizeof(TOffset);
     }
     return InlineSize(type.Type);
 }
 
-inline TFieldResolverFunc MakeFieldResolverFunc(const TTableDescriptor* desc) {
+inline TFieldResolverFunc MakeFieldResolverFunc(const TMessageDescriptor* desc) {
     return [desc](const TFieldId id) {
         YAFF_REQUIRE(id > 0);
         return desc->Fields[id - 1].FlatOffset;

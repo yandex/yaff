@@ -6,13 +6,8 @@
 
 namespace NYaFF::NCompile {
 
-template <typename T>
-inline std::string AdaptString(T value) {
-    return std::string{std::move(value)};
-}
-
 std::vector<const NIR::TSchemaDef*> GetSchemaDependencyOrder(const NIR::TIR& ir);
-std::vector<const NIR::TTableDef*> GetTableDependencyOrder(const NIR::TSchemaDef& schemaDef);
+std::vector<const NIR::TMessageDef*> GetMessageDependencyOrder(const NIR::TSchemaDef& schemaDef);
 
 std::string ToCamelCase(const std::string& input, bool upper);
 

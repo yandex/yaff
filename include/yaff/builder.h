@@ -51,11 +51,11 @@ public:
 
     ~TBuilder() = default;
 
-    void EnforceDynamicAlternative(ETableLayout layout) noexcept {
+    void EnforceDynamicAlternative(EMessageLayout layout) noexcept {
         ForcedAlternative_ = layout;
     }
 
-    ETableLayout GetForcedDynamicAlternative() const noexcept {
+    EMessageLayout GetForcedDynamicAlternative() const noexcept {
         return ForcedAlternative_;
     }
 
@@ -66,7 +66,7 @@ public:
 
     void Clear() noexcept {
         Buf_.Clear();
-        TableBuilder_.emplace<TDummyTableBuilder>();
+        MessageBuilder_.emplace<TDummyMessageBuilder>();
         Depth_ = 0;
         Finished_ = false;
         ObjectSet_.clear();
@@ -83,34 +83,34 @@ public:
     }
 
     template <typename M>
-    void StartFixedTable() {
-        // Nesting is possible for this call, but not another table, since no TFieldOffset is set.
-        YAFF_REQUIRE(std::holds_alternative<TDummyTableBuilder>(TableBuilder_));
+    void StartFixedMessage() {
+        // Nesting is possible for this call, but not another message, since no TFieldOffset is set.
+        YAFF_REQUIRE(std::holds_alternative<TDummyMessageBuilder>(MessageBuilder_));
         Buf_.RightFill(M::LIMIT);
-        StartTableDispatch<TFixedTableBuilder>(Buf_, Buf_.RightSize(), &M::ResolveField);
+        StartMessageDispatch<TFixedMessageBuilder>(Buf_, Buf_.RightSize(), &M::ResolveField);
     }
 
-    TOffset FinishFixedTable() {
-        return FinishTableDispatch<TFixedTableBuilder>();
+    TOffset FinishFixedMessage() {
+        return FinishMessageDispatch<TFixedMessageBuilder>();
     }
 
     template <typename M>
-    void StartFlatTable(bool implicit = false) {
+    void StartFlatMessage(bool implicit = false) {
         CheckNotNested();
-        StartTableDispatch<TFlatTableBuilder>(Buf_, implicit, &M::ResolveField);
+        StartMessageDispatch<TFlatMessageBuilder>(Buf_, implicit, &M::ResolveField);
     }
 
-    TOffset FinishFlatTable() {
-        return FinishTableDispatch<TFlatTableBuilder>();
+    TOffset FinishFlatMessage() {
+        return FinishMessageDispatch<TFlatMessageBuilder>();
     }
 
-    void StartSparseTable(bool implicit = false) {
+    void StartSparseMessage(bool implicit = false) {
         CheckNotNested();
-        StartTableDispatch<TSparseTableBuilder>(Buf_, implicit);
+        StartMessageDispatch<TSparseMessageBuilder>(Buf_, implicit);
     }
 
-    TOffset FinishSparseTable() {
-        return FinishTableDispatch<TSparseTableBuilder>();
+    TOffset FinishSparseMessage() {
+        return FinishMessageDispatch<TSparseMessageBuilder>();
     }
 
     template <typename T>
@@ -331,7 +331,7 @@ private:
 
     using TObjectOffsetSet = std::unordered_set<TObjectOffset, TObjectOffsetHash, TObjectOffsetEqual>;
 
-    struct TDummyTableBuilder {
+    struct TDummyMessageBuilder {
         template <typename T, typename... Ps>
         void AddField(TFieldId, Ps&&...) {
             YAFF_THROW("impossible control flow");
@@ -341,16 +341,16 @@ private:
         }
     };
 
-    struct TFixedTableBuilder {
-        TFixedTableBuilder(TDualBuffer& buffer, size_t loc, TFieldResolverFunc resolver)
+    struct TFixedMessageBuilder {
+        TFixedMessageBuilder(TDualBuffer& buffer, size_t loc, TFieldResolverFunc resolver)
             : Buf(buffer), Loc(loc), ResolverFunc(std::move(resolver)) {
         }
 
-        TFixedTableBuilder(const TFixedTableBuilder&) = delete;
-        TFixedTableBuilder& operator=(const TFixedTableBuilder&) = delete;
+        TFixedMessageBuilder(const TFixedMessageBuilder&) = delete;
+        TFixedMessageBuilder& operator=(const TFixedMessageBuilder&) = delete;
 
-        TFixedTableBuilder(TFixedTableBuilder&& other) = delete;
-        TFixedTableBuilder& operator=(TFixedTableBuilder&& other) = delete;
+        TFixedMessageBuilder(TFixedMessageBuilder&& other) = delete;
+        TFixedMessageBuilder& operator=(TFixedMessageBuilder&& other) = delete;
 
         template <typename T>
         void AddField(TFieldId id, T value, T def) {
@@ -382,7 +382,7 @@ private:
         TFieldResolverFunc ResolverFunc;
     };
 
-    struct TFlatTableBuilder {
+    struct TFlatMessageBuilder {
         inline static constexpr size_t TYPED_LIMIT_SIZE = sizeof(TFieldId);
 
         static constexpr size_t CalculatePresenceSize(const TFieldId maxId) {
@@ -393,7 +393,7 @@ private:
             maskStart[-((id - 0x1) >> 0x3) - 0x1] |= (static_cast<char>(0x1) << ((id - 0x1) & 0x7));
         }
 
-        TFlatTableBuilder(TDualBuffer& buffer, bool implicit, TFieldResolverFunc resolver)
+        TFlatMessageBuilder(TDualBuffer& buffer, bool implicit, TFieldResolverFunc resolver)
             : Buf(buffer),
               Start(Buf.RightSize()),
               End(0),
@@ -404,11 +404,11 @@ private:
               ResolverFunc(std::move(resolver)) {
         }
 
-        TFlatTableBuilder(const TFlatTableBuilder&) = delete;
-        TFlatTableBuilder& operator=(const TFlatTableBuilder&) = delete;
+        TFlatMessageBuilder(const TFlatMessageBuilder&) = delete;
+        TFlatMessageBuilder& operator=(const TFlatMessageBuilder&) = delete;
 
-        TFlatTableBuilder(TFlatTableBuilder&& other) = delete;
-        TFlatTableBuilder& operator=(TFlatTableBuilder&& other) = delete;
+        TFlatMessageBuilder(TFlatMessageBuilder&& other) = delete;
+        TFlatMessageBuilder& operator=(TFlatMessageBuilder&& other) = delete;
 
         template <typename T>
         void AddField(const TFieldId id, const T value, const T def) {
@@ -500,7 +500,7 @@ private:
         TFieldResolverFunc ResolverFunc;
     };
 
-    struct TSparseTableBuilder {
+    struct TSparseMessageBuilder {
         inline static constexpr TFieldId TINY_OFFSET_MAX_ID = 0x20;
         inline static constexpr TFieldOffset SPARSE_META_OFFSET = sizeof(TFieldId);
 
@@ -521,7 +521,7 @@ private:
         };
         YAFF_LAYOUT_END
 
-        TSparseTableBuilder(TDualBuffer& buffer, bool implicit)
+        TSparseMessageBuilder(TDualBuffer& buffer, bool implicit)
             : Buf(buffer),
               LeftStart(Buf.LeftSize()),
               RightStart(Buf.RightSize()),
@@ -531,11 +531,11 @@ private:
               Implicit(implicit) {
         }
 
-        TSparseTableBuilder(const TSparseTableBuilder&) = delete;
-        TSparseTableBuilder& operator=(const TSparseTableBuilder&) = delete;
+        TSparseMessageBuilder(const TSparseMessageBuilder&) = delete;
+        TSparseMessageBuilder& operator=(const TSparseMessageBuilder&) = delete;
 
-        TSparseTableBuilder(TSparseTableBuilder&& other) = delete;
-        TSparseTableBuilder& operator=(TSparseTableBuilder&& other) = delete;
+        TSparseMessageBuilder(TSparseMessageBuilder&& other) = delete;
+        TSparseMessageBuilder& operator=(TSparseMessageBuilder&& other) = delete;
 
         template <typename T>
         void AddField(TFieldId id, T value, T def) {
@@ -566,7 +566,7 @@ private:
 
             Buf.RightPushSmall<TSignedOffset>(0);
             Buf.RightPushSmall<TFieldId>((MaxId << 0x2) | 0x1);
-            const size_t tableStart = Buf.RightSize();
+            const size_t msgStart = Buf.RightSize();
 
             const size_t metaSize = CalculateMetaSize(MaxId);
             Buf.RightFill(metaSize);
@@ -576,21 +576,21 @@ private:
                 const auto* field = ReadLayout<TField>(Buf.LeftDataAt(LeftStart + i * sizeof(TField)));
 
                 if (field->Id < TINY_OFFSET_MAX_ID) {
-                    YAFF_REQUIRE(tableStart >= field->Offset &&
-                                 tableStart - field->Offset <= std::numeric_limits<uint8_t>::max());
-                    WriteValue<uint8_t>(Buf.RightDataAt(metaStart - (field->Id - 0x1)), tableStart - field->Offset);
+                    YAFF_REQUIRE(msgStart >= field->Offset &&
+                                 msgStart - field->Offset <= std::numeric_limits<uint8_t>::max());
+                    WriteValue<uint8_t>(Buf.RightDataAt(metaStart - (field->Id - 0x1)), msgStart - field->Offset);
                 } else {
-                    YAFF_REQUIRE(tableStart >= field->Offset &&
-                                 tableStart - field->Offset <= std::numeric_limits<uint16_t>::max());
+                    YAFF_REQUIRE(msgStart >= field->Offset &&
+                                 msgStart - field->Offset <= std::numeric_limits<uint16_t>::max());
                     WriteValue<uint16_t>(Buf.RightDataAt(metaStart - (field->Id << 0x1) + (TINY_OFFSET_MAX_ID + 1)),
-                                         tableStart - field->Offset);
+                                         msgStart - field->Offset);
                 }
 
                 if (!field->IsScalar) {
                     char* loc = Buf.RightDataAt(field->Offset);
                     const TOffset offset = ReadValue<TOffset>(loc);
-                    YAFF_REQUIRE(tableStart >= offset);
-                    WriteValue<TOffset>(loc, ToCheckedOffset(tableStart - offset));
+                    YAFF_REQUIRE(msgStart >= offset);
+                    WriteValue<TOffset>(loc, ToCheckedOffset(msgStart - offset));
                 }
             }
             Buf.LeftPop(FieldsAdded * sizeof(TField));
@@ -620,11 +620,11 @@ private:
                 Buf.LeftPushSmall<TMeta>(TMeta{.Offset = metaOffset, .MaxId = MaxId});
             }
 
-            YAFF_REQUIRE(sizeof(tableStart) < sizeof(int64_t) || tableStart <= std::numeric_limits<int64_t>::max());
-            WriteValue<TSignedOffset>(Buf.RightDataAt(tableStart - SPARSE_META_OFFSET),
-                                      ToCheckedSignedOffset(static_cast<int64_t>(tableStart) - metaOffset));
+            YAFF_REQUIRE(sizeof(msgStart) < sizeof(int64_t) || msgStart <= std::numeric_limits<int64_t>::max());
+            WriteValue<TSignedOffset>(Buf.RightDataAt(msgStart - SPARSE_META_OFFSET),
+                                      ToCheckedSignedOffset(static_cast<int64_t>(msgStart) - metaOffset));
 
-            return ToCheckedOffset(tableStart);
+            return ToCheckedOffset(msgStart);
         }
 
         void TrackField(TFieldId id, size_t offset, bool isScalar = true) {
@@ -658,14 +658,15 @@ private:
         bool Implicit;
     };
 
-    using TTableBuilder = std::variant<TDummyTableBuilder, TFixedTableBuilder, TFlatTableBuilder, TSparseTableBuilder>;
+    using TMessageBuilder =
+        std::variant<TDummyMessageBuilder, TFixedMessageBuilder, TFlatMessageBuilder, TSparseMessageBuilder>;
 
     explicit TBuilder(EBuilderType type, size_t initialSize = 0, bool = false)
         : Type_(type),
           Buf_(initialSize),
-          TableBuilder_(),
+          MessageBuilder_(),
           Depth_(0),
-          ForcedAlternative_(ETableLayout::TABLE_LAYOUT_FLAT),
+          ForcedAlternative_(EMessageLayout::MESSAGE_LAYOUT_FLAT),
           ObjectSet_(8, TObjectOffsetHash(Buf_), TObjectOffsetEqual(Buf_)),
           Finished_(false) {
     }
@@ -703,24 +704,24 @@ private:
     void AddFieldDispatch(TFieldId fieldId, Ps&&... params) {
         CheckNotFinished();
         CheckNested();
-        std::visit([&](auto& b) { b.template AddField<T>(fieldId, std::forward<Ps>(params)...); }, TableBuilder_);
+        std::visit([&](auto& b) { b.template AddField<T>(fieldId, std::forward<Ps>(params)...); }, MessageBuilder_);
     }
 
     template <typename T, typename... Ps>
-    void StartTableDispatch(Ps&&... params) {
+    void StartMessageDispatch(Ps&&... params) {
         CheckNotFinished();
         IncrementDepth();
-        TableBuilder_.emplace<T>(std::forward<Ps>(params)...);
+        MessageBuilder_.emplace<T>(std::forward<Ps>(params)...);
     }
 
     template <typename T>
-    TOffset FinishTableDispatch() {
+    TOffset FinishMessageDispatch() {
         CheckNotFinished();
         CheckNested();
         DecrementDepth();
-        YAFF_REQUIRE(std::holds_alternative<T>(TableBuilder_));
-        const auto offset = std::visit([](auto&& b) { return std::move(b).Finish(); }, std::move(TableBuilder_));
-        TableBuilder_.emplace<TDummyTableBuilder>();
+        YAFF_REQUIRE(std::holds_alternative<T>(MessageBuilder_));
+        const auto offset = std::visit([](auto&& b) { return std::move(b).Finish(); }, std::move(MessageBuilder_));
+        MessageBuilder_.emplace<TDummyMessageBuilder>();
         return offset;
     }
 
@@ -758,10 +759,10 @@ private:
     EBuilderType Type_;
 
     TDualBuffer Buf_;
-    TTableBuilder TableBuilder_;
+    TMessageBuilder MessageBuilder_;
     size_t Depth_;
 
-    ETableLayout ForcedAlternative_;
+    EMessageLayout ForcedAlternative_;
     TObjectOffsetSet ObjectSet_;
 
     bool Finished_;

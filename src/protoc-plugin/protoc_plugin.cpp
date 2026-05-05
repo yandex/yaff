@@ -72,7 +72,7 @@ static std::unique_ptr<NYaFF::NCompile::IProtobufReflectionTraits> GetReflection
 std::unique_ptr<NYaFF::NCompile::IFrontEnd> GetFrontEnd(const google::protobuf::FileDescriptor* descriptor,
                                                         const TProtobufPluginOptions& options) {
     NYaFF::NCompile::TProtobufReflectionFrontEndOptions protoReflectOpts;
-    protoReflectOpts.SkipEmptyTables = false;
+    protoReflectOpts.SkipEmptyMessages = false;
     protoReflectOpts.TargetFiles.emplace(descriptor->name());
     if (!options.RootNamespace.empty()) {
         protoReflectOpts.RootNamespace = options.RootNamespace;

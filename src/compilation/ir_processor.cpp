@@ -13,23 +13,23 @@ private:
 
     void ProcessSchema(NIR::TIR& ir, NIR::TSchemaDef& schemaDef);
     void ProcessEnum(NIR::TIR& ir, NIR::TEnumDef& enumDef);
-    void ProcessTable(NIR::TIR& ir, NIR::TTableDef& tableDef);
+    void ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef);
 
-    std::unordered_set<const NIR::TTableDef*> ProcessedTables_;
+    std::unordered_set<const NIR::TMessageDef*> ProcessedMessages_;
 };
 
 void TIRProcessor::Process(NIR::TIR& ir) && {
-    for (auto& [_, schemaDef] : ir.Schemas.Table) {
+    for (auto& [_, schemaDef] : ir.Schemas.Symbols) {
         ProcessSchema(ir, schemaDef);
     }
 
-    for (auto& [_, enumDef] : ir.Enums.Table) {
+    for (auto& [_, enumDef] : ir.Enums.Symbols) {
         ProcessEnum(ir, enumDef);
     }
 
-    for (auto& [_, tableDef] : ir.Tables.Table) {
-        if (!ProcessedTables_.contains(&tableDef)) {
-            ProcessTable(ir, tableDef);
+    for (auto& [_, messageDef] : ir.Messages.Symbols) {
+        if (!ProcessedMessages_.contains(&messageDef)) {
+            ProcessMessage(ir, messageDef);
         }
     }
 }
@@ -37,9 +37,9 @@ void TIRProcessor::Process(NIR::TIR& ir) && {
 void TIRProcessor::ProcessSchema(NIR::TIR&, NIR::TSchemaDef& schemaDef) {
     const bool someEnums = std::any_of(schemaDef.Enums.begin(), schemaDef.Enums.end(),
                                        [](const NIR::TEnumDef* enm) { return enm->Defined; });
-    const bool someTables = std::any_of(schemaDef.Tables.begin(), schemaDef.Tables.end(),
-                                        [](const NIR::TTableDef* tbl) { return tbl->Defined; });
-    schemaDef.Defined = (someEnums || someTables);
+    const bool someMessages = std::any_of(schemaDef.Messages.begin(), schemaDef.Messages.end(),
+                                          [](const NIR::TMessageDef* tbl) { return tbl->Defined; });
+    schemaDef.Defined = (someEnums || someMessages);
 }
 
 void TIRProcessor::ProcessEnum(NIR::TIR&, NIR::TEnumDef& enumDef) {
@@ -54,32 +54,32 @@ void TIRProcessor::ProcessEnum(NIR::TIR&, NIR::TEnumDef& enumDef) {
               [](const auto& l, const auto& r) { return l.Value < r.Value; });
 }
 
-void TIRProcessor::ProcessTable(NIR::TIR& ir, NIR::TTableDef& tableDef) {
-    if (!tableDef.Defined) {
+void TIRProcessor::ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef) {
+    if (!messageDef.Defined) {
         return;
     }
-    const auto [_, emplaced] = ProcessedTables_.emplace(&tableDef);
-    Ensure(emplaced, "duplicated process call for table '" + tableDef.Name + "'");
+    const auto [_, emplaced] = ProcessedMessages_.emplace(&messageDef);
+    Ensure(emplaced, "duplicated process call for message '" + messageDef.Name + "'");
 
-    Ensure(tableDef.Schema, "table can not be not connected to schema '" + tableDef.Name + "'");
-    Ensure(tableDef.Defined == tableDef.Schema->Defined, "incomplete definition of table '" + tableDef.Name +
-                                                             "' in defined schema '" + tableDef.Schema->Namespace +
-                                                             "'");
-    if (!tableDef.Defined) {
+    Ensure(messageDef.Schema, "message can not be not connected to schema '" + messageDef.Name + "'");
+    Ensure(messageDef.Defined == messageDef.Schema->Defined,
+           "incomplete definition of message '" + messageDef.Name + "'");
+    if (!messageDef.Defined) {
         return;
     }
 
-    std::sort(tableDef.Fields.begin(), tableDef.Fields.end(), [](const auto& l, const auto& r) { return l.Id < r.Id; });
+    std::sort(messageDef.Fields.begin(), messageDef.Fields.end(),
+              [](const auto& l, const auto& r) { return l.Id < r.Id; });
 
-    const bool gapped = NIR::IsGapTable(tableDef);
-    Ensure(!gapped || (tableDef.Layout != ETableLayout::TABLE_LAYOUT_FLAT &&
-                       tableDef.Layout != ETableLayout::TABLE_LAYOUT_FIXED),
-           "table '" + tableDef.Name + "' can not contain any gaps because it has field size based layout");
+    const bool gapped = NIR::IsGapMessage(messageDef);
+    Ensure(!gapped || (messageDef.Layout != EMessageLayout::MESSAGE_LAYOUT_FLAT &&
+                       messageDef.Layout != EMessageLayout::MESSAGE_LAYOUT_FIXED),
+           "message '" + messageDef.Name + "' can not contain any gaps because it has field size based layout");
 
     bool comparable = false;
     uint64_t activeIndex = 1;
     TFieldOffset flatOffset = 0;
-    for (auto& fieldDef : tableDef.Fields) {
+    for (auto& fieldDef : messageDef.Fields) {
         Ensure(!fieldDef.Name.empty() || fieldDef.Deprecated,
                "field with id '" + std::to_string(fieldDef.Id) + "' has empty name");
 
@@ -103,10 +103,10 @@ void TIRProcessor::ProcessTable(NIR::TIR& ir, NIR::TTableDef& tableDef) {
                        ") is vector, but has explicit presence");
         }
 
-        if (fieldDef.Type->Type == EType::TYPE_TABLE) {
+        if (fieldDef.Type->Type == EType::TYPE_MESSAGE) {
             Ensure(fieldDef.Deprecated || fieldDef.Presence == EPresence::PRESENCE_EXPLICIT,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
-                       ") is table, but has implicit presence");
+                       ") is message, but has implicit presence");
         }
 
         Ensure(fieldDef.ActiveIndex == 0,
@@ -123,13 +123,13 @@ void TIRProcessor::ProcessTable(NIR::TIR& ir, NIR::TTableDef& tableDef) {
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is not scalar or string and can not be key");
 
-            Ensure(!comparable, "table '" + tableDef.Name + "' contains multiple key fields");
+            Ensure(!comparable, "message '" + messageDef.Name + "' contains multiple key fields");
             comparable = true;
         }
 
         if (!fieldDef.SharedOffsetVia.empty()) {
-            Ensure(tableDef.Layout != ETableLayout::TABLE_LAYOUT_FIXED,
-                   "table '" + tableDef.Name + "' is fixed and can not have any oneof fields");
+            Ensure(messageDef.Layout != EMessageLayout::MESSAGE_LAYOUT_FIXED,
+                   "message '" + messageDef.Name + "' is fixed and can not have any oneof fields");
             Ensure(fieldDef.Type->Type != EType::TYPE_VECTOR, "field '" + fieldDef.Name +
                                                                   "' (id: " + std::to_string(fieldDef.Id) +
                                                                   ") is vector and can not be oneof field");
@@ -137,8 +137,8 @@ void TIRProcessor::ProcessTable(NIR::TIR& ir, NIR::TTableDef& tableDef) {
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is oneof field, but has implicit presence");
 
-            auto [it, _] = tableDef.SharedOffsets.try_emplace(
-                fieldDef.SharedOffsetVia, NIR::TTableDef::TSharedOffset{.Name = fieldDef.SharedOffsetVia});
+            auto [it, _] = messageDef.SharedOffsets.try_emplace(
+                fieldDef.SharedOffsetVia, NIR::TMessageDef::TSharedOffset{.Name = fieldDef.SharedOffsetVia});
             it->second.Fields.emplace_back(&fieldDef);
 
             fieldDef.SharedOffsetId = it->second.Fields.size();
@@ -148,25 +148,25 @@ void TIRProcessor::ProcessTable(NIR::TIR& ir, NIR::TTableDef& tableDef) {
         flatOffset += fieldDef.Type->InlineSize();
     }
 
-    for (auto& fieldDef : tableDef.Fields) {
-        const auto* fieldTable = ExtractTableDef(*fieldDef.Type);
-        if (!fieldTable) {
+    for (auto& fieldDef : messageDef.Fields) {
+        const auto* fieldMessage = ExtractMessageDef(*fieldDef.Type);
+        if (!fieldMessage) {
             continue;
         }
 
-        auto* table = ir.Tables.Get(*fieldTable);
-        if (!ProcessedTables_.contains(fieldTable)) {
-            ProcessTable(ir, *table);
+        auto* message = ir.Messages.Get(*fieldMessage);
+        if (!ProcessedMessages_.contains(fieldMessage)) {
+            ProcessMessage(ir, *message);
         }
 
         if (NIR::IsAssociative(*fieldDef.Type)) {
-            table->AssociativePair = true;
-            Ensure(table->Layout == ETableLayout::TABLE_LAYOUT_FIXED,
-                   "table '" + table->Name + "' marked as associative pair, but is not fixed");
-            Ensure(table->Fields.size() == 2,
-                   "table '" + table->Name + "' marked as associative pair, but contains not 2 fields");
+            message->AssociativePair = true;
+            Ensure(message->Layout == EMessageLayout::MESSAGE_LAYOUT_FIXED,
+                   "message '" + message->Name + "' marked as associative pair, but is not fixed");
+            Ensure(message->Fields.size() == 2,
+                   "message '" + message->Name + "' marked as associative pair, but contains not 2 fields");
 
-            const auto& key = table->Fields[0];
+            const auto& key = message->Fields[0];
             Ensure(!key.Deprecated, "field (id: " + std::to_string(key.Id) + ") is deprecated and can not be map key");
             Ensure(NIR::IsScalar(key.Type->Type) || key.Type->Type == EType::TYPE_STRING,
                    "field '" + key.Name + "' (id: " + std::to_string(key.Id) +

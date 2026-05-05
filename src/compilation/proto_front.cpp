@@ -3,26 +3,29 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <yaff/proto/options.pb.h>
 
-#include "util.h"
-
 namespace NYaFF::NCompile {
+
+template <typename T>
+inline std::string AdaptString(T value) {
+    return std::string{std::move(value)};
+}
 
 static bool IsMap(const google::protobuf::Descriptor& message) {
     return message.options().map_entry();
 }
 
-static ETableLayout TranslateTableLayout(const yaff::proto::Message::Layout layout) {
+static EMessageLayout TranslateMessageLayout(const yaff::proto::Message::Layout layout) {
     switch (layout) {
         case yaff::proto::Message::LAYOUT_UNKNOWN:
-            return ETableLayout::TABLE_LAYOUT_UNKNOWN;
+            return EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
         case yaff::proto::Message::LAYOUT_FIXED:
-            return ETableLayout::TABLE_LAYOUT_FIXED;
+            return EMessageLayout::MESSAGE_LAYOUT_FIXED;
         case yaff::proto::Message::LAYOUT_FLAT:
-            return ETableLayout::TABLE_LAYOUT_FLAT;
+            return EMessageLayout::MESSAGE_LAYOUT_FLAT;
         case yaff::proto::Message::LAYOUT_SPARSE:
-            return ETableLayout::TABLE_LAYOUT_SPARSE;
+            return EMessageLayout::MESSAGE_LAYOUT_SPARSE;
         case yaff::proto::Message::LAYOUT_DYNAMIC:
-            return ETableLayout::TABLE_LAYOUT_DYNAMIC;
+            return EMessageLayout::MESSAGE_LAYOUT_DYNAMIC;
     }
 }
 
@@ -64,14 +67,14 @@ static const yaff::proto::Message* GetMessageMeta(const google::protobuf::Messag
     return (match ? match : fallback);
 }
 
-static ETableLayout GetTableLayout(const google::protobuf::Descriptor& message, const std::string& sliceId = "") {
+static EMessageLayout GetMessageLayout(const google::protobuf::Descriptor& message, const std::string& sliceId = "") {
     if (IsMap(message)) {
-        return ETableLayout::TABLE_LAYOUT_FIXED;
+        return EMessageLayout::MESSAGE_LAYOUT_FIXED;
     }
     if (const auto* messageMeta = GetMessageMeta(message.options(), sliceId)) {
-        return TranslateTableLayout(messageMeta->layout());
+        return TranslateMessageLayout(messageMeta->layout());
     }
-    return ETableLayout::TABLE_LAYOUT_DYNAMIC;
+    return EMessageLayout::MESSAGE_LAYOUT_DYNAMIC;
 }
 
 static std::vector<TProtobufDeprecatedField> GetDeprecatedFields(const google::protobuf::Descriptor& message,
@@ -110,7 +113,7 @@ static void FillAdditionalModifiers(const google::protobuf::FieldDescriptor& fie
         modifiers.emplace(NIR::ASSOCIATIVE_MODIFIER_NAME, "");
     }
     if (field.is_repeated() && field.message_type() &&
-        GetTableLayout(*field.message_type(), sliceId) == ETableLayout::TABLE_LAYOUT_FIXED) {
+        GetMessageLayout(*field.message_type(), sliceId) == EMessageLayout::MESSAGE_LAYOUT_FIXED) {
         elementModifiers.emplace(NIR::INLINE_MODIFIER_NAME, "");
     }
 }
@@ -167,7 +170,7 @@ std::optional<TProtobufMessage> TProtobufReflectionDefaultTraits::GetYaffMessage
             });
         }
     }
-    return TProtobufMessage{.Layout = GetTableLayout(message), .DeprecatedFields = std::move(deprecated)};
+    return TProtobufMessage{.Layout = GetMessageLayout(message), .DeprecatedFields = std::move(deprecated)};
 }
 
 TProtobufReflectionTaggedTraits::TProtobufReflectionTaggedTraits(const std::string& sliceId) : SliceId_(sliceId) {
@@ -199,7 +202,7 @@ std::optional<TProtobufMessage> TProtobufReflectionTaggedTraits::GetYaffMessage(
         const auto& messageMeta = options.GetExtension(yaff::proto::message, i);
         if (messageMeta.slice_name() == SliceId_) {
             return TProtobufMessage{
-                .Layout = GetTableLayout(message, SliceId_),
+                .Layout = GetMessageLayout(message, SliceId_),
                 .DeprecatedFields = GetDeprecatedFields(message, SliceId_),
             };
         }
@@ -214,7 +217,7 @@ public:
     }
 
     void AddDescriptor(const google::protobuf::Descriptor& message) {
-        TraverseTable(message);
+        TraverseMessage(message);
     }
 
     void AddDescriptor(const google::protobuf::FileDescriptor& file) {
@@ -246,17 +249,18 @@ private:
     static std::map<std::string, std::string> GetFieldModifiers(const google::protobuf::FieldDescriptor& field,
                                                                 const TProtobufField::TAdditionalModifiers& mods);
 
-    const NIR::TTableDef* TraverseTable(const google::protobuf::Descriptor& message);
+    const NIR::TMessageDef* TraverseMessage(const google::protobuf::Descriptor& message);
     void TraverseFile(const google::protobuf::FileDescriptor& message);
 
     NIR::TSchemaDef* RegisterFile(const google::protobuf::FileDescriptor& file);
     NIR::TEnumDef* RegisterEnum(const google::protobuf::EnumDescriptor& enm);
     NIR::TType* RegisterFieldType(const google::protobuf::FieldDescriptor& field,
                                   const TProtobufField::TAdditionalModifiers& mods,
-                                  const NIR::TTableDef* tableDef = nullptr, const NIR::TEnumDef* enumDef = nullptr);
+                                  const NIR::TMessageDef* messageDef = nullptr, const NIR::TEnumDef* enumDef = nullptr);
     NIR::TType* RegisterFieldTypeImpl(const google::protobuf::FieldDescriptor& field,
                                       const TProtobufField::TAdditionalModifiers& mods,
-                                      const NIR::TTableDef* tableDef = nullptr, const NIR::TEnumDef* enumDef = nullptr);
+                                      const NIR::TMessageDef* messageDef = nullptr,
+                                      const NIR::TEnumDef* enumDef = nullptr);
     NIR::TType* RegisterDeprecatedFieldType(const TProtobufDeprecatedField& field);
     NIR::TType* RegisterReservedFieldType();
     void RegisterDependency(const NIR::TSchemaDef* from, NIR::TSchemaDef* to);
@@ -271,10 +275,10 @@ private:
     NIR::TIR Ir_;
 };
 
-const NIR::TTableDef* TProtobufBuilder::TraverseTable(const google::protobuf::Descriptor& message) {
+const NIR::TMessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf::Descriptor& message) {
     for (int i = 0; i < message.nested_type_count(); ++i) {
         if (const auto& nested = *message.nested_type(i); !IsMap(nested)) {
-            TraverseTable(nested);
+            TraverseMessage(nested);
         }
     }
     for (int i = 0; i < message.enum_type_count(); ++i) {
@@ -282,7 +286,7 @@ const NIR::TTableDef* TProtobufBuilder::TraverseTable(const google::protobuf::De
     }
 
     const auto fields = CollectFields(message);
-    if (Opts_.SkipEmptyTables && fields.empty()) {
+    if (Opts_.SkipEmptyMessages && fields.empty()) {
         return nullptr;
     }
 
@@ -294,14 +298,14 @@ const NIR::TTableDef* TProtobufBuilder::TraverseTable(const google::protobuf::De
     const auto* file = message.file();
     auto* schemaDef = RegisterFile(*file);
 
-    const std::string tableName = GetTypeDefName(AdaptString(file->package()), AdaptString(message.full_name()));
-    auto [tableDef, emplaced] = Ir_.Tables.TryEmplace(NIR::TTableDef(std::move(tableName), schemaDef));
+    const std::string messageName = GetTypeDefName(AdaptString(file->package()), AdaptString(message.full_name()));
+    auto [messageDef, emplaced] = Ir_.Messages.TryEmplace(NIR::TMessageDef(std::move(messageName), schemaDef));
     if (!emplaced) {
-        return tableDef;
+        return messageDef;
     }
-    schemaDef->Tables.emplace_back(tableDef);
+    schemaDef->Messages.emplace_back(messageDef);
     if (!IsTargetFile(*file)) {
-        return tableDef;
+        return messageDef;
     }
 
     uint64_t maxId = 0;
@@ -312,14 +316,14 @@ const NIR::TTableDef* TProtobufBuilder::TraverseTable(const google::protobuf::De
 
         // Register child types;
         const NIR::TEnumDef* childEnumDef = nullptr;
-        const NIR::TTableDef* childTableDef = nullptr;
+        const NIR::TMessageDef* childMessageDef = nullptr;
         const NIR::TSchemaDef* childSchemaDef = nullptr;
         if (field->type() == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
-            childTableDef = TraverseTable(*field->message_type());
-            if (!childTableDef) {  // Type of field is ignored by frontend, so skip this field;
+            childMessageDef = TraverseMessage(*field->message_type());
+            if (!childMessageDef) {  // Type of field is ignored by frontend, so skip this field;
                 continue;
             }
-            childSchemaDef = childTableDef->Schema;
+            childSchemaDef = childMessageDef->Schema;
         } else if (field->type() == google::protobuf::FieldDescriptor::TYPE_ENUM) {
             childEnumDef = RegisterEnum(*field->enum_type());
             childSchemaDef = childEnumDef->Schema;
@@ -329,8 +333,8 @@ const NIR::TTableDef* TProtobufBuilder::TraverseTable(const google::protobuf::De
             RegisterDependency(childSchemaDef, schemaDef);
         }
 
-        const auto* fieldType = RegisterFieldType(*field, target.AdditionalModifiers, childTableDef, childEnumDef);
-        tableDef->Fields.emplace_back(NIR::TTableDef::TFieldDef{
+        const auto* fieldType = RegisterFieldType(*field, target.AdditionalModifiers, childMessageDef, childEnumDef);
+        messageDef->Fields.emplace_back(NIR::TMessageDef::TFieldDef{
             .Id = target.Id,
             .Name = AdaptString(field->name()),
             .Type = fieldType,
@@ -351,7 +355,7 @@ const NIR::TTableDef* TProtobufBuilder::TraverseTable(const google::protobuf::De
         if (field.Type == PROTO_TYPE_RESERVED && knownIds.contains(field.Id)) {
             continue;
         }
-        tableDef->Fields.emplace_back(NIR::TTableDef::TFieldDef{
+        messageDef->Fields.emplace_back(NIR::TMessageDef::TFieldDef{
             .Id = field.Id,
             .Type = RegisterDeprecatedFieldType(field),
             .Deprecated = true,
@@ -364,21 +368,21 @@ const NIR::TTableDef* TProtobufBuilder::TraverseTable(const google::protobuf::De
         if (knownIds.contains(id)) {
             continue;
         }
-        tableDef->Fields.emplace_back(NIR::TTableDef::TFieldDef{
+        messageDef->Fields.emplace_back(NIR::TMessageDef::TFieldDef{
             .Id = static_cast<uint64_t>(id),
             .Type = RegisterReservedFieldType(),
             .Deprecated = true,
         });
     }
 
-    tableDef->Layout = mbMessage->Layout;
-    tableDef->Defined = true;
-    return tableDef;
+    messageDef->Layout = mbMessage->Layout;
+    messageDef->Defined = true;
+    return messageDef;
 }
 
 void TProtobufBuilder::TraverseFile(const google::protobuf::FileDescriptor& file) {
     for (int i = 0; i < file.message_type_count(); ++i) {
-        TraverseTable(*file.message_type(i));
+        TraverseMessage(*file.message_type(i));
     }
     for (int i = 0; i < file.enum_type_count(); ++i) {
         RegisterEnum(*file.enum_type(i));
@@ -417,13 +421,14 @@ NIR::TSchemaDef* TProtobufBuilder::RegisterFile(const google::protobuf::FileDesc
         return schemaDef;
     }
 
-    const std::string namespaceName = GetNamespaceName(Opts_.RootNamespace, AdaptString(file.package()));
+    const std::string package = AdaptString(file.package());
+    const std::string namespaceName = GetNamespaceName(Opts_.RootNamespace, package);
     schemaDef->Namespace = std::move(namespaceName);
 
     const std::string protoFileName = fileName + Opts_.GeneratedProtobufExt;
     schemaDef->Attributes.emplace(NIR::PROTO_FILE_ATTRIBUTE_NAME, protoFileName);
 
-    const std::string protoNamespaceName = GetNamespaceName("", AdaptString(file.package()));
+    const std::string protoNamespaceName = GetNamespaceName("", package);
     schemaDef->Attributes.emplace(NIR::PROTO_NAMESPACE_ATTRIBUTE_NAME, protoNamespaceName);
 
     return schemaDef;
@@ -431,24 +436,24 @@ NIR::TSchemaDef* TProtobufBuilder::RegisterFile(const google::protobuf::FileDesc
 
 NIR::TType* TProtobufBuilder::RegisterFieldType(const google::protobuf::FieldDescriptor& field,
                                                 const TProtobufField::TAdditionalModifiers& mods,
-                                                const NIR::TTableDef* tableDef, const NIR::TEnumDef* enumDef) {
+                                                const NIR::TMessageDef* messageDef, const NIR::TEnumDef* enumDef) {
     if (field.is_repeated()) {
         TProtobufField::TAdditionalModifiers elemMods{.Modifiers = mods.ElementModifiers};
         return Ir_.Types.GetOrEmplace(
             NIR::TType{.Type = EType::TYPE_VECTOR,
-                       .ElementType = RegisterFieldTypeImpl(field, elemMods, tableDef, enumDef),
+                       .ElementType = RegisterFieldTypeImpl(field, elemMods, messageDef, enumDef),
                        .Modifiers = GetFieldModifiers(field, mods)});
     }
-    return RegisterFieldTypeImpl(field, mods, tableDef, enumDef);
+    return RegisterFieldTypeImpl(field, mods, messageDef, enumDef);
 }
 
 NIR::TType* TProtobufBuilder::RegisterFieldTypeImpl(const google::protobuf::FieldDescriptor& field,
                                                     const TProtobufField::TAdditionalModifiers& mods,
-                                                    const NIR::TTableDef* tableDef, const NIR::TEnumDef* enumDef) {
+                                                    const NIR::TMessageDef* messageDef, const NIR::TEnumDef* enumDef) {
     const auto fieldType = field.type();
     if (fieldType == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
-        return Ir_.Types.GetOrEmplace(
-            NIR::TType{.Type = EType::TYPE_TABLE, .TableDef = tableDef, .Modifiers = GetFieldModifiers(field, mods)});
+        return Ir_.Types.GetOrEmplace(NIR::TType{
+            .Type = EType::TYPE_MESSAGE, .MessageDef = messageDef, .Modifiers = GetFieldModifiers(field, mods)});
     }
 
     if (fieldType == google::protobuf::FieldDescriptor::TYPE_ENUM) {
@@ -466,7 +471,7 @@ NIR::TType* TProtobufBuilder::RegisterDeprecatedFieldType(const TProtobufDepreca
     }
 
     if (field.Type == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
-        return Ir_.Types.GetOrEmplace(NIR::TType{.Type = EType::TYPE_TABLE});
+        return Ir_.Types.GetOrEmplace(NIR::TType{.Type = EType::TYPE_MESSAGE});
     }
 
     if (field.Type == google::protobuf::FieldDescriptor::TYPE_ENUM) {
@@ -541,12 +546,12 @@ std::string TProtobufBuilder::GetNamespaceName(const std::string& prefix, const 
 }
 
 std::string TProtobufBuilder::GetTypeDefName(const std::string& pkg, const std::string& fullName) {
-    std::string tableName = fullName;
+    std::string messageName = fullName;
     if (!pkg.empty() && fullName.find(pkg) == 0) {
-        tableName = fullName.substr(pkg.size() + 1);  // + 1 for dot.
+        messageName = fullName.substr(pkg.size() + 1);  // + 1 for dot.
     }
-    std::replace(tableName.begin(), tableName.end(), '.', '_');
-    return tableName;
+    std::replace(messageName.begin(), messageName.end(), '.', '_');
+    return messageName;
 }
 
 EType TProtobufBuilder::GetBaseType(const google::protobuf::FieldDescriptor::Type type) {
@@ -606,7 +611,7 @@ std::string TProtobufBuilder::GetDefaultFieldModifier(const google::protobuf::Fi
         case google::protobuf::FieldDescriptor::TYPE_UINT64:
         case google::protobuf::FieldDescriptor::TYPE_FIXED64:
             return std::to_string(field.default_value_uint64());
-        // TODO: (gavrilovsky): std::to_string rounds small double values, so these defaults may break.
+        // TODO: std::to_string rounds small double values, so these defaults may break.
         // This needs to be fixed by moving to the correct default descriptors.
         case google::protobuf::FieldDescriptor::TYPE_FLOAT:
             return std::to_string(field.default_value_float());

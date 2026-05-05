@@ -13,7 +13,7 @@ struct TProtobufReflectionFrontEndOptions {
     std::string RootNamespace = "NProtoYaFF";
     std::string GeneratedProtobufExt = ".pb.h";
 
-    bool SkipEmptyTables = true;
+    bool SkipEmptyMessages = true;
     bool FillGaps = false;
 };
 
@@ -34,7 +34,7 @@ struct TProtobufField {
 };
 
 struct TProtobufMessage {
-    NYaFF::ETableLayout Layout = NYaFF::ETableLayout::TABLE_LAYOUT_UNKNOWN;
+    NYaFF::EMessageLayout Layout = NYaFF::EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
     std::vector<TProtobufDeprecatedField> DeprecatedFields;
 };
 

@@ -7,8 +7,8 @@ file(MAKE_DIRECTORY ${YAFF_TEST_GENERATED_DIR})
 
 add_library(yaff_test_protoyaff STATIC
     protoyaff/proto_api.proto
-    protoyaff/tables2.proto
-    protoyaff/tables3.proto
+    protoyaff/proto2.proto
+    protoyaff/proto3.proto
 )
 
 protobuf_generate(
@@ -42,7 +42,7 @@ function(yaff_add_unit_test _src)
 endfunction()
 
 yaff_add_unit_test(common.cpp)
-yaff_add_unit_test(fixed_table.cpp)
-yaff_add_unit_test(flat_table.cpp)
 yaff_add_unit_test(proto_api.cpp)
-yaff_add_unit_test(sparse_table.cpp)
+yaff_add_unit_test(fixed_message.cpp)
+yaff_add_unit_test(flat_message.cpp)
+yaff_add_unit_test(sparse_message.cpp)

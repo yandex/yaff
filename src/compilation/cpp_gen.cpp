@@ -12,21 +12,21 @@ using namespace std::placeholders;
 
 namespace NYaFF::NCompile {
 
-static bool IsSizeableField(const NIR::TTableDef::TFieldDef& field) {
+static bool IsSizeableField(const NIR::TMessageDef::TFieldDef& field) {
     return field.Type->Type == EType::TYPE_VECTOR && !NIR::IsAssociative(*field.Type) &&
-           !NIR::IsSequentialTable(*field.Type);
+           !NIR::IsSequentialMessage(*field.Type);
 }
 
 template <typename D>
 static bool HasRealFields(const D& def) {
     return std::any_of(def.Fields.begin(), def.Fields.end(),
-                       [](const auto& field) { return !std::invoke(&NIR::TTableDef::TFieldDef::Deprecated, field); });
+                       [](const auto& field) { return !std::invoke(&NIR::TMessageDef::TFieldDef::Deprecated, field); });
 }
 
 template <typename D>
 static bool HasExplicitFields(const D& def) {
     return std::any_of(def.Fields.begin(), def.Fields.end(), [](const auto& field) {
-        return std::invoke(&NIR::TTableDef::TFieldDef::Presence, field) == EPresence::PRESENCE_EXPLICIT;
+        return std::invoke(&NIR::TMessageDef::TFieldDef::Presence, field) == EPresence::PRESENCE_EXPLICIT;
     });
 }
 
@@ -49,7 +49,7 @@ static void ForReversedFields(const D& def, F&& cb) {
 template <typename D, typename F>
 static void ForRealFields(const D& def, F&& cb) {
     ForFields(def, [cb = std::move(cb)](const auto& fieldDef) {
-        if (!std::invoke(&NIR::TTableDef::TFieldDef::Deprecated, fieldDef)) {
+        if (!std::invoke(&NIR::TMessageDef::TFieldDef::Deprecated, fieldDef)) {
             cb(fieldDef);
         }
     });
@@ -58,7 +58,7 @@ static void ForRealFields(const D& def, F&& cb) {
 template <typename D, typename F>
 static void ForReversedRealFields(const D& def, F&& cb) {
     ForReversedFields(def, [cb = std::move(cb)](const auto& fieldDef) {
-        if (!std::invoke(&NIR::TTableDef::TFieldDef::Deprecated, fieldDef)) {
+        if (!std::invoke(&NIR::TMessageDef::TFieldDef::Deprecated, fieldDef)) {
             cb(fieldDef);
         }
     });
@@ -67,7 +67,7 @@ static void ForReversedRealFields(const D& def, F&& cb) {
 template <typename D, typename F>
 static void ForRealScalarFields(const D& def, F&& cb) {
     ForRealFields(def, [cb = std::move(cb)](const auto& fieldDef) {
-        const auto* type = std::invoke(&NIR::TTableDef::TFieldDef::Type, fieldDef);
+        const auto* type = std::invoke(&NIR::TMessageDef::TFieldDef::Type, fieldDef);
         if (NIR::IsScalar(type->Type)) {
             cb(fieldDef);
         }
@@ -77,7 +77,7 @@ static void ForRealScalarFields(const D& def, F&& cb) {
 template <typename D, typename F>
 static void ForRealStructureFields(const D& def, F&& cb) {
     ForRealFields(def, [cb = std::move(cb)](const auto& fieldDef) {
-        const auto* type = std::invoke(&NIR::TTableDef::TFieldDef::Type, fieldDef);
+        const auto* type = std::invoke(&NIR::TMessageDef::TFieldDef::Type, fieldDef);
         if (!NIR::IsScalar(type->Type)) {
             cb(fieldDef);
         }
@@ -87,7 +87,7 @@ static void ForRealStructureFields(const D& def, F&& cb) {
 template <typename D, typename F>
 static void ForRealStringFields(const D& def, F&& cb) {
     ForRealFields(def, [cb = std::move(cb)](const auto& fieldDef) {
-        const auto* type = std::invoke(&NIR::TTableDef::TFieldDef::Type, fieldDef);
+        const auto* type = std::invoke(&NIR::TMessageDef::TFieldDef::Type, fieldDef);
         if (type->Type == EType::TYPE_STRING) {
             cb(fieldDef);
         }
@@ -126,7 +126,7 @@ public:
     void Generate(const NIR::TIR& ir);
 
 private:
-    enum class ETableType : int32_t {
+    enum class EMessageType : int32_t {
         FIXED = 0,
         FLAT = 1,
         SPARSE = 2,
@@ -161,12 +161,12 @@ private:
         }
     };
 
-    using TTableLayoutGenerator = std::function<void(ETableType, const NIR::TTableDef&)>;
+    using TMessageLayoutGenerator = std::function<void(EMessageType, const NIR::TMessageDef&)>;
 
     // External experimental generators;
-    static std::string GenerateTableColumnName(const NIR::TTableDef& tableDef);
+    static std::string GenerateMessageColumnName(const NIR::TMessageDef& msgDef);
 
-    static std::string GenerateTableType(const ETableType type);
+    static std::string GenerateMessageType(const EMessageType type);
     static std::string GenerateBasicType(const EType type);
     static std::string GenerateTypeProtobuf(const NIR::TType& type);
     static std::string GenerateTypeInternal(const NIR::TType& type);
@@ -175,8 +175,8 @@ private:
 
     static std::string GenerateBasicDefault(const EType type);
     static std::string GenerateStringDefault(const NIR::TType& type);
-    static std::string GenerateDefaultValueInternal(const NIR::TTableDef::TFieldDef& fieldDef);
-    static std::string GenerateDefaultValueExternal(const NIR::TTableDef::TFieldDef& fieldDef);
+    static std::string GenerateDefaultValueInternal(const NIR::TMessageDef::TFieldDef& fieldDef);
+    static std::string GenerateDefaultValueExternal(const NIR::TMessageDef::TFieldDef& fieldDef);
 
     static std::string GenerateTypeCastInternal(const NIR::TType& type, const std::string& call);
     static std::string GenerateTypeCastExternal(const NIR::TType& type, const std::string& call);
@@ -184,56 +184,56 @@ private:
     static std::string GenerateBasicTypeDescriptor(const EType type);
     static std::string GenerateCompositeTypeDescriptor(const NIR::TType& type, const TTypeIndex& index);
     static std::string GeneratePresenceDescriptor(const EPresence presence);
-    static std::string GenerateTableLayoutDescriptor(const ETableLayout layout);
+    static std::string GenerateMessageLayoutDescriptor(const EMessageLayout layout);
     static std::string GenerateDefaultDescriptor(const NIR::TType& type);
     static std::string GenerateDescriptorFuncName(const std::string& name);
     static std::string GenerateEnumDescriptorFuncDeclaration(const std::string& name);
-    static std::string GenerateTableDescriptorFuncDeclaration(const std::string& name);
+    static std::string GenerateMessageDescriptorFuncDeclaration(const std::string& name);
 
     static std::string GenerateDefaultFuncName(const std::string& name);
-    static std::string GenerateTableDefaultFuncDeclaration(const std::string& ret, const std::string& name);
+    static std::string GenerateMessageDefaultFuncDeclaration(const std::string& ret, const std::string& name);
 
-    static std::string GenerateProtobufValue(const NIR::TTableDef::TFieldDef& fieldDef);
-    static std::string GenerateProtobufPairValue(const NIR::TTableDef::TFieldDef& fieldDef);
-    static std::string GenerateProtobufPairFill(const NIR::TTableDef::TFieldDef& fieldDef);
+    static std::string GenerateProtobufValue(const NIR::TMessageDef::TFieldDef& fieldDef);
+    static std::string GenerateProtobufPairValue(const NIR::TMessageDef::TFieldDef& fieldDef);
+    static std::string GenerateProtobufPairFill(const NIR::TMessageDef::TFieldDef& fieldDef);
     static std::string GenerateProtobufStructFill(const std::string& mutableCall, const std::string& clearCall,
-                                                  const NIR::TTableDef::TFieldDef& fieldDef);
+                                                  const NIR::TMessageDef::TFieldDef& fieldDef);
     static std::string GenerateProtobufScalarFill(const std::string& mutableCall, const std::string& clearCall,
-                                                  const NIR::TTableDef::TFieldDef& fieldDef);
+                                                  const NIR::TMessageDef::TFieldDef& fieldDef);
 
-    static std::string GenerateExternalPairName(const NIR::TTableDef::TFieldDef& fieldDef);
+    static std::string GenerateExternalPairName(const NIR::TMessageDef::TFieldDef& fieldDef);
     static std::string GenerateExternalCreate(const std::string& getCall, const std::string& getSuffix,
                                               const NIR::TType& type);
-    static std::string GenerateDeferredCreateFuncName(const NIR::TTableDef& tableDef);
-    static std::string GenerateCreateFuncName(const NIR::TTableDef& tableDef);
-    static std::string GenerateTransformFuncName(const NIR::TTableDef& tableDef);
+    static std::string GenerateDeferredCreateFuncName(const NIR::TMessageDef& msgDef);
+    static std::string GenerateCreateFuncName(const NIR::TMessageDef& msgDef);
+    static std::string GenerateTransformFuncName(const NIR::TMessageDef& msgDef);
 
-    static std::string GenerateDeferredCreateFromProtobufFuncDeclaration(const NIR::TTableDef& tableDef);
-    static std::string GenerateCreateFromProtobufFuncDeclaration(const NIR::TTableDef& tableDef);
-    static std::string GenerateTransformToProtobufFuncDeclaration(const NIR::TTableDef& tableDef);
+    static std::string GenerateDeferredCreateFromProtobufFuncDeclaration(const NIR::TMessageDef& msgDef);
+    static std::string GenerateCreateFromProtobufFuncDeclaration(const NIR::TMessageDef& msgDef);
+    static std::string GenerateTransformToProtobufFuncDeclaration(const NIR::TMessageDef& msgDef);
 
-    static std::string GenerateTableCreateFuncArgument(const NIR::TTableDef::TFieldDef& fieldDef);
-    static std::string GenerateTableBasicCreateFuncCall(const NIR::TTableDef& tableDef,
-                                                        const std::string& templateArg = "");
-    static std::string GenerateTableBasicCreateFuncDeferredCall(const NIR::TTableDef& tableDef,
-                                                                const std::string& templateArg = "");
-    static std::string GenerateTableBasicCreateFuncDefault(const NIR::TTableDef& tableDef);
+    static std::string GenerateMessageCreateFuncArgument(const NIR::TMessageDef::TFieldDef& fieldDef);
+    static std::string GenerateMessageBasicCreateFuncCall(const NIR::TMessageDef& msgDef,
+                                                          const std::string& templateArg = "");
+    static std::string GenerateMessageBasicCreateFuncDeferredCall(const NIR::TMessageDef& msgDef,
+                                                                  const std::string& templateArg = "");
+    static std::string GenerateMessageBasicCreateFuncDefault(const NIR::TMessageDef& msgDef);
 
     static std::string GenerateEscapedName(const std::string& input);
-    static std::string GenerateFieldName(const NIR::TTableDef::TFieldDef& fieldDef);
-    static std::string GenerateDefaultName(const NIR::TTableDef::TFieldDef& fieldDef);
-    static std::string GenerateIdName(const NIR::TTableDef::TFieldDef& fieldDef);
+    static std::string GenerateFieldName(const NIR::TMessageDef::TFieldDef& fieldDef);
+    static std::string GenerateDefaultName(const NIR::TMessageDef::TFieldDef& fieldDef);
+    static std::string GenerateIdName(const NIR::TMessageDef::TFieldDef& fieldDef);
     static std::string GenerateSharedOffsetCaseEnumName(const std::string& name);
     static std::string GenerateSharedOffsetDefaultCaseEnumName(const std::string& name);
     static std::string GenerateSharedOffsetFieldName(const std::string& name,
-                                                     const NIR::TTableDef::TFieldDef* fieldDef);
-    static std::string GenerateTableBuilderName(ETableType tableType, const NIR::TTableDef& tableDef);
-    static std::string GenerateTableStaticMetaName(const NIR::TTableDef& tableDef);
-    static std::string GenerateTableProtobufName(const NIR::TTableDef& tableDef);
-    static std::string GenerateTableProtobufPair(const NIR::TTableDef& tableDef);
-    static std::string GenerateTableProtobufMap(const NIR::TTableDef& tableDef);
-    static std::string GenerateTableProtobufType(const NIR::TTableDef& tableDef);
-    static std::string GenerateTableBaseClass(const NIR::TTableDef& tableDef);
+                                                     const NIR::TMessageDef::TFieldDef* fieldDef);
+    static std::string GenerateMessageBuilderName(EMessageType msgType, const NIR::TMessageDef& msgDef);
+    static std::string GenerateMessageStaticMetaName(const NIR::TMessageDef& msgDef);
+    static std::string GenerateMessageProtobufName(const NIR::TMessageDef& msgDef);
+    static std::string GenerateMessageProtobufPair(const NIR::TMessageDef& msgDef);
+    static std::string GenerateMessageProtobufMap(const NIR::TMessageDef& msgDef);
+    static std::string GenerateMessageProtobufType(const NIR::TMessageDef& msgDef);
+    static std::string GenerateMessageBaseClass(const NIR::TMessageDef& msgDef);
     static std::string GenerateEnumProtobufName(const NIR::TEnumDef& enumDef);
     static std::string GenerateWithNamespaceName(const std::string& ns, const std::string& name);
 
@@ -245,13 +245,13 @@ private:
     void GenerateEnumPre(const NIR::TEnumDef& enumDef);
     void GenerateEnumPost(const NIR::TEnumDef& enumDef);
 
-    void GenerateTable(const NIR::TTableDef& tableDef);
-    void GenerateTablePre(const NIR::TTableDef& tableDef);
-    void GenerateTablePost(const NIR::TTableDef& tableDef);
+    void GenerateMessage(const NIR::TMessageDef& msgDef);
+    void GenerateMessagePre(const NIR::TMessageDef& msgDef);
+    void GenerateMessagePost(const NIR::TMessageDef& msgDef);
 
-    void GenerateTableFieldDescriptors(const NIR::TTableDef& tableDef);
-    void GenerateTableDescriptor(const NIR::TTableDef& tableDef);
-    void GenerateTableAliasDescriptor(const NIR::TTableDef& tableDef);
+    void GenerateMessageFieldDescriptors(const NIR::TMessageDef& msgDef);
+    void GenerateMessageDescriptor(const NIR::TMessageDef& msgDef);
+    void GenerateMessageAliasDescriptor(const NIR::TMessageDef& msgDef);
     void GenerateTypeDescriptor(const NIR::TType& type);
 
     void GenerateEnumValueDescriptors(const NIR::TEnumDef& enumDef);
@@ -261,26 +261,26 @@ private:
     void GenerateEnumIsValidFunc(const NIR::TEnumDef& enumDef);
     void GenerateEnumNameFunc(const NIR::TEnumDef& enumDef);
 
-    void GenerateTableTransformToProtobuf(const NIR::TTableDef& tableDef);
-    void GenerateTableProtobufBuilder(const NIR::TTableDef& tableDef, const bool deferred = false);
-    void GenerateTableAliasCreateFunc(const NIR::TTableDef& tableDef);
-    void GenerateTableAliasDeferredCreateFunc(const NIR::TTableDef& tableDef);
-    void GenerateTableAliasTransformFunc(const NIR::TTableDef& tableDef);
-    void GenerateTableBasicCreateFunc(const NIR::TTableDef& tableDef);
-    void GenerateTableDynamicCreateFunc(const NIR::TTableDef& tableDef);
-    void GenerateTableBuilder(ETableType tableType, const NIR::TTableDef& tableDef);
-    void GenerateTableIdsEnum(const NIR::TTableDef& tableDef);
-    void GenerateTableStaticMeta(const NIR::TTableDef& tableDef);
-    void GenerateTableAliasDefaultFunc(const NIR::TTableDef& tableDef);
-    void GenerateTableDefaultFunc(const NIR::TTableDef& tableDef);
-    void GenerateTableFieldGet(const NIR::TTableDef::TFieldDef& fieldDef);
-    void GenerateTableFieldGetIdx(const NIR::TTableDef::TFieldDef& fieldDef);
-    void GenerateTableFieldCheck(const NIR::TTableDef::TFieldDef& fieldDef);
-    void GenerateTableFieldSize(const NIR::TTableDef::TFieldDef& fieldDef);
-    void GenerateTableFieldCompare(const std::string& tableName, const NIR::TTableDef::TFieldDef& fieldDef);
-    void GenerateTableFieldAdd(const std::string& tableName, const NIR::TTableDef::TFieldDef& fieldDef);
-    void GenerateTableSharedOffsetCase(const NIR::TTableDef::TSharedOffset& sharedOffset);
-    void GenerateByTableLayout(const NIR::TTableDef& tableDef, TTableLayoutGenerator gen);
+    void GenerateMessageTransformToProtobuf(const NIR::TMessageDef& msgDef);
+    void GenerateMessageProtobufBuilder(const NIR::TMessageDef& msgDef, const bool deferred = false);
+    void GenerateMessageAliasCreateFunc(const NIR::TMessageDef& msgDef);
+    void GenerateMessageAliasDeferredCreateFunc(const NIR::TMessageDef& msgDef);
+    void GenerateMessageAliasTransformFunc(const NIR::TMessageDef& msgDef);
+    void GenerateMessageBasicCreateFunc(const NIR::TMessageDef& msgDef);
+    void GenerateMessageDynamicCreateFunc(const NIR::TMessageDef& msgDef);
+    void GenerateMessageBuilder(EMessageType msgType, const NIR::TMessageDef& msgDef);
+    void GenerateMessageIdsEnum(const NIR::TMessageDef& msgDef);
+    void GenerateMessageStaticMeta(const NIR::TMessageDef& msgDef);
+    void GenerateMessageAliasDefaultFunc(const NIR::TMessageDef& msgDef);
+    void GenerateMessageDefaultFunc(const NIR::TMessageDef& msgDef);
+    void GenerateMessageFieldGet(const NIR::TMessageDef::TFieldDef& fieldDef);
+    void GenerateMessageFieldGetIdx(const NIR::TMessageDef::TFieldDef& fieldDef);
+    void GenerateMessageFieldCheck(const NIR::TMessageDef::TFieldDef& fieldDef);
+    void GenerateMessageFieldSize(const NIR::TMessageDef::TFieldDef& fieldDef);
+    void GenerateMessageFieldCompare(const std::string& msgName, const NIR::TMessageDef::TFieldDef& fieldDef);
+    void GenerateMessageFieldAdd(const std::string& msgName, const NIR::TMessageDef::TFieldDef& fieldDef);
+    void GenerateMessageSharedOffsetCase(const NIR::TMessageDef::TSharedOffset& sharedOffset);
+    void GenerateByMessageLayout(const NIR::TMessageDef& msgDef, TMessageLayoutGenerator gen);
 
     TCppGenerationOptions Opts_;
     TCodeWriter Writer_;
@@ -315,29 +315,29 @@ void TCppGenerator::TImpl::GenerateSchema(const NIR::TSchemaDef& schema) {
     }
 
     const auto& enums = schema.Enums;
-    const auto& tables = GetTableDependencyOrder(schema);
+    const auto& messages = GetMessageDependencyOrder(schema);
     for (const auto* enumDef : enums) {
         GenerateEnumPre(*enumDef);
     }
 
-    for (const auto* tableDef : tables) {
-        GenerateTablePre(*tableDef);
+    for (const auto* msgDef : messages) {
+        GenerateMessagePre(*msgDef);
     }
 
     for (const auto* enumDef : enums) {
         GenerateEnum(*enumDef);
     }
 
-    for (const auto* tableDef : tables) {
-        GenerateTable(*tableDef);
+    for (const auto* msgDef : messages) {
+        GenerateMessage(*msgDef);
     }
 
     for (const auto* enumDef : enums) {
         GenerateEnumPost(*enumDef);
     }
 
-    for (const auto* tableDef : tables) {
-        GenerateTablePost(*tableDef);
+    for (const auto* msgDef : messages) {
+        GenerateMessagePost(*msgDef);
     }
 
     if (!schema.Namespace.empty()) {
@@ -455,36 +455,36 @@ void TCppGenerator::TImpl::GenerateEnumPost(const NIR::TEnumDef& enumDef) {
     }
 }
 
-void TCppGenerator::TImpl::GenerateTable(const NIR::TTableDef& tableDef) {
-    if (NIR::IsStaticMetaTable(tableDef)) {
-        GenerateTableStaticMeta(tableDef);
+void TCppGenerator::TImpl::GenerateMessage(const NIR::TMessageDef& msgDef) {
+    if (NIR::IsStaticMetaMessage(msgDef)) {
+        GenerateMessageStaticMeta(msgDef);
     }
 
-    const std::string baseClass = GenerateTableBaseClass(tableDef);
-    Writer_ |= "YAFF_LAYOUT_BEGIN(" + tableDef.Name + ") final : private " + baseClass + " {";
+    const std::string baseClass = GenerateMessageBaseClass(msgDef);
+    Writer_ |= "YAFF_LAYOUT_BEGIN(" + msgDef.Name + ") final : private " + baseClass + " {";
 
     Writer_.TrackText();
     Writer_ >= "using TMetaType = " +
-                   (NIR::IsStaticMetaTable(tableDef) ? GenerateTableStaticMetaName(tableDef) : "void") + ";";
+                   (NIR::IsStaticMetaMessage(msgDef) ? GenerateMessageStaticMetaName(msgDef) : "void") + ";";
     if (Opts_.GenerateProtobufApi) {
-        Writer_ >= "using TProtobufType = " + GenerateTableProtobufType(tableDef) + ";";
+        Writer_ >= "using TProtobufType = " + GenerateMessageProtobufType(msgDef) + ";";
     }
     if (Writer_.TextWritten()) {
         Writer_ |= "";
     }
 
-    if (!tableDef.Fields.empty()) {
-        auto tableStructGuard = Writer_.IdentGuard();
+    if (!msgDef.Fields.empty()) {
+        auto messageStructGuard = Writer_.IdentGuard();
 
-        ForRealStringFields(tableDef, [&](const auto& fieldDef) {
+        ForRealStringFields(msgDef, [&](const auto& fieldDef) {
             if (fieldDef.Type->Modifiers.contains(NIR::DEFAULT_MODIFIER_NAME)) {
                 Writer_ |= "inline static const auto& " + GenerateDefaultName(fieldDef) +
                            " = *::NYaFF::ReadLayout<::NYaFF::TString>(" + GenerateStringDefault(*fieldDef.Type) + ");";
             }
         });
 
-        GenerateTableIdsEnum(tableDef);
-        ForSharedOffsets(tableDef, [&](const auto& sharedOffset) {
+        GenerateMessageIdsEnum(msgDef);
+        ForSharedOffsets(msgDef, [&](const auto& sharedOffset) {
             Writer_ |= "enum " + GenerateSharedOffsetCaseEnumName(sharedOffset.Name) + " : ::NYaFF::TFieldId {";
             ForFields(sharedOffset, [&](const auto* fieldDef) {
                 if (fieldDef->Deprecated) {
@@ -497,126 +497,126 @@ void TCppGenerator::TImpl::GenerateTable(const NIR::TTableDef& tableDef) {
             Writer_ |= "};\n";
         });
 
-        ForSharedOffsets(tableDef, [&](const auto& sharedOffset) { GenerateTableSharedOffsetCase(sharedOffset); });
+        ForSharedOffsets(msgDef, [&](const auto& sharedOffset) { GenerateMessageSharedOffsetCase(sharedOffset); });
 
-        ForRealFields(tableDef, [&](const auto& fieldDef) {
+        ForRealFields(msgDef, [&](const auto& fieldDef) {
             if (NIR::IsExplicitField(fieldDef)) {
-                GenerateTableFieldCheck(fieldDef);
+                GenerateMessageFieldCheck(fieldDef);
             }
             if (IsSizeableField(fieldDef)) {
-                GenerateTableFieldSize(fieldDef);
-                GenerateTableFieldGetIdx(fieldDef);
+                GenerateMessageFieldSize(fieldDef);
+                GenerateMessageFieldGetIdx(fieldDef);
             }
-            GenerateTableFieldGet(fieldDef);
+            GenerateMessageFieldGet(fieldDef);
         });
     }
 
-    if (NIR::IsAssociativePair(tableDef)) {
+    if (NIR::IsAssociativePair(msgDef)) {
         auto g = Writer_.IdentGuard();
-        GenerateTableFieldCompare(tableDef.Name, tableDef.Fields[0]);
+        GenerateMessageFieldCompare(msgDef.Name, msgDef.Fields[0]);
     }
 
     Writer_.IncrementIdentLevel();
-    GenerateTableAliasDefaultFunc(tableDef);
+    GenerateMessageAliasDefaultFunc(msgDef);
     Writer_.DecrementIdentLevel();
 
     if (Opts_.GenerateReflectionApi) {
         auto g = Writer_.IdentGuard();
-        GenerateTableAliasDescriptor(tableDef);
+        GenerateMessageAliasDescriptor(msgDef);
     }
 
     if (Opts_.GenerateProtobufApi) {
         auto g = Writer_.IdentGuard();
-        GenerateTableAliasTransformFunc(tableDef);
-        GenerateTableAliasCreateFunc(tableDef);
-        if (NIR::IsFixedTable(tableDef)) {
-            GenerateTableAliasDeferredCreateFunc(tableDef);
+        GenerateMessageAliasTransformFunc(msgDef);
+        GenerateMessageAliasCreateFunc(msgDef);
+        if (NIR::IsFixedMessage(msgDef)) {
+            GenerateMessageAliasDeferredCreateFunc(msgDef);
         }
     }
 
     Writer_ |= "};";
     Writer_ |= "YAFF_LAYOUT_END\n";
 
-    GenerateByTableLayout(tableDef, std::bind(&TCppGenerator::TImpl::GenerateTableBuilder, this, _1, _2));
+    GenerateByMessageLayout(msgDef, std::bind(&TCppGenerator::TImpl::GenerateMessageBuilder, this, _1, _2));
 
-    GenerateTableBasicCreateFunc(tableDef);
-    if (NIR::IsDynamicTable(tableDef) && !NIR::IsGapTable(tableDef)) {
-        GenerateTableDynamicCreateFunc(tableDef);
+    GenerateMessageBasicCreateFunc(msgDef);
+    if (NIR::IsDynamicMessage(msgDef) && !NIR::IsGapMessage(msgDef)) {
+        GenerateMessageDynamicCreateFunc(msgDef);
     }
 }
 
-void TCppGenerator::TImpl::GenerateTableFieldCompare(const std::string& tableName,
-                                                     const NIR::TTableDef::TFieldDef& fieldDef) {
+void TCppGenerator::TImpl::GenerateMessageFieldCompare(const std::string& msgName,
+                                                       const NIR::TMessageDef::TFieldDef& fieldDef) {
     const std::string getter = GenerateFieldName(fieldDef) + "()";
 
     // Using `auto` for the return type lets the compiler pick
     // the right ordering category based on the field type.
-    Writer_ |= "friend auto operator<=>(const " + tableName + "& lhs, const " + tableName + "& rhs) {";
+    Writer_ |= "friend auto operator<=>(const " + msgName + "& lhs, const " + msgName + "& rhs) {";
     Writer_ >= "return lhs." + getter + " <=> rhs." + getter + ";";
     Writer_ |= "}\n";
 
-    Writer_ |= "friend bool operator==(const " + tableName + "& lhs, const " + tableName + "& rhs) {";
+    Writer_ |= "friend bool operator==(const " + msgName + "& lhs, const " + msgName + "& rhs) {";
     Writer_ >= "return lhs." + getter + " == rhs." + getter + ";";
     Writer_ |= "}\n";
 
     Writer_ |= "template <typename K>";
-    Writer_ |= "friend auto operator<=>(const " + tableName + "& lhs, const K& k) {";
+    Writer_ |= "friend auto operator<=>(const " + msgName + "& lhs, const K& k) {";
     Writer_ >= "return lhs." + getter + " <=> k;";
     Writer_ |= "}\n";
 
     Writer_ |= "template <typename K>";
-    Writer_ |= "friend bool operator==(const " + tableName + "& lhs, const K& k) {";
+    Writer_ |= "friend bool operator==(const " + msgName + "& lhs, const K& k) {";
     Writer_ >= "return lhs." + getter + " == k;";
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateByTableLayout(const NIR::TTableDef& tableDef, TTableLayoutGenerator gen) {
-    switch (tableDef.Layout) {
-        case ETableLayout::TABLE_LAYOUT_FIXED: {
-            gen(ETableType::FIXED, tableDef);
+void TCppGenerator::TImpl::GenerateByMessageLayout(const NIR::TMessageDef& msgDef, TMessageLayoutGenerator gen) {
+    switch (msgDef.Layout) {
+        case EMessageLayout::MESSAGE_LAYOUT_FIXED: {
+            gen(EMessageType::FIXED, msgDef);
             break;
         }
-        case ETableLayout::TABLE_LAYOUT_FLAT: {
-            gen(ETableType::FLAT, tableDef);
+        case EMessageLayout::MESSAGE_LAYOUT_FLAT: {
+            gen(EMessageType::FLAT, msgDef);
             break;
         }
-        case ETableLayout::TABLE_LAYOUT_SPARSE: {
-            gen(ETableType::SPARSE, tableDef);
+        case EMessageLayout::MESSAGE_LAYOUT_SPARSE: {
+            gen(EMessageType::SPARSE, msgDef);
             break;
         }
-        case ETableLayout::TABLE_LAYOUT_DYNAMIC: {
-            if (!NIR::IsGapTable(tableDef)) {
-                gen(ETableType::FLAT, tableDef);
+        case EMessageLayout::MESSAGE_LAYOUT_DYNAMIC: {
+            if (!NIR::IsGapMessage(msgDef)) {
+                gen(EMessageType::FLAT, msgDef);
             }
-            gen(ETableType::SPARSE, tableDef);
+            gen(EMessageType::SPARSE, msgDef);
             break;
         }
         default:
-            YAFF_THROW("unknown table layout");
+            YAFF_THROW("unknown message layout");
     }
 }
 
-void TCppGenerator::TImpl::GenerateTableIdsEnum(const NIR::TTableDef& tableDef) {
-    Writer_ |= "enum ETableIds : ::NYaFF::TFieldId {";
-    ForFields(tableDef, [&](const auto& fieldDef) {
+void TCppGenerator::TImpl::GenerateMessageIdsEnum(const NIR::TMessageDef& msgDef) {
+    Writer_ |= "enum EMessageIds : ::NYaFF::TFieldId {";
+    ForFields(msgDef, [&](const auto& fieldDef) {
         Writer_ >= GenerateIdName(fieldDef) + " = " + std::to_string(fieldDef.Id) + ",";
     });
     Writer_ |= "};\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableStaticMeta(const NIR::TTableDef& tableDef) {
-    YAFF_REQUIRE(NIR::IsStaticMetaTable(tableDef));
+void TCppGenerator::TImpl::GenerateMessageStaticMeta(const NIR::TMessageDef& msgDef) {
+    YAFF_REQUIRE(NIR::IsStaticMetaMessage(msgDef));
 
-    Writer_ |= "struct " + GenerateTableStaticMetaName(tableDef) + " {";
+    Writer_ |= "struct " + GenerateMessageStaticMetaName(msgDef) + " {";
     Writer_.IncrementIdentLevel();
 
-    if (NIR::IsFixedTable(tableDef)) {
-        Writer_ |= "inline static constexpr size_t LIMIT = " + std::to_string(NIR::FixedTableSize(tableDef)) + ";";
+    if (NIR::IsFixedMessage(msgDef)) {
+        Writer_ |= "inline static constexpr size_t LIMIT = " + std::to_string(NIR::FixedMessageSize(msgDef)) + ";";
     }
 
-    Writer_ |= "inline static constexpr std::array<NYaFF::TFieldOffset, " + std::to_string(tableDef.Fields.size()) +
+    Writer_ |= "inline static constexpr std::array<NYaFF::TFieldOffset, " + std::to_string(msgDef.Fields.size()) +
                "> FLAT_OFFSETS = {\\";
-    ForFields(tableDef, [&](const auto& fieldDef) { Writer_ >= std::to_string(fieldDef.FlatOffset) + ", \\"; });
+    ForFields(msgDef, [&](const auto& fieldDef) { Writer_ >= std::to_string(fieldDef.FlatOffset) + ", \\"; });
     Writer_ |= "};\n";
 
     Writer_ |= "inline static constexpr NYaFF::TFieldOffset ResolveField(const NYaFF::TFieldId id) {";
@@ -627,9 +627,9 @@ void TCppGenerator::TImpl::GenerateTableStaticMeta(const NIR::TTableDef& tableDe
     Writer_ |= "};\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableBuilder(ETableType tableType, const NIR::TTableDef& tableDef) {
-    const std::string tableSuffix = GenerateTableType(tableType);
-    const std::string builderName = GenerateTableBuilderName(tableType, tableDef);
+void TCppGenerator::TImpl::GenerateMessageBuilder(EMessageType msgType, const NIR::TMessageDef& msgDef) {
+    const std::string messageSuffix = GenerateMessageType(msgType);
+    const std::string builderName = GenerateMessageBuilderName(msgType, msgDef);
 
     Writer_ |= "struct " + builderName + " {";
     Writer_.IncrementIdentLevel();
@@ -637,42 +637,42 @@ void TCppGenerator::TImpl::GenerateTableBuilder(ETableType tableType, const NIR:
     Writer_ |= "::NYaFF::TBuilder& B;\n";
 
     const std::string templateArgs =
-        (tableType == ETableType::FIXED || tableType == ETableType::FLAT ? "<" + tableDef.Name + "::TMetaType" + ">"
+        (msgType == EMessageType::FIXED || msgType == EMessageType::FLAT ? "<" + msgDef.Name + "::TMetaType" + ">"
                                                                          : "");
     const std::string callArgs =
-        ((tableType == ETableType::FLAT || tableType == ETableType::SPARSE) && !HasExplicitFields(tableDef)
+        ((msgType == EMessageType::FLAT || msgType == EMessageType::SPARSE) && !HasExplicitFields(msgDef)
              ? "/* implicit */ true"
              : "");
     Writer_ |= "explicit " + builderName + "(::NYaFF::TBuilder& yffb)";
     Writer_ >= ": B(yffb)";
     Writer_ |= "{";
-    Writer_ >= "B.Start" + tableSuffix + "Table" + templateArgs + "(" + callArgs + ");";
+    Writer_ >= "B.Start" + messageSuffix + "Message" + templateArgs + "(" + callArgs + ");";
     Writer_ |= "}\n";
 
-    ForRealFields(tableDef, [&](const auto& fieldDef) { GenerateTableFieldAdd(tableDef.Name, fieldDef); });
+    ForRealFields(msgDef, [&](const auto& fieldDef) { GenerateMessageFieldAdd(msgDef.Name, fieldDef); });
 
-    const std::string finishType = "::NYaFF::TInternalOffset<" + tableDef.Name + ">";
+    const std::string finishType = "::NYaFF::TInternalOffset<" + msgDef.Name + ">";
     Writer_ |= finishType + " Finish() && {";
-    Writer_ >= "return " + finishType + "(B.Finish" + tableSuffix + "Table());";
+    Writer_ >= "return " + finishType + "(B.Finish" + messageSuffix + "Message());";
     Writer_ |= "}";
 
     Writer_.DecrementIdentLevel();
     Writer_ |= "};\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableBasicCreateFunc(const NIR::TTableDef& tableDef) {
-    Writer_ |= "template <typename TUnderlying = " + GenerateTableBasicCreateFuncDefault(tableDef) + ">";
-    Writer_ |= "inline ::NYaFF::TInternalOffset<" + tableDef.Name + "> " + GenerateCreateFuncName(tableDef) + "(";
+void TCppGenerator::TImpl::GenerateMessageBasicCreateFunc(const NIR::TMessageDef& msgDef) {
+    Writer_ |= "template <typename TUnderlying = " + GenerateMessageBasicCreateFuncDefault(msgDef) + ">";
+    Writer_ |= "inline ::NYaFF::TInternalOffset<" + msgDef.Name + "> " + GenerateCreateFuncName(msgDef) + "(";
     Writer_ >= "::NYaFF::TBuilder& yffb\\";
-    ForRealFields(tableDef, [&](const auto& fieldDef) {
+    ForRealFields(msgDef, [&](const auto& fieldDef) {
         Writer_ >= ",";
-        Writer_ >= GenerateTableCreateFuncArgument(fieldDef) + "\\";
+        Writer_ >= GenerateMessageCreateFuncArgument(fieldDef) + "\\";
     });
     Writer_ |= "";
     Writer_ |= ") {";
     Writer_ >= "TUnderlying b(yffb);";
 
-    ForReversedRealFields(tableDef, [&](const auto& fieldDef) {
+    ForReversedRealFields(msgDef, [&](const auto& fieldDef) {
         const bool isOptional = NIR::IsScalar(fieldDef.Type->Type) && NIR::IsExplicitField(fieldDef);
         const std::string argName = "a_" + GenerateFieldName(fieldDef);
         const std::string argPrefix = (isOptional ? "*" : "");
@@ -684,27 +684,27 @@ void TCppGenerator::TImpl::GenerateTableBasicCreateFunc(const NIR::TTableDef& ta
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableDynamicCreateFunc(const NIR::TTableDef& tableDef) {
-    const std::string createFuncName = GenerateCreateFuncName(tableDef);
-    Writer_ |= "inline ::NYaFF::TInternalOffset<" + tableDef.Name + "> " + createFuncName + "(";
+void TCppGenerator::TImpl::GenerateMessageDynamicCreateFunc(const NIR::TMessageDef& msgDef) {
+    const std::string createFuncName = GenerateCreateFuncName(msgDef);
+    Writer_ |= "inline ::NYaFF::TInternalOffset<" + msgDef.Name + "> " + createFuncName + "(";
     Writer_ >= "::NYaFF::TBuilder& yffb\\";
-    ForRealFields(tableDef, [&](const auto& fieldDef) {
+    ForRealFields(msgDef, [&](const auto& fieldDef) {
         Writer_ >= ",";
-        Writer_ >= GenerateTableCreateFuncArgument(fieldDef) + "\\";
+        Writer_ >= GenerateMessageCreateFuncArgument(fieldDef) + "\\";
     });
     Writer_ |= "";
     Writer_ |= ") {";
     Writer_.IncrementIdentLevel();
     Writer_ |= "switch (yffb.GetForcedDynamicAlternative()) {";
-    Writer_ |= "case ::NYaFF::ETableLayout::TABLE_LAYOUT_FLAT: {";
+    Writer_ |= "case ::NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT: {";
     Writer_ >= "return " +
-                   GenerateTableBasicCreateFuncCall(tableDef, GenerateTableBuilderName(ETableType::FLAT, tableDef)) +
+                   GenerateMessageBasicCreateFuncCall(msgDef, GenerateMessageBuilderName(EMessageType::FLAT, msgDef)) +
                    ";";
     Writer_ |= "}";
-    Writer_ |= "case ::NYaFF::ETableLayout::TABLE_LAYOUT_SPARSE: {";
-    Writer_ >= "return " +
-                   GenerateTableBasicCreateFuncCall(tableDef, GenerateTableBuilderName(ETableType::SPARSE, tableDef)) +
-                   ";";
+    Writer_ |= "case ::NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE: {";
+    Writer_ >=
+        "return " +
+            GenerateMessageBasicCreateFuncCall(msgDef, GenerateMessageBuilderName(EMessageType::SPARSE, msgDef)) + ";";
     Writer_ |= "}";
     Writer_ |= "default:";
     Writer_ >= "YAFF_THROW(\"unknown preferable layout in '" + createFuncName + "'\");";
@@ -713,15 +713,15 @@ void TCppGenerator::TImpl::GenerateTableDynamicCreateFunc(const NIR::TTableDef& 
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableFieldAdd(const std::string& tableName,
-                                                 const NIR::TTableDef::TFieldDef& fieldDef) {
+void TCppGenerator::TImpl::GenerateMessageFieldAdd(const std::string& msgName,
+                                                   const NIR::TMessageDef::TFieldDef& fieldDef) {
     const std::string valueArgType = GenerateTypeExternal(*fieldDef.Type);
     const std::string valueArgName = GenerateFieldName(fieldDef);
 
     Writer_ |= "void add_" + GenerateFieldName(fieldDef) + "(" + valueArgType + " " + valueArgName + ") {";
 
     const std::string type = GenerateTypeInternal(*fieldDef.Type);
-    const std::string id = tableName + "::" + GenerateIdName(fieldDef);
+    const std::string id = msgName + "::" + GenerateIdName(fieldDef);
     const std::string defaultSuffix =
         (NIR::IsScalar(fieldDef.Type->Type) ? ", " + GenerateDefaultValueInternal(fieldDef) : "");
     Writer_ >= "B.AddField<" + type + ">(" + id + ", " + GenerateTypeCastInternal(*fieldDef.Type, valueArgName) +
@@ -730,7 +730,7 @@ void TCppGenerator::TImpl::GenerateTableFieldAdd(const std::string& tableName,
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableSharedOffsetCase(const NIR::TTableDef::TSharedOffset& sharedOffset) {
+void TCppGenerator::TImpl::GenerateMessageSharedOffsetCase(const NIR::TMessageDef::TSharedOffset& sharedOffset) {
     const std::string enumName = GenerateSharedOffsetCaseEnumName(sharedOffset.Name);
     Writer_ |= enumName + " " + sharedOffset.Name + "_case() const {";
     Writer_.IncrementIdentLevel();
@@ -754,7 +754,7 @@ void TCppGenerator::TImpl::GenerateTableSharedOffsetCase(const NIR::TTableDef::T
     }
 }
 
-void TCppGenerator::TImpl::GenerateTableFieldGet(const NIR::TTableDef::TFieldDef& fieldDef) {
+void TCppGenerator::TImpl::GenerateMessageFieldGet(const NIR::TMessageDef::TFieldDef& fieldDef) {
     Writer_ |=
         "YAFF_PURE " + GenerateGetterReturnType(*fieldDef.Type) + " " + GenerateFieldName(fieldDef) + "() const {";
     Writer_.IncrementIdentLevel();
@@ -775,7 +775,7 @@ void TCppGenerator::TImpl::GenerateTableFieldGet(const NIR::TTableDef::TFieldDef
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableFieldGetIdx(const NIR::TTableDef::TFieldDef& fieldDef) {
+void TCppGenerator::TImpl::GenerateMessageFieldGetIdx(const NIR::TMessageDef::TFieldDef& fieldDef) {
     YAFF_REQUIRE(IsSizeableField(fieldDef));
 
     Writer_ |= "YAFF_PURE " + GenerateGetterReturnType(*fieldDef.Type->ElementType) + " " +
@@ -792,7 +792,7 @@ void TCppGenerator::TImpl::GenerateTableFieldGetIdx(const NIR::TTableDef::TField
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableFieldCheck(const NIR::TTableDef::TFieldDef& fieldDef) {
+void TCppGenerator::TImpl::GenerateMessageFieldCheck(const NIR::TMessageDef::TFieldDef& fieldDef) {
     YAFF_REQUIRE(NIR::IsExplicitField(fieldDef));
 
     Writer_ |= "YAFF_PURE bool has_" + GenerateFieldName(fieldDef) + "() const {";
@@ -810,7 +810,7 @@ void TCppGenerator::TImpl::GenerateTableFieldCheck(const NIR::TTableDef::TFieldD
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableFieldSize(const NIR::TTableDef::TFieldDef& fieldDef) {
+void TCppGenerator::TImpl::GenerateMessageFieldSize(const NIR::TMessageDef::TFieldDef& fieldDef) {
     YAFF_REQUIRE(IsSizeableField(fieldDef));
 
     Writer_ |= "YAFF_PURE int " + GenerateFieldName(fieldDef) + "_size() const {";
@@ -822,45 +822,45 @@ void TCppGenerator::TImpl::GenerateTableFieldSize(const NIR::TTableDef::TFieldDe
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTablePre(const NIR::TTableDef& tableDef) {
-    Writer_ |= "struct " + tableDef.Name + ";";
+void TCppGenerator::TImpl::GenerateMessagePre(const NIR::TMessageDef& msgDef) {
+    Writer_ |= "struct " + msgDef.Name + ";";
 
     if (Opts_.GenerateProtobufApi) {
-        Writer_ |= GenerateTransformToProtobufFuncDeclaration(tableDef) + ";";
-        Writer_ |= GenerateCreateFromProtobufFuncDeclaration(tableDef) + ";";
-        if (NIR::IsFixedTable(tableDef)) {
-            Writer_ |= GenerateDeferredCreateFromProtobufFuncDeclaration(tableDef) + ";";
+        Writer_ |= GenerateTransformToProtobufFuncDeclaration(msgDef) + ";";
+        Writer_ |= GenerateCreateFromProtobufFuncDeclaration(msgDef) + ";";
+        if (NIR::IsFixedMessage(msgDef)) {
+            Writer_ |= GenerateDeferredCreateFromProtobufFuncDeclaration(msgDef) + ";";
         }
     }
 
     if (Opts_.GenerateReflectionApi) {
-        Writer_ |= GenerateTableDescriptorFuncDeclaration(tableDef.Name) + ";";
+        Writer_ |= GenerateMessageDescriptorFuncDeclaration(msgDef.Name) + ";";
     }
 
-    Writer_ |= GenerateTableDefaultFuncDeclaration(tableDef.Name, tableDef.Name) + ";";
+    Writer_ |= GenerateMessageDefaultFuncDeclaration(msgDef.Name, msgDef.Name) + ";";
     Writer_ |= "";
 
     // Forward declarations for external experimental generation;
-    Writer_ |= "template <template <typename> typename S> struct " + GenerateTableColumnName(tableDef) + ";";
-    Writer_ |= GenerateTableDefaultFuncDeclaration(GenerateTableColumnName(tableDef) + "<::NYaFF::NExp::TSizeable>",
-                                                   GenerateTableColumnName(tableDef)) +
+    Writer_ |= "template <template <typename> typename S> struct " + GenerateMessageColumnName(msgDef) + ";";
+    Writer_ |= GenerateMessageDefaultFuncDeclaration(GenerateMessageColumnName(msgDef) + "<::NYaFF::NExp::TSizeable>",
+                                                     GenerateMessageColumnName(msgDef)) +
                ";";
     Writer_ |= "";
 }
 
-void TCppGenerator::TImpl::GenerateTablePost(const NIR::TTableDef& tableDef) {
-    GenerateTableDefaultFunc(tableDef);
+void TCppGenerator::TImpl::GenerateMessagePost(const NIR::TMessageDef& msgDef) {
+    GenerateMessageDefaultFunc(msgDef);
 
     if (Opts_.GenerateProtobufApi) {
-        GenerateTableTransformToProtobuf(tableDef);
-        GenerateTableProtobufBuilder(tableDef, /* deferred */ false);
-        if (NIR::IsFixedTable(tableDef)) {
-            GenerateTableProtobufBuilder(tableDef, /* deferred */ true);
+        GenerateMessageTransformToProtobuf(msgDef);
+        GenerateMessageProtobufBuilder(msgDef, /* deferred */ false);
+        if (NIR::IsFixedMessage(msgDef)) {
+            GenerateMessageProtobufBuilder(msgDef, /* deferred */ true);
         }
     }
 
     if (Opts_.GenerateReflectionApi) {
-        GenerateTableDescriptor(tableDef);
+        GenerateMessageDescriptor(msgDef);
     }
 }
 
@@ -898,38 +898,38 @@ void TCppGenerator::TImpl::GenerateEnumValueDescriptors(const NIR::TEnumDef& enu
     Writer_ |= "};\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableAliasDescriptor(const NIR::TTableDef& tableDef) {
-    Writer_ |= "static const ::NYaFF::NReflect::TTableDescriptor* Descriptor() {";
-    Writer_ >= "return " + GenerateDescriptorFuncName(tableDef.Name) + "();";
+void TCppGenerator::TImpl::GenerateMessageAliasDescriptor(const NIR::TMessageDef& msgDef) {
+    Writer_ |= "static const ::NYaFF::NReflect::TMessageDescriptor* Descriptor() {";
+    Writer_ >= "return " + GenerateDescriptorFuncName(msgDef.Name) + "();";
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableDescriptor(const NIR::TTableDef& tableDef) {
-    Writer_ |= GenerateTableDescriptorFuncDeclaration(tableDef.Name) + " {";
+void TCppGenerator::TImpl::GenerateMessageDescriptor(const NIR::TMessageDef& msgDef) {
+    Writer_ |= GenerateMessageDescriptorFuncDeclaration(msgDef.Name) + " {";
     Writer_.IncrementIdentLevel();
 
-    const bool hasFields = !tableDef.Fields.empty();
+    const bool hasFields = !msgDef.Fields.empty();
     if (hasFields) {
-        GenerateTableFieldDescriptors(tableDef);
+        GenerateMessageFieldDescriptors(msgDef);
     }
 
-    Writer_ |= "static constexpr ::NYaFF::NReflect::TTableDescriptor table = {";
-    Writer_ >= ".Name = \"" + tableDef.Name + "\",";
-    Writer_ >= ".Layout = " + GenerateTableLayoutDescriptor(tableDef.Layout) + ",";
-    Writer_ >= ".FieldCount = " + std::to_string(tableDef.Fields.size()) + ",";
+    Writer_ |= "static constexpr ::NYaFF::NReflect::TMessageDescriptor message = {";
+    Writer_ >= ".Name = \"" + msgDef.Name + "\",";
+    Writer_ >= ".Layout = " + GenerateMessageLayoutDescriptor(msgDef.Layout) + ",";
+    Writer_ >= ".FieldCount = " + std::to_string(msgDef.Fields.size()) + ",";
     if (hasFields != 0) {
         Writer_ >= ".Fields = fields,";
     }
     Writer_ |= "};";
-    Writer_ |= "return &table;";
+    Writer_ |= "return &message;";
 
     Writer_.DecrementIdentLevel();
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableFieldDescriptors(const NIR::TTableDef& tableDef) {
+void TCppGenerator::TImpl::GenerateMessageFieldDescriptors(const NIR::TMessageDef& msgDef) {
     TTypeIndex index;
-    ForFields(tableDef, [&](const auto& fieldDef) {
+    ForFields(msgDef, [&](const auto& fieldDef) {
         const auto* type = fieldDef.Type;
         index.Add(type);
         if (type->Type == EType::TYPE_VECTOR && type->ElementType) {
@@ -955,7 +955,7 @@ void TCppGenerator::TImpl::GenerateTableFieldDescriptors(const NIR::TTableDef& t
     Writer_ |= "};";
 
     Writer_ |= "static constexpr ::NYaFF::NReflect::TFieldDescriptor fields[] = {";
-    ForFields(tableDef, [&](const auto& fieldDef) {
+    ForFields(msgDef, [&](const auto& fieldDef) {
         auto g = Writer_.IdentGuard();
         Writer_ |= "{";
         Writer_ >= ".Id = " + std::to_string(fieldDef.Id) + ",";
@@ -976,55 +976,54 @@ void TCppGenerator::TImpl::GenerateTableFieldDescriptors(const NIR::TTableDef& t
     Writer_ |= "};";
 }
 
-void TCppGenerator::TImpl::GenerateTableDefaultFunc(const NIR::TTableDef& tableDef) {
-    Writer_ |= GenerateTableDefaultFuncDeclaration(tableDef.Name, tableDef.Name) + " {";
-    Writer_ >= "return " + tableDef.Name + "::Default();";
+void TCppGenerator::TImpl::GenerateMessageDefaultFunc(const NIR::TMessageDef& msgDef) {
+    Writer_ |= GenerateMessageDefaultFuncDeclaration(msgDef.Name, msgDef.Name) + " {";
+    Writer_ >= "return " + msgDef.Name + "::Default();";
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableAliasDefaultFunc(const NIR::TTableDef& tableDef) {
-    Writer_ |= "static const " + tableDef.Name + "& Default() {";
-    Writer_ >= "return *::NYaFF::ReadLayout<" + tableDef.Name + ">(DEFAULT_TABLE);";
+void TCppGenerator::TImpl::GenerateMessageAliasDefaultFunc(const NIR::TMessageDef& msgDef) {
+    Writer_ |= "static const " + msgDef.Name + "& Default() {";
+    Writer_ >= "return *::NYaFF::ReadLayout<" + msgDef.Name + ">(DEFAULT_MESSAGE);";
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableAliasCreateFunc(const NIR::TTableDef& tableDef) {
+void TCppGenerator::TImpl::GenerateMessageAliasCreateFunc(const NIR::TMessageDef& msgDef) {
     Writer_ |= "template <typename ...Ps>";
     Writer_ |=
-        "static ::NYaFF::TInternalOffset<" + tableDef.Name + "> CreateFrom(::NYaFF::TBuilder& yffb, Ps&&... params) {";
-    Writer_ >= "return " + GenerateCreateFuncName(tableDef) + "(yffb, std::forward<Ps>(params)...);";
+        "static ::NYaFF::TInternalOffset<" + msgDef.Name + "> CreateFrom(::NYaFF::TBuilder& yffb, Ps&&... params) {";
+    Writer_ >= "return " + GenerateCreateFuncName(msgDef) + "(yffb, std::forward<Ps>(params)...);";
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableAliasDeferredCreateFunc(const NIR::TTableDef& tableDef) {
+void TCppGenerator::TImpl::GenerateMessageAliasDeferredCreateFunc(const NIR::TMessageDef& msgDef) {
     Writer_ |= "template <typename ...Ps>";
     Writer_ |= "static auto DeferCreateFrom(::NYaFF::TBuilder& yffb, Ps&&... params) {";
-    Writer_ >= "return " + GenerateDeferredCreateFuncName(tableDef) + "(yffb, std::forward<Ps>(params)...);";
+    Writer_ >= "return " + GenerateDeferredCreateFuncName(msgDef) + "(yffb, std::forward<Ps>(params)...);";
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableAliasTransformFunc(const NIR::TTableDef& tableDef) {
+void TCppGenerator::TImpl::GenerateMessageAliasTransformFunc(const NIR::TMessageDef& msgDef) {
     Writer_ |= "template <typename T>";
     Writer_ |= "void TransformTo(T& to) const {";
-    Writer_ >=
-        GenerateWithNamespaceName(tableDef.Schema->Namespace, GenerateTransformFuncName(tableDef)) + "(*this, to);";
+    Writer_ >= GenerateWithNamespaceName(msgDef.Schema->Namespace, GenerateTransformFuncName(msgDef)) + "(*this, to);";
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableTransformToProtobuf(const NIR::TTableDef& tableDef) {
-    Writer_ |= GenerateTransformToProtobufFuncDeclaration(tableDef) + " {";
+void TCppGenerator::TImpl::GenerateMessageTransformToProtobuf(const NIR::TMessageDef& msgDef) {
+    Writer_ |= GenerateTransformToProtobufFuncDeclaration(msgDef) + " {";
     Writer_.IncrementIdentLevel();
 
-    if (NIR::IsAssociativePair(tableDef)) {
-        Writer_ |= GenerateProtobufPairFill(tableDef.Fields[0]);
-        Writer_ |= GenerateProtobufPairFill(tableDef.Fields[1]);
+    if (NIR::IsAssociativePair(msgDef)) {
+        Writer_ |= GenerateProtobufPairFill(msgDef.Fields[0]);
+        Writer_ |= GenerateProtobufPairFill(msgDef.Fields[1]);
     } else {
         // Read and transform scalars first to increase read locality.
-        ForRealScalarFields(tableDef, [&](const auto& fieldDef) {
+        ForRealScalarFields(msgDef, [&](const auto& fieldDef) {
             Writer_ |=
                 GenerateProtobufScalarFill("proto", "proto.clear_" + GenerateFieldName(fieldDef) + "()", fieldDef);
         });
-        ForRealStructureFields(tableDef, [&](const auto& fieldDef) {
+        ForRealStructureFields(msgDef, [&](const auto& fieldDef) {
             Writer_ |= GenerateProtobufStructFill("proto.mutable_" + GenerateFieldName(fieldDef) + "()",
                                                   "proto.clear_" + GenerateFieldName(fieldDef) + "()", fieldDef);
         });
@@ -1034,20 +1033,20 @@ void TCppGenerator::TImpl::GenerateTableTransformToProtobuf(const NIR::TTableDef
     Writer_ |= "}\n";
 }
 
-void TCppGenerator::TImpl::GenerateTableProtobufBuilder(const NIR::TTableDef& tableDef, const bool deferred) {
-    const std::string declaration = (deferred ? GenerateDeferredCreateFromProtobufFuncDeclaration(tableDef)
-                                              : GenerateCreateFromProtobufFuncDeclaration(tableDef));
+void TCppGenerator::TImpl::GenerateMessageProtobufBuilder(const NIR::TMessageDef& msgDef, const bool deferred) {
+    const std::string declaration = (deferred ? GenerateDeferredCreateFromProtobufFuncDeclaration(msgDef)
+                                              : GenerateCreateFromProtobufFuncDeclaration(msgDef));
     Writer_ |= declaration + " {";
     Writer_.IncrementIdentLevel();
 
-    ForRealFields(tableDef, [&](const auto& fieldDef) {
+    ForRealFields(msgDef, [&](const auto& fieldDef) {
         const std::string protobufValue =
-            (NIR::IsAssociativePair(tableDef) ? GenerateProtobufPairValue(fieldDef) : GenerateProtobufValue(fieldDef));
+            (NIR::IsAssociativePair(msgDef) ? GenerateProtobufPairValue(fieldDef) : GenerateProtobufValue(fieldDef));
         Writer_ |= "const auto a_" + GenerateFieldName(fieldDef) + " = " + protobufValue + ";";
     });
 
     const std::string createCall =
-        (deferred ? GenerateTableBasicCreateFuncDeferredCall(tableDef) : GenerateTableBasicCreateFuncCall(tableDef));
+        (deferred ? GenerateMessageBasicCreateFuncDeferredCall(msgDef) : GenerateMessageBasicCreateFuncCall(msgDef));
     Writer_ |= "return " + createCall + ";";
     Writer_.DecrementIdentLevel();
     Writer_ |= "}\n";
@@ -1055,7 +1054,7 @@ void TCppGenerator::TImpl::GenerateTableProtobufBuilder(const NIR::TTableDef& ta
 
 std::string TCppGenerator::TImpl::GenerateProtobufStructFill(const std::string& mutableCall,
                                                              const std::string& clearCall,
-                                                             const NIR::TTableDef::TFieldDef& fieldDef) {
+                                                             const NIR::TMessageDef::TFieldDef& fieldDef) {
     switch (fieldDef.Type->Type) {
         case EType::TYPE_STRING: {
             const std::string fieldName = GenerateFieldName(fieldDef);
@@ -1069,14 +1068,14 @@ std::string TCppGenerator::TImpl::GenerateProtobufStructFill(const std::string& 
         case EType::TYPE_VECTOR: {
             std::string fillVector =
                 "if (const auto& _v = from." + GenerateFieldName(fieldDef) + "(); _v.Size() != 0) { ";
-            if (fieldDef.Type->ElementType->Type == EType::TYPE_TABLE) {
+            if (fieldDef.Type->ElementType->Type == EType::TYPE_MESSAGE) {
                 // Vector element can not be empty, so there is no need for additional check;
-                const auto* elemTable = fieldDef.Type->ElementType->TableDef;
+                const auto* elemMessage = fieldDef.Type->ElementType->MessageDef;
                 if (NIR::IsAssociative(*fieldDef.Type)) {
                     fillVector += "for (uint32_t i = 0; i < _v.Size(); ++i) { " +
-                                  GenerateTableProtobufPair(*elemTable) + " _p; _v.Get(i).TransformTo(_p); " +
+                                  GenerateMessageProtobufPair(*elemMessage) + " _p; _v.Get(i).TransformTo(_p); " +
                                   mutableCall + "->emplace(std::move(_p)); }";
-                } else if (NIR::IsSequentialTable(*fieldDef.Type)) {
+                } else if (NIR::IsSequentialMessage(*fieldDef.Type)) {
                     fillVector += "::NYaFF::NExp::ColumnarTransformTo(_v, *" + mutableCall + ");";
                 } else {
                     fillVector += mutableCall + "->Reserve(_v.Size()); ";
@@ -1100,7 +1099,7 @@ std::string TCppGenerator::TImpl::GenerateProtobufStructFill(const std::string& 
             fillVector += " } else { " + clearCall + "; }";
             return fillVector;
         }
-        case EType::TYPE_TABLE: {
+        case EType::TYPE_MESSAGE: {
             const std::string fieldName = GenerateFieldName(fieldDef);
             return "if (from.has_" + fieldName + "()) { from." + fieldName + "().TransformTo(*" + mutableCall +
                    "); } else { " + clearCall + "; }";
@@ -1112,7 +1111,7 @@ std::string TCppGenerator::TImpl::GenerateProtobufStructFill(const std::string& 
 
 std::string TCppGenerator::TImpl::GenerateProtobufScalarFill(const std::string& mutableCall,
                                                              const std::string& clearCall,
-                                                             const NIR::TTableDef::TFieldDef& fieldDef) {
+                                                             const NIR::TMessageDef::TFieldDef& fieldDef) {
     YAFF_REQUIRE(NIR::IsScalar(fieldDef.Type->Type));
     const std::string fieldName = GenerateFieldName(fieldDef);
     const std::string checkCall =
@@ -1129,7 +1128,7 @@ std::string TCppGenerator::TImpl::GenerateProtobufScalarFill(const std::string& 
            clearCall + "; }";
 }
 
-std::string TCppGenerator::TImpl::GenerateProtobufPairFill(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateProtobufPairFill(const NIR::TMessageDef::TFieldDef& fieldDef) {
     const std::string getCall = "from." + GenerateFieldName(fieldDef) + "()";
     const std::string pairName = "proto." + GenerateExternalPairName(fieldDef);
     const std::string mutableCall =
@@ -1146,7 +1145,7 @@ std::string TCppGenerator::TImpl::GenerateProtobufPairFill(const NIR::TTableDef:
                                       fieldDef);
 }
 
-std::string TCppGenerator::TImpl::GenerateProtobufValue(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateProtobufValue(const NIR::TMessageDef::TFieldDef& fieldDef) {
     const std::string getCall = "proto." + GenerateFieldName(fieldDef) + "()";
     const std::string createCall = GenerateExternalCreate(getCall, "", *fieldDef.Type);
     if (fieldDef.Type->Type == EType::TYPE_STRING) {
@@ -1158,7 +1157,7 @@ std::string TCppGenerator::TImpl::GenerateProtobufValue(const NIR::TTableDef::TF
     if (fieldDef.Type->Type == EType::TYPE_VECTOR) {
         return "(!" + getCall + ".empty() ? " + createCall + " : 0)";
     }
-    if (fieldDef.Type->Type == EType::TYPE_TABLE) {
+    if (fieldDef.Type->Type == EType::TYPE_MESSAGE) {
         return "(proto.has_" + GenerateFieldName(fieldDef) + "() ? " + createCall + " : 0)";
     }
     return (NIR::IsExplicitField(fieldDef)
@@ -1167,7 +1166,7 @@ std::string TCppGenerator::TImpl::GenerateProtobufValue(const NIR::TTableDef::TF
                 : createCall);
 }
 
-std::string TCppGenerator::TImpl::GenerateProtobufPairValue(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateProtobufPairValue(const NIR::TMessageDef::TFieldDef& fieldDef) {
     return GenerateExternalCreate("proto." + GenerateExternalPairName(fieldDef), "", *fieldDef.Type);
 }
 
@@ -1186,11 +1185,11 @@ std::string TCppGenerator::TImpl::GenerateExternalCreate(const std::string& getC
                 return "yffb.CreateVector<" + elemType + ">(::NYaFF::SortedKeys(" + getCall +
                        "), [&] (const auto& _k) { return " + createPairCall + "; })";
             }
-            if (NIR::IsSequentialTable(type)) {
+            if (NIR::IsSequentialMessage(type)) {
                 return "::NYaFF::NExp::ColumnarCreateFrom<" +
                        GenerateWithNamespaceName(
-                           type.ElementType->TableDef->Schema->Namespace,
-                           GenerateTableColumnName(*type.ElementType->TableDef) + "<::NYaFF::NExp::TSizeable>") +
+                           type.ElementType->MessageDef->Schema->Namespace,
+                           GenerateMessageColumnName(*type.ElementType->MessageDef) + "<::NYaFF::NExp::TSizeable>") +
                        ">(yffb, " + getCall + ")";
             }
             if (!NIR::IsScalar(type.ElementType->Type)) {
@@ -1204,10 +1203,10 @@ std::string TCppGenerator::TImpl::GenerateExternalCreate(const std::string& getC
             return "yffb.CreateVector<" + elemType + ">(reinterpret_cast<const " + elemType + "*>(" + getCall +
                    ".data()), " + getCall + ".size())";
         }
-        case EType::TYPE_TABLE: {
-            const std::string createFunc = (NIR::IsInline(type) ? GenerateDeferredCreateFuncName(*type.TableDef)
-                                                                : GenerateCreateFuncName(*type.TableDef));
-            return GenerateWithNamespaceName(type.TableDef->Schema->Namespace, createFunc) + "(yffb, " + getPrefix +
+        case EType::TYPE_MESSAGE: {
+            const std::string createFunc = (NIR::IsInline(type) ? GenerateDeferredCreateFuncName(*type.MessageDef)
+                                                                : GenerateCreateFuncName(*type.MessageDef));
+            return GenerateWithNamespaceName(type.MessageDef->Schema->Namespace, createFunc) + "(yffb, " + getPrefix +
                    getCall + ")";
         }
         default:
@@ -1215,7 +1214,7 @@ std::string TCppGenerator::TImpl::GenerateExternalCreate(const std::string& getC
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateExternalPairName(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateExternalPairName(const NIR::TMessageDef::TFieldDef& fieldDef) {
     switch (fieldDef.Id) {
         case 1:
             return "first";
@@ -1226,44 +1225,44 @@ std::string TCppGenerator::TImpl::GenerateExternalPairName(const NIR::TTableDef:
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateTransformToProtobufFuncDeclaration(const NIR::TTableDef& tableDef) {
-    const bool nonEmpty = HasRealFields(tableDef);
+std::string TCppGenerator::TImpl::GenerateTransformToProtobufFuncDeclaration(const NIR::TMessageDef& msgDef) {
+    const bool nonEmpty = HasRealFields(msgDef);
     const std::string fromArgName = (nonEmpty ? " from" : "");
     const std::string protoArgName = (nonEmpty ? " proto" : "");
-    return "template <typename F> inline void " + GenerateTransformFuncName(tableDef) + "(const F&" + fromArgName +
-           ", " + GenerateTableProtobufType(tableDef) + "&" + protoArgName + ")";
+    return "template <typename F> inline void " + GenerateTransformFuncName(msgDef) + "(const F&" + fromArgName + ", " +
+           GenerateMessageProtobufType(msgDef) + "&" + protoArgName + ")";
 }
 
-std::string TCppGenerator::TImpl::GenerateDeferredCreateFromProtobufFuncDeclaration(const NIR::TTableDef& tableDef) {
-    const std::string protoArgName = (HasRealFields(tableDef) ? " proto" : "");
-    return "inline auto " + GenerateDeferredCreateFuncName(tableDef) + "(::NYaFF::TBuilder& yffb, const " +
-           GenerateTableProtobufType(tableDef) + "&" + protoArgName + ")";
+std::string TCppGenerator::TImpl::GenerateDeferredCreateFromProtobufFuncDeclaration(const NIR::TMessageDef& msgDef) {
+    const std::string protoArgName = (HasRealFields(msgDef) ? " proto" : "");
+    return "inline auto " + GenerateDeferredCreateFuncName(msgDef) + "(::NYaFF::TBuilder& yffb, const " +
+           GenerateMessageProtobufType(msgDef) + "&" + protoArgName + ")";
 }
 
-std::string TCppGenerator::TImpl::GenerateCreateFromProtobufFuncDeclaration(const NIR::TTableDef& tableDef) {
-    const std::string protoArgName = (HasRealFields(tableDef) ? " proto" : "");
-    return "inline ::NYaFF::TInternalOffset<" + tableDef.Name + "> " + GenerateCreateFuncName(tableDef) +
-           "(::NYaFF::TBuilder& yffb, const " + GenerateTableProtobufType(tableDef) + "&" + protoArgName + ")";
+std::string TCppGenerator::TImpl::GenerateCreateFromProtobufFuncDeclaration(const NIR::TMessageDef& msgDef) {
+    const std::string protoArgName = (HasRealFields(msgDef) ? " proto" : "");
+    return "inline ::NYaFF::TInternalOffset<" + msgDef.Name + "> " + GenerateCreateFuncName(msgDef) +
+           "(::NYaFF::TBuilder& yffb, const " + GenerateMessageProtobufType(msgDef) + "&" + protoArgName + ")";
 }
 
-std::string TCppGenerator::TImpl::GenerateDeferredCreateFuncName(const NIR::TTableDef& tableDef) {
-    return "Defer" + GenerateCreateFuncName(tableDef);
+std::string TCppGenerator::TImpl::GenerateDeferredCreateFuncName(const NIR::TMessageDef& msgDef) {
+    return "Defer" + GenerateCreateFuncName(msgDef);
 }
 
-std::string TCppGenerator::TImpl::GenerateCreateFuncName(const NIR::TTableDef& tableDef) {
-    return "Create" + tableDef.Name;
+std::string TCppGenerator::TImpl::GenerateCreateFuncName(const NIR::TMessageDef& msgDef) {
+    return "Create" + msgDef.Name;
 }
 
-std::string TCppGenerator::TImpl::GenerateTransformFuncName(const NIR::TTableDef& tableDef) {
-    return "Transform" + tableDef.Name;
+std::string TCppGenerator::TImpl::GenerateTransformFuncName(const NIR::TMessageDef& msgDef) {
+    return "Transform" + msgDef.Name;
 }
 
 std::string TCppGenerator::TImpl::GenerateEnumDescriptorFuncDeclaration(const std::string& name) {
     return "inline const ::NYaFF::NReflect::TEnumDescriptor* " + GenerateDescriptorFuncName(name) + "()";
 }
 
-std::string TCppGenerator::TImpl::GenerateTableDescriptorFuncDeclaration(const std::string& name) {
-    return "inline const ::NYaFF::NReflect::TTableDescriptor* " + GenerateDescriptorFuncName(name) + "()";
+std::string TCppGenerator::TImpl::GenerateMessageDescriptorFuncDeclaration(const std::string& name) {
+    return "inline const ::NYaFF::NReflect::TMessageDescriptor* " + GenerateDescriptorFuncName(name) + "()";
 }
 
 std::string TCppGenerator::TImpl::GenerateDescriptorFuncName(const std::string& name) {
@@ -1301,20 +1300,20 @@ std::string TCppGenerator::TImpl::GenerateDefaultDescriptor(const NIR::TType& ty
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateTableLayoutDescriptor(const ETableLayout layout) {
+std::string TCppGenerator::TImpl::GenerateMessageLayoutDescriptor(const EMessageLayout layout) {
     switch (layout) {
-        case ETableLayout::TABLE_LAYOUT_UNKNOWN:
-            return "::NYaFF::ETableLayout::TABLE_LAYOUT_UNKNOWN";
-        case ETableLayout::TABLE_LAYOUT_FIXED:
-            return "::NYaFF::ETableLayout::TABLE_LAYOUT_FIXED";
-        case ETableLayout::TABLE_LAYOUT_FLAT:
-            return "::NYaFF::ETableLayout::TABLE_LAYOUT_FLAT";
-        case ETableLayout::TABLE_LAYOUT_SPARSE:
-            return "::NYaFF::ETableLayout::TABLE_LAYOUT_SPARSE";
-        case ETableLayout::TABLE_LAYOUT_DYNAMIC:
-            return "::NYaFF::ETableLayout::TABLE_LAYOUT_DYNAMIC";
+        case EMessageLayout::MESSAGE_LAYOUT_UNKNOWN:
+            return "::NYaFF::EMessageLayout::MESSAGE_LAYOUT_UNKNOWN";
+        case EMessageLayout::MESSAGE_LAYOUT_FIXED:
+            return "::NYaFF::EMessageLayout::MESSAGE_LAYOUT_FIXED";
+        case EMessageLayout::MESSAGE_LAYOUT_FLAT:
+            return "::NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT";
+        case EMessageLayout::MESSAGE_LAYOUT_SPARSE:
+            return "::NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE";
+        case EMessageLayout::MESSAGE_LAYOUT_DYNAMIC:
+            return "::NYaFF::EMessageLayout::MESSAGE_LAYOUT_DYNAMIC";
         default:
-            YAFF_THROW("unknown table layout");
+            YAFF_THROW("unknown message layout");
     }
 }
 
@@ -1327,7 +1326,7 @@ std::string TCppGenerator::TImpl::GeneratePresenceDescriptor(const EPresence pre
         case EPresence::PRESENCE_EXPLICIT:
             return "::NYaFF::EPresence::PRESENCE_EXPLICIT";
         default:
-            YAFF_THROW("unknown table layout");
+            YAFF_THROW("unknown message layout");
     }
 }
 
@@ -1355,8 +1354,8 @@ std::string TCppGenerator::TImpl::GenerateBasicTypeDescriptor(const EType type) 
             return "::NYaFF::EType::TYPE_STRING";
         case EType::TYPE_VECTOR:
             return "::NYaFF::EType::TYPE_VECTOR";
-        case EType::TYPE_TABLE:
-            return "::NYaFF::EType::TYPE_TABLE";
+        case EType::TYPE_MESSAGE:
+            return "::NYaFF::EType::TYPE_MESSAGE";
         default:
             YAFF_THROW("unknown type");
     }
@@ -1377,19 +1376,21 @@ std::string TCppGenerator::TImpl::GenerateCompositeTypeDescriptor(const NIR::TTy
             }
             return "{.Element = &types[" + std::to_string(index.At(type.ElementType)) + "]}";
         }
-        case EType::TYPE_TABLE: {
-            if (!type.TableDef) {
-                return "{.Table = nullptr}";
+        case EType::TYPE_MESSAGE: {
+            if (!type.MessageDef) {
+                return "{.Message = nullptr}";
             }
-            const std::string name = GenerateWithNamespaceName(type.TableDef->Schema->Namespace, type.TableDef->Name);
-            return "{.Table = " + GenerateDescriptorFuncName(name) + "()}";
+            const std::string name =
+                GenerateWithNamespaceName(type.MessageDef->Schema->Namespace, type.MessageDef->Name);
+            return "{.Message = " + GenerateDescriptorFuncName(name) + "()}";
         }
         default:
             return "{}";
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateTableDefaultFuncDeclaration(const std::string& ret, const std::string& name) {
+std::string TCppGenerator::TImpl::GenerateMessageDefaultFuncDeclaration(const std::string& ret,
+                                                                        const std::string& name) {
     return "inline const " + ret + "& " + GenerateDefaultFuncName(name) + "()";
 }
 
@@ -1415,7 +1416,7 @@ std::string TCppGenerator::TImpl::GenerateTypeCastInternal(const NIR::TType& typ
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateDefaultValueExternal(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateDefaultValueExternal(const NIR::TMessageDef::TFieldDef& fieldDef) {
     switch (fieldDef.Type->Type) {
         case EType::TYPE_ENUM: {
             const std::string externalType = GenerateTypeExternal(*fieldDef.Type);
@@ -1432,7 +1433,7 @@ std::string TCppGenerator::TImpl::GenerateDefaultValueExternal(const NIR::TTable
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateDefaultValueInternal(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateDefaultValueInternal(const NIR::TMessageDef::TFieldDef& fieldDef) {
     switch (fieldDef.Type->Type) {
         case EType::TYPE_ENUM: {
             const std::string externalType = GenerateTypeExternal(*fieldDef.Type);
@@ -1447,15 +1448,15 @@ std::string TCppGenerator::TImpl::GenerateDefaultValueInternal(const NIR::TTable
             return GenerateTypeInternal(*fieldDef.Type) + "::Default()";
         }
         case EType::TYPE_VECTOR:
-            return (NIR::IsSequentialTable(*fieldDef.Type)
-                        ? GenerateWithNamespaceName(
-                              fieldDef.Type->ElementType->TableDef->Schema->Namespace,
-                              GenerateDefaultFuncName(GenerateTableColumnName(*fieldDef.Type->ElementType->TableDef))) +
+            return (NIR::IsSequentialMessage(*fieldDef.Type)
+                        ? GenerateWithNamespaceName(fieldDef.Type->ElementType->MessageDef->Schema->Namespace,
+                                                    GenerateDefaultFuncName(GenerateMessageColumnName(
+                                                        *fieldDef.Type->ElementType->MessageDef))) +
                               "()"
                         : GenerateTypeInternal(*fieldDef.Type) + "::Default()");
-        case EType::TYPE_TABLE:
-            return GenerateWithNamespaceName(fieldDef.Type->TableDef->Schema->Namespace,
-                                             GenerateDefaultFuncName(fieldDef.Type->TableDef->Name)) +
+        case EType::TYPE_MESSAGE:
+            return GenerateWithNamespaceName(fieldDef.Type->MessageDef->Schema->Namespace,
+                                             GenerateDefaultFuncName(fieldDef.Type->MessageDef->Name)) +
                    "()";
         default: {
             const std::string* defaultPtr = FindKey(fieldDef.Type->Modifiers, NIR::DEFAULT_MODIFIER_NAME);
@@ -1489,10 +1490,10 @@ std::string TCppGenerator::TImpl::GenerateTypeProtobuf(const NIR::TType& type) {
             return "std::string";
         case EType::TYPE_VECTOR:
             return (NIR::IsAssociative(type)
-                        ? GenerateTableProtobufMap(*type.ElementType->TableDef)
+                        ? GenerateMessageProtobufMap(*type.ElementType->MessageDef)
                         : "::google::protobuf::RepeatedPtrField<" + GenerateTypeProtobuf(*type.ElementType) + ">");
-        case EType::TYPE_TABLE:
-            return GenerateTableProtobufType(*type.TableDef);
+        case EType::TYPE_MESSAGE:
+            return GenerateMessageProtobufType(*type.MessageDef);
         default:
             return GenerateTypeExternal(type);
     }
@@ -1504,7 +1505,7 @@ std::string TCppGenerator::TImpl::GenerateTypeExternal(const NIR::TType& type) {
             return GenerateWithNamespaceName(type.EnumDef->Schema->Namespace, type.EnumDef->Name);
         case EType::TYPE_STRING:
         case EType::TYPE_VECTOR:
-        case EType::TYPE_TABLE: {
+        case EType::TYPE_MESSAGE: {
             const std::string offsetType =
                 (NIR::IsInline(type) ? "::NYaFF::TInlineOffset" : "::NYaFF::TInternalOffset");
             return offsetType + "<" + GenerateTypeInternal(type) + ">";
@@ -1521,13 +1522,13 @@ std::string TCppGenerator::TImpl::GenerateTypeInternal(const NIR::TType& type) {
         case EType::TYPE_STRING:
             return "::NYaFF::TString";
         case EType::TYPE_VECTOR:
-            return NIR::IsSequentialTable(type)
+            return NIR::IsSequentialMessage(type)
                        ? GenerateWithNamespaceName(
-                             type.ElementType->TableDef->Schema->Namespace,
-                             GenerateTableColumnName(*type.ElementType->TableDef) + "<::NYaFF::NExp::TSizeable>")
+                             type.ElementType->MessageDef->Schema->Namespace,
+                             GenerateMessageColumnName(*type.ElementType->MessageDef) + "<::NYaFF::NExp::TSizeable>")
                        : "::NYaFF::TVector<" + GenerateTypeExternal(*type.ElementType) + ">";
-        case EType::TYPE_TABLE:
-            return GenerateWithNamespaceName(type.TableDef->Schema->Namespace, type.TableDef->Name);
+        case EType::TYPE_MESSAGE:
+            return GenerateWithNamespaceName(type.MessageDef->Schema->Namespace, type.MessageDef->Name);
         default:
             return GenerateBasicType(type.Type);
     }
@@ -1554,37 +1555,37 @@ std::string TCppGenerator::TImpl::GenerateBasicType(const EType type) {
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateTableType(const ETableType type) {
+std::string TCppGenerator::TImpl::GenerateMessageType(const EMessageType type) {
     switch (type) {
-        case ETableType::FIXED:
+        case EMessageType::FIXED:
             return "Fixed";
-        case ETableType::FLAT:
+        case EMessageType::FLAT:
             return "Flat";
-        case ETableType::SPARSE:
+        case EMessageType::SPARSE:
             return "Sparse";
     }
-    YAFF_THROW("unknown table type");
+    YAFF_THROW("unknown message type");
 }
 
-std::string TCppGenerator::TImpl::GenerateTableBaseClass(const NIR::TTableDef& tableDef) {
-    switch (tableDef.Layout) {
-        case ETableLayout::TABLE_LAYOUT_FIXED:
-            return "::NYaFF::TFixedTable<" + GenerateTableStaticMetaName(tableDef) + ">";
-        case ETableLayout::TABLE_LAYOUT_FLAT:
-            return "::NYaFF::TFlatTable<" + GenerateTableStaticMetaName(tableDef) + ">";
-        case ETableLayout::TABLE_LAYOUT_SPARSE:
-            return "::NYaFF::TSparseTable";
-        case ETableLayout::TABLE_LAYOUT_DYNAMIC: {
+std::string TCppGenerator::TImpl::GenerateMessageBaseClass(const NIR::TMessageDef& msgDef) {
+    switch (msgDef.Layout) {
+        case EMessageLayout::MESSAGE_LAYOUT_FIXED:
+            return "::NYaFF::TFixedMessage<" + GenerateMessageStaticMetaName(msgDef) + ">";
+        case EMessageLayout::MESSAGE_LAYOUT_FLAT:
+            return "::NYaFF::TFlatMessage<" + GenerateMessageStaticMetaName(msgDef) + ">";
+        case EMessageLayout::MESSAGE_LAYOUT_SPARSE:
+            return "::NYaFF::TSparseMessage";
+        case EMessageLayout::MESSAGE_LAYOUT_DYNAMIC: {
             const std::string templateArgs =
-                (!NIR::IsGapTable(tableDef) ? GenerateTableStaticMetaName(tableDef) : "void");
-            return "::NYaFF::TDynamicTable<" + templateArgs + ">";
+                (!NIR::IsGapMessage(msgDef) ? GenerateMessageStaticMetaName(msgDef) : "void");
+            return "::NYaFF::TDynamicMessage<" + templateArgs + ">";
         }
         default:
-            YAFF_THROW("unknown table layout");
+            YAFF_THROW("unknown message layout");
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateFieldName(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateFieldName(const NIR::TMessageDef::TFieldDef& fieldDef) {
     return GenerateEscapedName(ToLowerString(fieldDef.Name));
 }
 
@@ -1604,13 +1605,13 @@ std::string TCppGenerator::TImpl::GenerateStringDefault(const NIR::TType& type) 
     return arrayLiteral;
 }
 
-std::string TCppGenerator::TImpl::GenerateDefaultName(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateDefaultName(const NIR::TMessageDef::TFieldDef& fieldDef) {
     std::string defaultName = fieldDef.Name + "_DEFAULT";
     std::transform(defaultName.cbegin(), defaultName.cend(), defaultName.begin(), toupper);
     return defaultName;
 }
 
-std::string TCppGenerator::TImpl::GenerateIdName(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateIdName(const NIR::TMessageDef::TFieldDef& fieldDef) {
     std::string idName = "ID_" + (!fieldDef.Deprecated ? fieldDef.Name : "DEPRECATED" + std::to_string(fieldDef.Id));
     std::transform(idName.cbegin(), idName.cend(), idName.begin(), toupper);
     return idName;
@@ -1627,7 +1628,7 @@ std::string TCppGenerator::TImpl::GenerateSharedOffsetDefaultCaseEnumName(const 
 }
 
 std::string TCppGenerator::TImpl::GenerateSharedOffsetFieldName(const std::string& name,
-                                                                const NIR::TTableDef::TFieldDef* fieldDef) {
+                                                                const NIR::TMessageDef::TFieldDef* fieldDef) {
     YAFF_REQUIRE(fieldDef && fieldDef->SharedOffsetVia == name);
     std::string fieldName = "k" + ToCamelCase(fieldDef->Name, true);
     return fieldName;
@@ -1639,7 +1640,7 @@ std::string TCppGenerator::TImpl::GenerateGetterReturnType(const NIR::TType& typ
     return (!NIR::IsScalar(type.Type) ? "const " + GenerateTypeInternal(type) + "&" : GenerateTypeExternal(type));
 }
 
-std::string TCppGenerator::TImpl::GenerateTableCreateFuncArgument(const NIR::TTableDef::TFieldDef& fieldDef) {
+std::string TCppGenerator::TImpl::GenerateMessageCreateFuncArgument(const NIR::TMessageDef::TFieldDef& fieldDef) {
     const bool isScalar = NIR::IsScalar(fieldDef.Type->Type);
     const bool isOptional = NIR::IsExplicitField(fieldDef) && isScalar;
     const std::string fieldType = GenerateTypeExternal(*fieldDef.Type);
@@ -1650,55 +1651,55 @@ std::string TCppGenerator::TImpl::GenerateTableCreateFuncArgument(const NIR::TTa
     return argType + " " + argName + defaultSuffix;
 }
 
-std::string TCppGenerator::TImpl::GenerateTableBasicCreateFuncDefault(const NIR::TTableDef& tableDef) {
-    switch (tableDef.Layout) {
-        case ETableLayout::TABLE_LAYOUT_FIXED:
-            return GenerateTableBuilderName(ETableType::FIXED, tableDef);
-        case ETableLayout::TABLE_LAYOUT_FLAT:
-            return GenerateTableBuilderName(ETableType::FLAT, tableDef);
-        case ETableLayout::TABLE_LAYOUT_SPARSE:
-            return GenerateTableBuilderName(ETableType::SPARSE, tableDef);
-        case ETableLayout::TABLE_LAYOUT_DYNAMIC: {
-            const ETableType type = (NIR::IsGapTable(tableDef) ? ETableType::SPARSE : ETableType::FLAT);
-            return GenerateTableBuilderName(type, tableDef);
+std::string TCppGenerator::TImpl::GenerateMessageBasicCreateFuncDefault(const NIR::TMessageDef& msgDef) {
+    switch (msgDef.Layout) {
+        case EMessageLayout::MESSAGE_LAYOUT_FIXED:
+            return GenerateMessageBuilderName(EMessageType::FIXED, msgDef);
+        case EMessageLayout::MESSAGE_LAYOUT_FLAT:
+            return GenerateMessageBuilderName(EMessageType::FLAT, msgDef);
+        case EMessageLayout::MESSAGE_LAYOUT_SPARSE:
+            return GenerateMessageBuilderName(EMessageType::SPARSE, msgDef);
+        case EMessageLayout::MESSAGE_LAYOUT_DYNAMIC: {
+            const EMessageType type = (NIR::IsGapMessage(msgDef) ? EMessageType::SPARSE : EMessageType::FLAT);
+            return GenerateMessageBuilderName(type, msgDef);
         }
         default:
-            YAFF_THROW("unknown table layout");
+            YAFF_THROW("unknown message layout");
     }
 }
 
-std::string TCppGenerator::TImpl::GenerateTableBasicCreateFuncCall(const NIR::TTableDef& tableDef,
-                                                                   const std::string& templateArg) {
+std::string TCppGenerator::TImpl::GenerateMessageBasicCreateFuncCall(const NIR::TMessageDef& msgDef,
+                                                                     const std::string& templateArg) {
     std::string result =
-        GenerateCreateFuncName(tableDef) + (!templateArg.empty() ? "<" + templateArg + ">" : "") + "(yffb";
-    ForRealFields(tableDef, [&](const auto& fieldDef) { result += ", a_" + GenerateFieldName(fieldDef); });
+        GenerateCreateFuncName(msgDef) + (!templateArg.empty() ? "<" + templateArg + ">" : "") + "(yffb";
+    ForRealFields(msgDef, [&](const auto& fieldDef) { result += ", a_" + GenerateFieldName(fieldDef); });
     result += ")";
     return result;
 }
 
-std::string TCppGenerator::TImpl::GenerateTableBasicCreateFuncDeferredCall(const NIR::TTableDef& tableDef,
-                                                                           const std::string& templateArg) {
-    std::string result = "[=, &yffb]() { return " + GenerateCreateFuncName(tableDef) +
+std::string TCppGenerator::TImpl::GenerateMessageBasicCreateFuncDeferredCall(const NIR::TMessageDef& msgDef,
+                                                                             const std::string& templateArg) {
+    std::string result = "[=, &yffb]() { return " + GenerateCreateFuncName(msgDef) +
                          (!templateArg.empty() ? "<" + templateArg + ">" : "") + "(yffb";
-    ForRealFields(tableDef, [&](const auto& fieldDef) { result += ", a_" + GenerateFieldName(fieldDef); });
+    ForRealFields(msgDef, [&](const auto& fieldDef) { result += ", a_" + GenerateFieldName(fieldDef); });
     result += "); }";
     return result;
 }
 
-std::string TCppGenerator::TImpl::GenerateTableProtobufType(const NIR::TTableDef& tableDef) {
-    return NIR::IsAssociativePair(tableDef) ? GenerateTableProtobufPair(tableDef) : GenerateTableProtobufName(tableDef);
+std::string TCppGenerator::TImpl::GenerateMessageProtobufType(const NIR::TMessageDef& msgDef) {
+    return NIR::IsAssociativePair(msgDef) ? GenerateMessageProtobufPair(msgDef) : GenerateMessageProtobufName(msgDef);
 }
 
-std::string TCppGenerator::TImpl::GenerateTableProtobufPair(const NIR::TTableDef& tableDef) {
-    YAFF_REQUIRE(NIR::IsAssociativePair(tableDef));
-    return "std::pair<const " + GenerateTypeProtobuf(*tableDef.Fields.at(0).Type) + ", " +
-           GenerateTypeProtobuf(*tableDef.Fields.at(1).Type) + ">";
+std::string TCppGenerator::TImpl::GenerateMessageProtobufPair(const NIR::TMessageDef& msgDef) {
+    YAFF_REQUIRE(NIR::IsAssociativePair(msgDef));
+    return "std::pair<const " + GenerateTypeProtobuf(*msgDef.Fields.at(0).Type) + ", " +
+           GenerateTypeProtobuf(*msgDef.Fields.at(1).Type) + ">";
 }
 
-std::string TCppGenerator::TImpl::GenerateTableProtobufMap(const NIR::TTableDef& tableDef) {
-    YAFF_REQUIRE(NIR::IsAssociativePair(tableDef));
-    return "::google::protobuf::Map<" + GenerateTypeProtobuf(*tableDef.Fields.at(0).Type) + ", " +
-           GenerateTypeProtobuf(*tableDef.Fields.at(1).Type) + ">";
+std::string TCppGenerator::TImpl::GenerateMessageProtobufMap(const NIR::TMessageDef& msgDef) {
+    YAFF_REQUIRE(NIR::IsAssociativePair(msgDef));
+    return "::google::protobuf::Map<" + GenerateTypeProtobuf(*msgDef.Fields.at(0).Type) + ", " +
+           GenerateTypeProtobuf(*msgDef.Fields.at(1).Type) + ">";
 }
 
 std::string TCppGenerator::TImpl::GenerateEnumProtobufName(const NIR::TEnumDef& enumDef) {
@@ -1707,22 +1708,22 @@ std::string TCppGenerator::TImpl::GenerateEnumProtobufName(const NIR::TEnumDef& 
     return GenerateWithNamespaceName(*protoNamespace, enumDef.Name);
 }
 
-std::string TCppGenerator::TImpl::GenerateTableProtobufName(const NIR::TTableDef& tableDef) {
-    const std::string* protoNamespace = FindKey(tableDef.Schema->Attributes, NIR::PROTO_NAMESPACE_ATTRIBUTE_NAME);
+std::string TCppGenerator::TImpl::GenerateMessageProtobufName(const NIR::TMessageDef& msgDef) {
+    const std::string* protoNamespace = FindKey(msgDef.Schema->Attributes, NIR::PROTO_NAMESPACE_ATTRIBUTE_NAME);
     YAFF_REQUIRE(protoNamespace);
-    return GenerateWithNamespaceName(*protoNamespace, tableDef.Name);
+    return GenerateWithNamespaceName(*protoNamespace, msgDef.Name);
 }
 
-std::string TCppGenerator::TImpl::GenerateTableColumnName(const NIR::TTableDef& tableDef) {
-    return tableDef.Name + "Column";
+std::string TCppGenerator::TImpl::GenerateMessageColumnName(const NIR::TMessageDef& msgDef) {
+    return msgDef.Name + "Column";
 }
 
-std::string TCppGenerator::TImpl::GenerateTableStaticMetaName(const NIR::TTableDef& tableDef) {
-    return tableDef.Name + "Meta";
+std::string TCppGenerator::TImpl::GenerateMessageStaticMetaName(const NIR::TMessageDef& msgDef) {
+    return msgDef.Name + "Meta";
 }
 
-std::string TCppGenerator::TImpl::GenerateTableBuilderName(ETableType tableType, const NIR::TTableDef& tableDef) {
-    return tableDef.Name + GenerateTableType(tableType) + "Builder";
+std::string TCppGenerator::TImpl::GenerateMessageBuilderName(EMessageType msgType, const NIR::TMessageDef& msgDef) {
+    return msgDef.Name + GenerateMessageType(msgType) + "Builder";
 }
 
 std::string TCppGenerator::TImpl::GenerateWithNamespaceName(const std::string& ns, const std::string& name) {

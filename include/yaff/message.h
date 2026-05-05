@@ -6,18 +6,18 @@ namespace NYaFF {
 
 namespace NReflect {
 
-struct TAnyTable;
+struct TAnyMessage;
 
 }
 
 template <typename M>
-YAFF_LAYOUT_BEGIN(TFixedTable) {
+YAFF_LAYOUT_BEGIN(TFixedMessage) {
 public:
     using TMetaType = M;
 
 public:
-    TFixedTable(const TFixedTable&) = delete;
-    TFixedTable& operator=(const TFixedTable&) = delete;
+    TFixedMessage(const TFixedMessage&) = delete;
+    TFixedMessage& operator=(const TFixedMessage&) = delete;
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
@@ -41,8 +41,8 @@ public:
         return ReadPresenceUnsafe<T>(M::ResolveField(id));
     }
 
-    static const TFixedTable<M>& Default() noexcept {
-        return *NYaFF::ReadLayout<TFixedTable<M>>(DEFAULT_TABLE);
+    static const TFixedMessage<M>& Default() noexcept {
+        return *NYaFF::ReadLayout<TFixedMessage<M>>(DEFAULT_MESSAGE);
     }
 
 protected:
@@ -54,32 +54,32 @@ protected:
         }
     }
 
-    inline static constexpr std::byte DEFAULT_TABLE[MetaLimit()] = {};
+    inline static constexpr std::byte DEFAULT_MESSAGE[MetaLimit()] = {};
 
-    TFixedTable() noexcept = default;
+    TFixedMessage() noexcept = default;
 
 private:
-    friend struct NReflect::TAnyTable;
+    friend struct NReflect::TAnyMessage;
 
-    YAFF_PURE const std::byte* Table() const noexcept {
+    YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
     }
 
     template <typename T>
     YAFF_PURE T ReadValueUnsafe(const TFieldOffset offset, const T defaultVal) const noexcept {
-        return XorDef(NYaFF::ReadValue<T>(Table() + offset), defaultVal);
+        return XorDef(NYaFF::ReadValue<T>(Message() + offset), defaultVal);
     }
 
     template <typename T>
     YAFF_PURE const T* ReadLayoutUnsafe(const TFieldOffset offset, const T* defaultPtr = nullptr) const noexcept {
-        const TOffset pointer = NYaFF::ReadValue<TOffset>(Table() + offset);
-        return ResolveNullableOffset<T>(Table(), pointer, defaultPtr);
+        const TOffset pointer = NYaFF::ReadValue<TOffset>(Message() + offset);
+        return ResolveNullableOffset<T>(Message(), pointer, defaultPtr);
     }
 
     template <typename T>
     YAFF_PURE bool ReadPresenceUnsafe(const TFieldOffset offset) const noexcept {
         using TPresenceType = typename std::conditional_t<std::is_scalar<T>::value, T, TOffset>;
-        return NYaFF::ReadValue<TPresenceType>(Table() + offset) != 0;
+        return NYaFF::ReadValue<TPresenceType>(Message() + offset) != 0;
     }
 
     std::byte Data_[MetaLimit()];
@@ -87,16 +87,16 @@ private:
 YAFF_LAYOUT_END
 
 template <typename T>
-concept CFixedTable = std::is_base_of<TFixedTable<typename T::TMetaType>, T>::value;
+concept CFixedMessage = std::is_base_of<TFixedMessage<typename T::TMetaType>, T>::value;
 
 template <typename M>
-YAFF_LAYOUT_BEGIN(TFlatTable) {
+YAFF_LAYOUT_BEGIN(TFlatMessage) {
 public:
     using TMetaType = M;
 
 public:
-    TFlatTable(const TFlatTable&) = delete;
-    TFlatTable& operator=(const TFlatTable&) = delete;
+    TFlatMessage(const TFlatMessage&) = delete;
+    TFlatMessage& operator=(const TFlatMessage&) = delete;
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
@@ -114,20 +114,20 @@ public:
         return ToTypedLimit(id) < typedLimit && ReadPresenceUnsafe<T>(typedLimit, id, M::ResolveField(id));
     }
 
-    static const TFlatTable<M>& Default() noexcept {
-        return *NYaFF::ReadLayout<TFlatTable<M>>(DEFAULT_TABLE);
+    static const TFlatMessage<M>& Default() noexcept {
+        return *NYaFF::ReadLayout<TFlatMessage<M>>(DEFAULT_MESSAGE);
     }
 
 protected:
-    inline static constexpr std::byte DEFAULT_TABLE[] = {std::byte{0x03}, std::byte{0x80}};
+    inline static constexpr std::byte DEFAULT_MESSAGE[] = {std::byte{0x03}, std::byte{0x80}};
 
-    TFlatTable() noexcept = default;
+    TFlatMessage() noexcept = default;
 
 private:
-    friend struct NReflect::TAnyTable;
+    friend struct NReflect::TAnyMessage;
 
     template <typename T>
-    friend struct TDynamicTable;
+    friend struct TDynamicMessage;
 
     inline static constexpr TFieldId ToTypedLimit(const TFieldId id) noexcept {
         return ((id << 0x2) | 0x8003);
@@ -141,7 +141,7 @@ private:
         return reinterpret_cast<const std::byte*>(this + 1);
     }
 
-    YAFF_PURE const std::byte* Table() const noexcept {
+    YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
     }
 
@@ -153,7 +153,7 @@ private:
     template <typename T>
     YAFF_PURE const T* ReadLayoutUnsafe(const TFieldOffset offset, const T* defaultPtr = nullptr) const noexcept {
         const TOffset pointer = NYaFF::ReadValue<TOffset>(Fields() + offset);
-        return ResolveNullableOffset<T>(Table(), pointer, defaultPtr);
+        return ResolveNullableOffset<T>(Message(), pointer, defaultPtr);
     }
 
     template <typename T>
@@ -164,7 +164,7 @@ private:
 
     template <typename T>
     YAFF_PURE bool ReadExplicitPresenceUnsafe(const TFieldId id) const noexcept {
-        return static_cast<std::uint8_t>(Table()[-((id - 0x1) >> 0x3) - 0x1]) &
+        return static_cast<std::uint8_t>(Message()[-((id - 0x1) >> 0x3) - 0x1]) &
                (static_cast<std::uint8_t>(0x1) << ((id - 0x1) & 0x7));
     }
 
@@ -179,12 +179,12 @@ private:
 YAFF_LAYOUT_END
 
 template <typename T>
-concept CFlatTable = std::is_base_of<TFlatTable<typename T::TMetaType>, T>::value;
+concept CFlatMessage = std::is_base_of<TFlatMessage<typename T::TMetaType>, T>::value;
 
-YAFF_LAYOUT_BEGIN(TSparseTable) {
+YAFF_LAYOUT_BEGIN(TSparseMessage) {
 public:
-    TSparseTable(const TSparseTable&) = delete;
-    TSparseTable& operator=(const TSparseTable&) = delete;
+    TSparseMessage(const TSparseMessage&) = delete;
+    TSparseMessage& operator=(const TSparseMessage&) = delete;
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
@@ -201,20 +201,20 @@ public:
         return ToTypedLimit(id) < TypedLimit_ && ReadPresenceUnsafe<T>(ResolveField(id));
     }
 
-    static const TSparseTable& Default() noexcept {
-        return *NYaFF::ReadLayout<TSparseTable>(DEFAULT_TABLE);
+    static const TSparseMessage& Default() noexcept {
+        return *NYaFF::ReadLayout<TSparseMessage>(DEFAULT_MESSAGE);
     }
 
 protected:
-    inline static constexpr std::byte DEFAULT_TABLE[] = {std::byte{0x3}, std::byte{0x0}};
+    inline static constexpr std::byte DEFAULT_MESSAGE[] = {std::byte{0x3}, std::byte{0x0}};
 
-    TSparseTable() noexcept = default;
+    TSparseMessage() noexcept = default;
 
 private:
-    friend struct NReflect::TAnyTable;
+    friend struct NReflect::TAnyMessage;
 
     template <typename T>
-    friend struct TDynamicTable;
+    friend struct TDynamicMessage;
 
     inline static constexpr TFieldId ToTypedLimit(const TFieldId id) noexcept {
         return ((id << 0x2) | 0x3);
@@ -226,7 +226,7 @@ private:
 
     inline static constexpr TFieldId TINY_OFFSET_MAX_ID = 0x20;
 
-    YAFF_PURE const std::byte* Table() const noexcept {
+    YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
     }
 
@@ -235,7 +235,7 @@ private:
     }
 
     YAFF_PURE const char* ReadMeta() const noexcept {
-        return ResolveOffset<char>(Table(), NYaFF::ReadValue<TSignedOffset>(Data()));
+        return ResolveOffset<char>(Message(), NYaFF::ReadValue<TSignedOffset>(Data()));
     }
 
     YAFF_PURE TFieldOffset ReadTinyOffset(const TFieldId id) const noexcept {
@@ -256,12 +256,12 @@ private:
 
     template <typename T>
     YAFF_PURE T ReadValueUnsafe(const TFieldOffset offset, const T defaultVal) const noexcept {
-        return offset ? NYaFF::ReadValue<T>(Table() + offset) : defaultVal;
+        return offset ? NYaFF::ReadValue<T>(Message() + offset) : defaultVal;
     }
 
     template <typename T>
     YAFF_PURE const T* ReadLayoutUnsafe(const TFieldOffset offset, const T* defaultPtr) const noexcept {
-        return offset ? ResolveOffset<T>(Table(), NYaFF::ReadValue<TOffset>(Table() + offset)) : defaultPtr;
+        return offset ? ResolveOffset<T>(Message(), NYaFF::ReadValue<TOffset>(Message() + offset)) : defaultPtr;
     }
 
     template <typename T>
@@ -274,19 +274,19 @@ private:
 YAFF_LAYOUT_END
 
 template <typename T>
-concept CSparseTable = std::is_base_of<TSparseTable, T>::value;
+concept CSparseMessage = std::is_base_of<TSparseMessage, T>::value;
 
 template <typename M>
-struct TDynamicTable;
+struct TDynamicMessage;
 
 template <>
-YAFF_LAYOUT_BEGIN(TDynamicTable<void>) {
+YAFF_LAYOUT_BEGIN(TDynamicMessage<void>) {
 public:
     using TMetaType = void;
 
 public:
-    TDynamicTable(const TDynamicTable&) = delete;
-    TDynamicTable& operator=(const TDynamicTable&) = delete;
+    TDynamicMessage(const TDynamicMessage&) = delete;
+    TDynamicMessage& operator=(const TDynamicMessage&) = delete;
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
@@ -303,26 +303,26 @@ public:
         return ReadPresenceDispatch<T>(TypedLimit_, id);
     }
 
-    static const TDynamicTable<void>& Default() noexcept {
-        return *NYaFF::ReadLayout<TDynamicTable<void>>(DEFAULT_TABLE);
+    static const TDynamicMessage<void>& Default() noexcept {
+        return *NYaFF::ReadLayout<TDynamicMessage<void>>(DEFAULT_MESSAGE);
     }
 
 protected:
-    inline static constexpr std::byte DEFAULT_TABLE[] = {std::byte{0x3}, std::byte{0x0}};
+    inline static constexpr std::byte DEFAULT_MESSAGE[] = {std::byte{0x3}, std::byte{0x0}};
 
-    TDynamicTable() noexcept = default;
+    TDynamicMessage() noexcept = default;
 
 private:
-    friend struct NReflect::TAnyTable;
+    friend struct NReflect::TAnyMessage;
 
     template <typename T>
-    friend struct TDynamicTable;
+    friend struct TDynamicMessage;
 
     inline static constexpr bool IsFlat(const TFieldId id) noexcept {
         return id & 0x8000;
     }
 
-    YAFF_PURE const std::byte* Table() const noexcept {
+    YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
     }
 
@@ -331,8 +331,8 @@ private:
         if (YAFF_UNLIKELY(IsFlat(typedLimit))) {
             return defaultVal;
         }
-        if (YAFF_LIKELY(TSparseTable::ToTypedLimit(id) < typedLimit)) {
-            return AsSparseTable()->ReadValueUnsafe<T>(AsSparseTable()->ResolveField(id), defaultVal);
+        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < typedLimit)) {
+            return AsSparseMessage()->ReadValueUnsafe<T>(AsSparseMessage()->ResolveField(id), defaultVal);
         }
         return defaultVal;
     }
@@ -343,8 +343,8 @@ private:
         if (YAFF_UNLIKELY(IsFlat(typedLimit))) {
             return defaultPtr;
         }
-        if (YAFF_LIKELY(TSparseTable::ToTypedLimit(id) < typedLimit)) {
-            return AsSparseTable()->ReadLayoutUnsafe<T>(AsSparseTable()->ResolveField(id), defaultPtr);
+        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < typedLimit)) {
+            return AsSparseMessage()->ReadLayoutUnsafe<T>(AsSparseMessage()->ResolveField(id), defaultPtr);
         }
         return defaultPtr;
     }
@@ -354,14 +354,14 @@ private:
         if (YAFF_UNLIKELY(IsFlat(typedLimit))) {
             return false;
         }
-        if (YAFF_LIKELY(TSparseTable::ToTypedLimit(id) < typedLimit)) {
-            return AsSparseTable()->ReadPresenceUnsafe<T>(AsSparseTable()->ResolveField(id));
+        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < typedLimit)) {
+            return AsSparseMessage()->ReadPresenceUnsafe<T>(AsSparseMessage()->ResolveField(id));
         }
         return false;
     }
 
-    YAFF_PURE const TSparseTable* AsSparseTable() const noexcept {
-        return NYaFF::ReadLayout<TSparseTable>(Table());
+    YAFF_PURE const TSparseMessage* AsSparseMessage() const noexcept {
+        return NYaFF::ReadLayout<TSparseMessage>(Message());
     }
 
     TFieldId TypedLimit_;
@@ -369,61 +369,61 @@ private:
 YAFF_LAYOUT_END
 
 template <typename M>
-YAFF_LAYOUT_BEGIN(TDynamicTable) {
+YAFF_LAYOUT_BEGIN(TDynamicMessage) {
 public:
     using TMetaType = M;
 
 public:
-    TDynamicTable(const TDynamicTable&) = delete;
-    TDynamicTable& operator=(const TDynamicTable&) = delete;
+    TDynamicMessage(const TDynamicMessage&) = delete;
+    TDynamicMessage& operator=(const TDynamicMessage&) = delete;
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
         const TFieldId typedLimit = TypedLimit_;
-        if (YAFF_LIKELY(TFlatTable<M>::ToTypedLimit(id) < typedLimit)) {
-            return AsFlatTable()->template ReadValueUnsafe<T>(M::ResolveField(id), defaultVal);
+        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < typedLimit)) {
+            return AsFlatMessage()->template ReadValueUnsafe<T>(M::ResolveField(id), defaultVal);
         }
-        return AsDynamicTable()->template ReadValueDispatch<T>(typedLimit, id, defaultVal);
+        return AsDynamicMessage()->template ReadValueDispatch<T>(typedLimit, id, defaultVal);
     }
 
     template <typename T>
     YAFF_PURE const T* ReadLayout(const TFieldId id, const T* defaultPtr = nullptr) const noexcept {
         const TFieldId typedLimit = TypedLimit_;
-        if (YAFF_LIKELY(TFlatTable<M>::ToTypedLimit(id) < typedLimit)) {
-            return AsFlatTable()->template ReadLayoutUnsafe<T>(M::ResolveField(id), defaultPtr);
+        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < typedLimit)) {
+            return AsFlatMessage()->template ReadLayoutUnsafe<T>(M::ResolveField(id), defaultPtr);
         }
-        return AsDynamicTable()->template ReadLayoutDispatch<T>(typedLimit, id, defaultPtr);
+        return AsDynamicMessage()->template ReadLayoutDispatch<T>(typedLimit, id, defaultPtr);
     }
 
     template <typename T>
     YAFF_PURE bool ReadPresence(const TFieldId id) const noexcept {
         const TFieldId typedLimit = TypedLimit_;
-        if (YAFF_LIKELY(TFlatTable<M>::ToTypedLimit(id) < typedLimit)) {
-            return AsFlatTable()->template ReadPresenceUnsafe<T>(typedLimit, id, M::ResolveField(id));
+        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < typedLimit)) {
+            return AsFlatMessage()->template ReadPresenceUnsafe<T>(typedLimit, id, M::ResolveField(id));
         }
-        return AsDynamicTable()->template ReadPresenceDispatch<T>(typedLimit, id);
+        return AsDynamicMessage()->template ReadPresenceDispatch<T>(typedLimit, id);
     }
 
-    static const TDynamicTable<M>& Default() noexcept {
-        return *NYaFF::ReadLayout<TDynamicTable<M>>(DEFAULT_TABLE);
+    static const TDynamicMessage<M>& Default() noexcept {
+        return *NYaFF::ReadLayout<TDynamicMessage<M>>(DEFAULT_MESSAGE);
     }
 
 protected:
-    inline static constexpr std::byte DEFAULT_TABLE[] = {std::byte{0x03}, std::byte{0x80}};
+    inline static constexpr std::byte DEFAULT_MESSAGE[] = {std::byte{0x03}, std::byte{0x80}};
 
-    TDynamicTable() noexcept = default;
+    TDynamicMessage() noexcept = default;
 
 private:
-    YAFF_PURE const std::byte* Table() const noexcept {
+    YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
     }
 
-    YAFF_PURE const TFlatTable<M>* AsFlatTable() const noexcept {
-        return NYaFF::ReadLayout<TFlatTable<M>>(Table());
+    YAFF_PURE const TFlatMessage<M>* AsFlatMessage() const noexcept {
+        return NYaFF::ReadLayout<TFlatMessage<M>>(Message());
     }
 
-    YAFF_PURE const TDynamicTable<void>* AsDynamicTable() const noexcept {
-        return NYaFF::ReadLayout<TDynamicTable<void>>(Table());
+    YAFF_PURE const TDynamicMessage<void>* AsDynamicMessage() const noexcept {
+        return NYaFF::ReadLayout<TDynamicMessage<void>>(Message());
     }
 
     TFieldId TypedLimit_;
@@ -431,9 +431,9 @@ private:
 YAFF_LAYOUT_END
 
 template <typename T>
-concept CDynamicTable = std::is_base_of<TDynamicTable<typename T::TMetaType>, T>::value;
+concept CDynamicMessage = std::is_base_of<TDynamicMessage<typename T::TMetaType>, T>::value;
 
 template <typename T>
-concept CTable = CFixedTable<T> or CFlatTable<T> or CSparseTable<T> or CDynamicTable<T>;
+concept CMessage = CFixedMessage<T> or CFlatMessage<T> or CSparseMessage<T> or CDynamicMessage<T>;
 
 }  // namespace NYaFF

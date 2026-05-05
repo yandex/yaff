@@ -233,7 +233,7 @@ public:
         return fbb.Release();
     }
 
-    template <NYaFF::ETableLayout Layout>
+    template <NYaFF::EMessageLayout Layout>
     NYaFF::TDetachedBuffer GenerateYaFFFlat5(size_t max, double density) {
         const std::vector<uint64_t> values = GenerateRandomVector(5, max);
 
@@ -247,7 +247,7 @@ public:
         return yffb.Release();
     }
 
-    template <NYaFF::ETableLayout Layout>
+    template <NYaFF::EMessageLayout Layout>
     NYaFF::TDetachedBuffer GenerateYaFFFlat50(size_t max, double density) {
         const std::vector<uint64_t> values = GenerateRandomVector(50, max);
 
@@ -302,8 +302,8 @@ void BM_Space_Flat5_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const std::string table = gen.GenerateProtobufFlat5(state.range(0), state.range(1));
-        totalSize += table.size();
+        const std::string msg = gen.GenerateProtobufFlat5(state.range(0), state.range(1));
+        totalSize += msg.size();
     }
     state.counters["Size(bytes)"] =
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
@@ -313,8 +313,8 @@ void BM_Space_Flat50_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const std::string table = gen.GenerateProtobufFlat50(state.range(0), state.range(1));
-        totalSize += table.size();
+        const std::string msg = gen.GenerateProtobufFlat50(state.range(0), state.range(1));
+        totalSize += msg.size();
     }
     state.counters["Size(bytes)"] =
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
@@ -324,8 +324,8 @@ void BM_Space_Flat5_FlatBuffers(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const flatbuffers::DetachedBuffer table = gen.GenerateFlatBuffersFlat5(state.range(0), state.range(1));
-        totalSize += table.size();
+        const flatbuffers::DetachedBuffer msg = gen.GenerateFlatBuffersFlat5(state.range(0), state.range(1));
+        totalSize += msg.size();
     }
     state.counters["Size(bytes)"] =
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
@@ -335,32 +335,32 @@ void BM_Space_Flat50_FlatBuffers(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const flatbuffers::DetachedBuffer table = gen.GenerateFlatBuffersFlat50(state.range(0), state.range(1));
-        totalSize += table.size();
+        const flatbuffers::DetachedBuffer msg = gen.GenerateFlatBuffersFlat50(state.range(0), state.range(1));
+        totalSize += msg.size();
     }
     state.counters["Size(bytes)"] =
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
 }
 
-template <NYaFF::ETableLayout Layout>
+template <NYaFF::EMessageLayout Layout>
 void BM_Space_Flat5_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const NYaFF::TDetachedBuffer table = gen.GenerateYaFFFlat5<Layout>(state.range(0), state.range(1));
-        totalSize += table.Size();
+        const NYaFF::TDetachedBuffer msg = gen.GenerateYaFFFlat5<Layout>(state.range(0), state.range(1));
+        totalSize += msg.Size();
     }
     state.counters["Size(bytes)"] =
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
 }
 
-template <NYaFF::ETableLayout Layout>
+template <NYaFF::EMessageLayout Layout>
 void BM_Space_Flat50_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const NYaFF::TDetachedBuffer table = gen.GenerateYaFFFlat50<Layout>(state.range(0), state.range(1));
-        totalSize += table.Size();
+        const NYaFF::TDetachedBuffer msg = gen.GenerateYaFFFlat50<Layout>(state.range(0), state.range(1));
+        totalSize += msg.Size();
     }
     state.counters["Size(bytes)"] =
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
@@ -374,11 +374,11 @@ BENCHMARK(BM_Space_Flat5_FlatBuffers)
     ->Name("BM_Space_Flat_FlatBuffers/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Space_Flat_YaFF/FlatLayout/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Space_Flat_YaFF/SparseLayout/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
@@ -391,11 +391,11 @@ BENCHMARK(BM_Space_Flat50_FlatBuffers)
     ->Name("BM_Space_Flat_FlatBuffers/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Space_Flat_YaFF/FlatLayout/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Space_Flat_YaFF/SparseLayout/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});

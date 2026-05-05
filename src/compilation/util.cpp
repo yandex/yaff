@@ -15,29 +15,30 @@ static void GetSchemaDependencyOrderImpl(const NIR::TSchemaDef* schemaDef,
     order.emplace_back(schemaDef);
 }
 
-static void GetTableDependencyOrderImpl(const NIR::TTableDef* tableDef, std::unordered_set<const NIR::TTableDef*>& used,
-                                        std::vector<const NIR::TTableDef*>& order) {
-    YAFF_REQUIRE(tableDef);
-    used.emplace(tableDef);
-    for (const auto& fieldDef : tableDef->Fields) {
+static void GetMessageDependencyOrderImpl(const NIR::TMessageDef* msg,
+                                          std::unordered_set<const NIR::TMessageDef*>& used,
+                                          std::vector<const NIR::TMessageDef*>& order) {
+    YAFF_REQUIRE(msg);
+    used.emplace(msg);
+    for (const auto& fieldDef : msg->Fields) {
         YAFF_REQUIRE(fieldDef.Type);
-        const auto* next = NIR::ExtractTableDef(*fieldDef.Type);
-        if (next && next->Schema == tableDef->Schema && !used.contains(next)) {
-            GetTableDependencyOrderImpl(next, used, order);
+        const auto* next = NIR::ExtractMessageDef(*fieldDef.Type);
+        if (next && next->Schema == msg->Schema && !used.contains(next)) {
+            GetMessageDependencyOrderImpl(next, used, order);
         }
     }
-    order.emplace_back(tableDef);
+    order.emplace_back(msg);
 }
 
 std::vector<const NIR::TSchemaDef*> GetSchemaDependencyOrder(const NIR::TIR& ir) {
-    const size_t schemaCnt = ir.Schemas.Table.size();
+    const size_t schemaCnt = ir.Schemas.Symbols.size();
 
     std::vector<const NIR::TSchemaDef*> order;
     order.reserve(schemaCnt);
     std::unordered_set<const NIR::TSchemaDef*> used;
     used.reserve(schemaCnt);
 
-    for (const auto& [_, schema] : ir.Schemas.Table) {
+    for (const auto& [_, schema] : ir.Schemas.Symbols) {
         if (!used.contains(&schema)) {
             GetSchemaDependencyOrderImpl(&schema, used, order);
         }
@@ -46,16 +47,16 @@ std::vector<const NIR::TSchemaDef*> GetSchemaDependencyOrder(const NIR::TIR& ir)
     return order;
 }
 
-std::vector<const NIR::TTableDef*> GetTableDependencyOrder(const NIR::TSchemaDef& schemaDef) {
-    const size_t tableCount = schemaDef.Tables.size();
-    std::vector<const NIR::TTableDef*> order;
-    order.reserve(tableCount);
-    std::unordered_set<const NIR::TTableDef*> used;
-    used.reserve(tableCount);
+std::vector<const NIR::TMessageDef*> GetMessageDependencyOrder(const NIR::TSchemaDef& schemaDef) {
+    const size_t msgCount = schemaDef.Messages.size();
+    std::vector<const NIR::TMessageDef*> order;
+    order.reserve(msgCount);
+    std::unordered_set<const NIR::TMessageDef*> used;
+    used.reserve(msgCount);
 
-    for (const auto* tableDef : schemaDef.Tables) {
-        if (!used.contains(tableDef)) {
-            GetTableDependencyOrderImpl(tableDef, used, order);
+    for (const auto* msg : schemaDef.Messages) {
+        if (!used.contains(msg)) {
+            GetMessageDependencyOrderImpl(msg, used, order);
         }
     }
 

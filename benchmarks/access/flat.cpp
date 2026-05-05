@@ -8,17 +8,17 @@
 
 class TDataGenerator {
 public:
-    struct TProtobufTable {
+    struct TProtobufMessage {
         std::string Buffer;
         std::vector<uint64_t> Values;
     };
 
-    struct TFlatBuffersTable {
+    struct TFlatBuffersMessage {
         flatbuffers::DetachedBuffer Buffer;
         std::vector<uint64_t> Values;
     };
 
-    struct TYaFFTable {
+    struct TYaFFMessage {
         NYaFF::TDetachedBuffer Buffer;
         std::vector<uint64_t> Values;
     };
@@ -27,7 +27,7 @@ public:
     explicit TDataGenerator(uint64_t seed) : Rng_(seed) {
     }
 
-    TProtobufTable GenerateProtobufFlat10() {
+    TProtobufMessage GenerateProtobufFlat10() {
         std::vector<uint64_t> values = GenerateRandomVector64(10);
 
         NYaFFBench::TFlat10 proto;
@@ -48,7 +48,7 @@ public:
         };
     }
 
-    TProtobufTable GenerateProtobufFlat100() {
+    TProtobufMessage GenerateProtobufFlat100() {
         std::vector<uint64_t> values = GenerateRandomVector64(100);
 
         NYaFFBench::TFlat100 proto;
@@ -159,7 +159,7 @@ public:
         };
     }
 
-    TFlatBuffersTable GenerateFlatBuffersFlat10() {
+    TFlatBuffersMessage GenerateFlatBuffersFlat10() {
         std::vector<uint64_t> values = GenerateRandomVector64(10);
 
         flatbuffers::FlatBufferBuilder fbb;
@@ -173,7 +173,7 @@ public:
         };
     }
 
-    TFlatBuffersTable GenerateFlatBuffersFlat100() {
+    TFlatBuffersMessage GenerateFlatBuffersFlat100() {
         std::vector<uint64_t> values = GenerateRandomVector64(100);
 
         flatbuffers::FlatBufferBuilder fbb;
@@ -198,12 +198,12 @@ public:
         };
     }
 
-    template <NYaFF::ETableLayout Layout>
-    TYaFFTable GenerateYaFFFlat10() {
-        TProtobufTable protoTable = GenerateProtobufFlat10();
+    template <NYaFF::EMessageLayout Layout>
+    TYaFFMessage GenerateYaFFFlat10() {
+        TProtobufMessage protoMessage = GenerateProtobufFlat10();
 
         NYaFFBench::TFlat10 proto;
-        std::ignore = proto.ParseFromString(protoTable.Buffer);
+        std::ignore = proto.ParseFromString(protoMessage.Buffer);
 
         NYaFF::TBuilder yffb;
         yffb.EnforceDynamicAlternative(Layout);
@@ -212,16 +212,16 @@ public:
 
         return {
             .Buffer = yffb.Release(),
-            .Values = std::move(protoTable.Values),
+            .Values = std::move(protoMessage.Values),
         };
     }
 
-    template <NYaFF::ETableLayout Layout>
-    TYaFFTable GenerateYaFFFlat100() {
-        TProtobufTable protoTable = GenerateProtobufFlat100();
+    template <NYaFF::EMessageLayout Layout>
+    TYaFFMessage GenerateYaFFFlat100() {
+        TProtobufMessage protoMessage = GenerateProtobufFlat100();
 
         NYaFFBench::TFlat100 proto;
-        std::ignore = proto.ParseFromString(protoTable.Buffer);
+        std::ignore = proto.ParseFromString(protoMessage.Buffer);
 
         NYaFF::TBuilder yffb;
         yffb.EnforceDynamicAlternative(Layout);
@@ -230,7 +230,7 @@ public:
 
         return {
             .Buffer = yffb.Release(),
-            .Values = std::move(protoTable.Values),
+            .Values = std::move(protoMessage.Values),
         };
     }
 
@@ -373,11 +373,11 @@ uint64_t SumFlat100(const T& root) {
 
 void BM_Access_Flat10_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
-    const auto protoTable = gen.GenerateProtobufFlat10();
+    const auto msg = gen.GenerateProtobufFlat10();
 
     for (auto _ : state) {
         NYaFFBench::TFlat10 proto;
-        std::ignore = proto.ParseFromString(protoTable.Buffer);
+        std::ignore = proto.ParseFromString(msg.Buffer);
         uint64_t sum = SumFlat10(proto);
         benchmark::DoNotOptimize(sum);
     }
@@ -385,11 +385,11 @@ void BM_Access_Flat10_Protobuf(benchmark::State& state) {
 
 void BM_Access_Flat100_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
-    const auto protoTable = gen.GenerateProtobufFlat100();
+    const auto msg = gen.GenerateProtobufFlat100();
 
     for (auto _ : state) {
         NYaFFBench::TFlat100 proto;
-        std::ignore = proto.ParseFromString(protoTable.Buffer);
+        std::ignore = proto.ParseFromString(msg.Buffer);
         uint64_t sum = SumFlat100(proto);
         benchmark::DoNotOptimize(sum);
     }
@@ -397,10 +397,10 @@ void BM_Access_Flat100_Protobuf(benchmark::State& state) {
 
 void BM_Access_Flat10_FlatBuffers(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
-    const auto table = gen.GenerateFlatBuffersFlat10();
+    const auto msg = gen.GenerateFlatBuffersFlat10();
 
     for (auto _ : state) {
-        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::TFlat10>(table.Buffer.data());
+        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::TFlat10>(msg.Buffer.data());
         uint64_t sum = SumFlat10<NFlatBuffersBench::TFlat10>(*root);
         benchmark::DoNotOptimize(sum);
     }
@@ -408,34 +408,34 @@ void BM_Access_Flat10_FlatBuffers(benchmark::State& state) {
 
 void BM_Access_Flat100_FlatBuffers(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
-    const auto table = gen.GenerateFlatBuffersFlat100();
+    const auto msg = gen.GenerateFlatBuffersFlat100();
 
     for (auto _ : state) {
-        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::TFlat100>(table.Buffer.data());
+        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::TFlat100>(msg.Buffer.data());
         uint64_t sum = SumFlat100<NFlatBuffersBench::TFlat100>(*root);
         benchmark::DoNotOptimize(sum);
     }
 }
 
-template <NYaFF::ETableLayout Layout>
+template <NYaFF::EMessageLayout Layout>
 void BM_Access_Flat10_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
-    const auto table = gen.template GenerateYaFFFlat10<Layout>();
+    const auto msg = gen.GenerateYaFFFlat10<Layout>();
 
     for (auto _ : state) {
-        const auto& root = NYaFF::ReadRoot<NProtoYaFF::NYaFFBench::TFlat10>(table.Buffer.Data());
+        const auto& root = NYaFF::ReadRoot<NProtoYaFF::NYaFFBench::TFlat10>(msg.Buffer.Data());
         uint64_t sum = SumFlat10<NProtoYaFF::NYaFFBench::TFlat10>(root);
         benchmark::DoNotOptimize(sum);
     }
 }
 
-template <NYaFF::ETableLayout Layout>
+template <NYaFF::EMessageLayout Layout>
 void BM_Access_Flat100_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
-    const auto table = gen.template GenerateYaFFFlat100<Layout>();
+    const auto msg = gen.GenerateYaFFFlat100<Layout>();
 
     for (auto _ : state) {
-        const auto& root = NYaFF::ReadRoot<NProtoYaFF::NYaFFBench::TFlat100>(table.Buffer.Data());
+        const auto& root = NYaFF::ReadRoot<NProtoYaFF::NYaFFBench::TFlat100>(msg.Buffer.Data());
         uint64_t sum = SumFlat100<NProtoYaFF::NYaFFBench::TFlat100>(root);
         benchmark::DoNotOptimize(sum);
     }
@@ -443,14 +443,14 @@ void BM_Access_Flat100_YaFF(benchmark::State& state) {
 
 BENCHMARK(BM_Access_Flat10_Protobuf)->Name("BM_Access_Flat_Protobuf/FieldCount:10");
 BENCHMARK(BM_Access_Flat10_FlatBuffers)->Name("BM_Access_Flat_FlatBuffers/FieldCount:10");
-BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Access_Flat_YaFF/FlatLayout/FieldCount:10");
-BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Access_Flat_YaFF/SparseLayout/FieldCount:10");
 
 BENCHMARK(BM_Access_Flat100_Protobuf)->Name("BM_Access_Flat_Protobuf/FieldCount:100");
 BENCHMARK(BM_Access_Flat100_FlatBuffers)->Name("BM_Access_Flat_FlatBuffers/FieldCount:100");
-BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Access_Flat_YaFF/FlatLayout/FieldCount:100");
-BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, NYaFF::ETableLayout::TABLE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Access_Flat_YaFF/SparseLayout/FieldCount:100");

@@ -12,21 +12,21 @@ static std::string TypeString(const TType& type) {
             const std::string inner = (type.ElementType ? type.ElementType->ToString() : "Incomplete");
             return "Vector[" + inner + "]";
         }
-        case EType::TYPE_TABLE: {
-            const std::string inner = (type.TableDef ? type.TableDef->ToString() : "Incomplete");
-            return "Table{" + inner + "}";
+        case EType::TYPE_MESSAGE: {
+            const std::string inner = (type.MessageDef ? type.MessageDef->ToString() : "Incomplete");
+            return "Message{" + inner + "}";
         }
         default:
             return TypeToString(type.Type);
     }
 }
 
-size_t FixedTableSize(const TTableDef& table) {
-    YAFF_REQUIRE(IsFixedTable(table));
-    if (table.Fields.empty()) {
+size_t FixedMessageSize(const TMessageDef& msg) {
+    YAFF_REQUIRE(IsFixedMessage(msg));
+    if (msg.Fields.empty()) {
         return 0;
     }
-    const auto& last = table.Fields.back();
+    const auto& last = msg.Fields.back();
     return last.FlatOffset + last.Type->InlineSize();
 }
 
@@ -52,17 +52,17 @@ size_t InlineSize(const EType type) {
         case EType::TYPE_VECTOR:
         case EType::TYPE_STRING:
             return sizeof(TOffset);
-        case EType::TYPE_TABLE:
-            YAFF_THROW("incomplete table type");
+        case EType::TYPE_MESSAGE:
+            YAFF_THROW("incomplete message type");
     }
     YAFF_THROW("unknown type");
 }
 
 size_t TType::InlineSize() const {
-    if (Type == EType::TYPE_TABLE) {
+    if (Type == EType::TYPE_MESSAGE) {
         if (IsInline(*this)) {
-            YAFF_REQUIRE(TableDef);
-            return FixedTableSize(*TableDef);
+            YAFF_REQUIRE(MessageDef);
+            return FixedMessageSize(*MessageDef);
         }
         return sizeof(TOffset);
     }
@@ -87,11 +87,11 @@ std::string TEnumDef::ToString() const {
     return Schema->Namespace + "::" + Name;
 }
 
-TTableDef::TTableDef(std::string name, const TSchemaDef* schema, ETableLayout layout)
+TMessageDef::TMessageDef(std::string name, const TSchemaDef* schema, EMessageLayout layout)
     : TDef(std::move(name)), Schema(schema), Layout(layout) {
 }
 
-std::string TTableDef::ToString() const {
+std::string TMessageDef::ToString() const {
     return Schema->Namespace + "::" + Name;
 }
 
@@ -134,8 +134,8 @@ std::string TypeToString(const EType type) {
             return "String";
         case EType::TYPE_VECTOR:
             return "Vector";
-        case EType::TYPE_TABLE:
-            return "Table";
+        case EType::TYPE_MESSAGE:
+            return "Message";
     }
     YAFF_THROW("unknown type");
 }
@@ -174,8 +174,8 @@ EType TypeFromString(const std::string& value) {
     if (value == "Vector") {
         return EType::TYPE_VECTOR;
     }
-    if (value == "Table") {
-        return EType::TYPE_TABLE;
+    if (value == "Message") {
+        return EType::TYPE_MESSAGE;
     }
     YAFF_THROW("unknown type");
 }
@@ -205,36 +205,36 @@ EPresence PresenceFromString(const std::string& value) {
     YAFF_THROW("unknown presence type");
 }
 
-const NIR::TTableDef* ExtractTableDef(const NIR::TType& type) {
+const NIR::TMessageDef* ExtractMessageDef(const NIR::TType& type) {
     if (type.Type == EType::TYPE_VECTOR && type.ElementType) {
-        return ExtractTableDef(*type.ElementType);
+        return ExtractMessageDef(*type.ElementType);
     }
-    if (type.Type == EType::TYPE_TABLE) {
-        return type.TableDef;
+    if (type.Type == EType::TYPE_MESSAGE) {
+        return type.MessageDef;
     }
     return nullptr;
 }
 
-bool IsFixedTable(const TTableDef& table) {
-    return table.Layout == ETableLayout::TABLE_LAYOUT_FIXED;
+bool IsFixedMessage(const TMessageDef& msg) {
+    return msg.Layout == EMessageLayout::MESSAGE_LAYOUT_FIXED;
 }
 
-bool IsDynamicTable(const TTableDef& table) {
-    return table.Layout == ETableLayout::TABLE_LAYOUT_DYNAMIC;
+bool IsDynamicMessage(const TMessageDef& msg) {
+    return msg.Layout == EMessageLayout::MESSAGE_LAYOUT_DYNAMIC;
 }
 
-bool IsStaticMetaTable(const TTableDef& table) {
-    return table.Layout == ETableLayout::TABLE_LAYOUT_FIXED || table.Layout == ETableLayout::TABLE_LAYOUT_FLAT ||
-           (table.Layout == ETableLayout::TABLE_LAYOUT_DYNAMIC && !NIR::IsGapTable(table));
+bool IsStaticMetaMessage(const TMessageDef& msg) {
+    return msg.Layout == EMessageLayout::MESSAGE_LAYOUT_FIXED || msg.Layout == EMessageLayout::MESSAGE_LAYOUT_FLAT ||
+           (msg.Layout == EMessageLayout::MESSAGE_LAYOUT_DYNAMIC && !NIR::IsGapMessage(msg));
 }
 
-bool IsAssociativePair(const TTableDef& table) {
-    return table.AssociativePair;
+bool IsAssociativePair(const TMessageDef& msg) {
+    return msg.AssociativePair;
 }
 
-bool IsGapTable(const TTableDef& table) {
-    for (uint64_t i = 0; i < table.Fields.size(); ++i) {
-        if (table.Fields[i].Id != i + 1) {
+bool IsGapMessage(const TMessageDef& msg) {
+    for (uint64_t i = 0; i < msg.Fields.size(); ++i) {
+        if (msg.Fields[i].Id != i + 1) {
             return true;
         }
     }
@@ -253,24 +253,24 @@ bool IsAssociative(const TType& type) {
     return type.Modifiers.contains(NIR::ASSOCIATIVE_MODIFIER_NAME);
 }
 
-bool IsSequentialTable(const TType& type) {
-    return type.ElementType && type.ElementType->Type == EType::TYPE_TABLE &&
+bool IsSequentialMessage(const TType& type) {
+    return type.ElementType && type.ElementType->Type == EType::TYPE_MESSAGE &&
            type.Modifiers.contains(NIR::SEQUENTIAL_MODIFIER_NAME);
 }
 
-bool IsSortedSequentialTable(const TType& type) {
-    return IsSequentialTable(type) && type.Modifiers.contains(NIR::SORT_ORDER_MODIFIER_NAME);
+bool IsSortedSequentialMessage(const TType& type) {
+    return IsSequentialMessage(type) && type.Modifiers.contains(NIR::SORT_ORDER_MODIFIER_NAME);
 }
 
-bool IsFixedTable(const TType& type) {
-    return type.Type == EType::TYPE_TABLE && type.TableDef && IsFixedTable(*type.TableDef);
+bool IsFixedMessage(const TType& type) {
+    return type.Type == EType::TYPE_MESSAGE && type.MessageDef && IsFixedMessage(*type.MessageDef);
 }
 
-bool IsSharedOffsetField(const TTableDef::TFieldDef& field) {
+bool IsSharedOffsetField(const TMessageDef::TFieldDef& field) {
     return !field.SharedOffsetVia.empty();
 }
 
-bool IsExplicitField(const TTableDef::TFieldDef& field) {
+bool IsExplicitField(const TMessageDef::TFieldDef& field) {
     return field.Presence == EPresence::PRESENCE_EXPLICIT;
 }
 

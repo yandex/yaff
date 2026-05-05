@@ -8,8 +8,8 @@ NYaFF::TDetachedBuffer BuildOrderDirect() {
     // clang-format off
     NYaFF::TBuilder yffb;
 
-    // Pre-create nested objects (strings, vectors, sub-tables)
-    // before starting the root table.
+    // Pre-create nested objects (strings, vectors, nested messages)
+    // before starting the main message.
     auto symbol = yffb.CreateString("AAPL");
 
     auto exec0 = NProtoYaFF::NTrading::CreateTExecution(yffb,

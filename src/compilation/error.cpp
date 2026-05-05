@@ -21,10 +21,10 @@ std::string GetErrorMessage(const EErrorType type) {
     switch (type) {
         case EErrorType::COMPILE_ERROR_NONE:
             return "unknown compile error";
-        case EErrorType::COMPAT_TABLE_REMOVED:
-            return "table removed";
-        case EErrorType::COMPAT_TABLE_NAME_CHANGED:
-            return "table name has changed";
+        case EErrorType::COMPAT_MESSAGE_REMOVED:
+            return "message removed";
+        case EErrorType::COMPAT_MESSAGE_NAME_CHANGED:
+            return "message name has changed";
         case EErrorType::COMPAT_DEPRECATED_REMOVE:
             return "deprecated field has been removed";
         case EErrorType::COMPAT_OFFSET_MISMATCH:
@@ -33,8 +33,8 @@ std::string GetErrorMessage(const EErrorType type) {
             return "field default value mismatch";
         case EErrorType::COMPAT_BASE_TYPE_MISMATCH:
             return "field base type mismatch";
-        case EErrorType::COMPAT_TABLE_LAYOUT_CHANGED:
-            return "table layout has changed";
+        case EErrorType::COMPAT_MESSAGE_LAYOUT_CHANGED:
+            return "message layout has changed";
     }
     YAFF_THROW("unknown error type");
 }

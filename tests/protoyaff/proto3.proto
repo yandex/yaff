@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package NTestYaFF;
 
-message TImplicitTable {
+message TImplicitMessage {
     string StringField = 1;
     int64 SignedField = 2;
     uint64 UnsignedField = 3;

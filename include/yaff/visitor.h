@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-#include "any_table.h"
+#include "any_message.h"
 #include "any_vector.h"
 #include "reflect.h"
 #include "util.h"
@@ -14,8 +14,8 @@ class IVisitor {
 public:
     virtual ~IVisitor() = default;
 
-    virtual void OnTableStart() = 0;
-    virtual void OnTableEnd() = 0;
+    virtual void OnMessageStart() = 0;
+    virtual void OnMessageEnd() = 0;
 
     virtual void OnVectorStart() = 0;
     virtual void OnVectorEnd() = 0;
@@ -40,13 +40,13 @@ public:
     explicit TVisitor(IVisitor* visitor) : Visitor_(visitor) {
     }
 
-    void VisitTable(const void* ptr, const TTableDescriptor* desc) {
+    void VisitMessage(const void* ptr, const TMessageDescriptor* desc) {
         if (!ptr) {
             return;
         }
         YAFF_REQUIRE(desc);
 
-        Visitor_->OnTableStart();
+        Visitor_->OnMessageStart();
         const auto resolver = MakeFieldResolverFunc(desc);
         for (uint64_t i = 0; i < desc->FieldCount; ++i) {
             const auto& field = desc->Fields[i];
@@ -55,8 +55,8 @@ public:
             }
 
             const auto& type = *field.Type;
-            if (type.Type == EType::TYPE_TABLE) {
-                DispatchTableField(desc->Layout, ptr, field, resolver);
+            if (type.Type == EType::TYPE_MESSAGE) {
+                DispatchMessageField(desc->Layout, ptr, field, resolver);
             } else if (type.Type == EType::TYPE_STRING) {
                 DispatchStringField(desc->Layout, ptr, field, resolver);
             } else if (type.Type == EType::TYPE_VECTOR) {
@@ -65,7 +65,7 @@ public:
                 DispatchScalarField(desc->Layout, ptr, field, resolver);
             }
         }
-        Visitor_->OnTableEnd();
+        Visitor_->OnMessageEnd();
     }
 
 private:
@@ -101,8 +101,8 @@ private:
         }
 
         Visitor_->OnVectorStart();
-        if (element->Type == EType::TYPE_TABLE) {
-            DispatchTableVector(ptr, element);
+        if (element->Type == EType::TYPE_MESSAGE) {
+            DispatchMessageVector(ptr, element);
         } else if (element->Type == EType::TYPE_STRING) {
             DispatchStringVector(ptr, element);
         } else {
@@ -111,13 +111,13 @@ private:
         Visitor_->OnVectorEnd();
     }
 
-    void DispatchTableVector(const void* ptr, const TTypeDescriptor* element) {
+    void DispatchMessageVector(const void* ptr, const TTypeDescriptor* element) {
         const auto& vector = *ReadLayout<TAnyVector>(ptr);
         const size_t inlineSize = (element->Inline ? InlineSize(*element) : 0);
         for (size_t i = 0; i < vector.Size(); ++i) {
             Visitor_->OnElement(i);
             const void* ith = inlineSize ? vector.GetLayout<char>(i, inlineSize) : vector.GetLayout<char>(i);
-            VisitTable(ith, element->Descriptor.Table);
+            VisitMessage(ith, element->Descriptor.Message);
         }
     }
 
@@ -193,41 +193,41 @@ private:
         }
     }
 
-    void DispatchTableField(const ETableLayout layout, const void* ptr, const TFieldDescriptor& field,
-                            const TFieldResolverFunc& resolver) {
-        const void* child = ReadLayout<TAnyTable>(ptr)->ReadLayout<char>(layout, field.Id, &resolver);
+    void DispatchMessageField(const EMessageLayout layout, const void* ptr, const TFieldDescriptor& field,
+                              const TFieldResolverFunc& resolver) {
+        const void* child = ReadLayout<TAnyMessage>(ptr)->ReadLayout<char>(layout, field.Id, &resolver);
         if (child) {
             Visitor_->OnField(field.Name);
-            VisitTable(child, field.Type->Descriptor.Table);
+            VisitMessage(child, field.Type->Descriptor.Message);
         }
     }
 
-    void DispatchStringField(const ETableLayout layout, const void* ptr, const TFieldDescriptor& field,
+    void DispatchStringField(const EMessageLayout layout, const void* ptr, const TFieldDescriptor& field,
                              const TFieldResolverFunc& resolver) {
-        const auto* strPtr = ReadLayout<TAnyTable>(ptr)->ReadLayout<TString>(layout, field.Id, &resolver);
+        const auto* strPtr = ReadLayout<TAnyMessage>(ptr)->ReadLayout<TString>(layout, field.Id, &resolver);
         if (strPtr) {
             Visitor_->OnField(field.Name);
             Visitor_->OnString(*strPtr);
         }
     }
 
-    void DispatchVectorField(const ETableLayout layout, const void* ptr, const TFieldDescriptor& field,
+    void DispatchVectorField(const EMessageLayout layout, const void* ptr, const TFieldDescriptor& field,
                              const TFieldResolverFunc& resolver) {
-        const void* vecPtr = ReadLayout<TAnyTable>(ptr)->ReadLayout<char>(layout, field.Id, &resolver);
+        const void* vecPtr = ReadLayout<TAnyMessage>(ptr)->ReadLayout<char>(layout, field.Id, &resolver);
         if (vecPtr) {
             Visitor_->OnField(field.Name);
             VisitVector(vecPtr, field.Type->Descriptor.Element);
         }
     }
 
-    void DispatchScalarField(const ETableLayout layout, const void* ptr, const TFieldDescriptor& field,
+    void DispatchScalarField(const EMessageLayout layout, const void* ptr, const TFieldDescriptor& field,
                              const TFieldResolverFunc& resolver) {
-        const auto& table = *ReadLayout<TAnyTable>(ptr);
+        const auto& msg = *ReadLayout<TAnyMessage>(ptr);
         const auto& type = *field.Type;
 
         switch (type.Type) {
             case EType::TYPE_BOOL: {
-                VisitScalarField<bool>(table.ReadValue<bool>(layout, field.Id, type.Default.Bool, &resolver),
+                VisitScalarField<bool>(msg.ReadValue<bool>(layout, field.Id, type.Default.Bool, &resolver),
                                        [&](bool v) {
                                            Visitor_->OnField(field.Name);
                                            Visitor_->OnBool(v);
@@ -235,7 +235,7 @@ private:
                 break;
             }
             case EType::TYPE_INT32: {
-                VisitScalarField<int32_t>(table.ReadValue<int32_t>(layout, field.Id, type.Default.Int32, &resolver),
+                VisitScalarField<int32_t>(msg.ReadValue<int32_t>(layout, field.Id, type.Default.Int32, &resolver),
                                           [&](int32_t v) {
                                               Visitor_->OnField(field.Name);
                                               Visitor_->OnInt32(v);
@@ -243,7 +243,7 @@ private:
                 break;
             }
             case EType::TYPE_UINT32: {
-                VisitScalarField<uint32_t>(table.ReadValue<uint32_t>(layout, field.Id, type.Default.Uint32, &resolver),
+                VisitScalarField<uint32_t>(msg.ReadValue<uint32_t>(layout, field.Id, type.Default.Uint32, &resolver),
                                            [&](uint32_t v) {
                                                Visitor_->OnField(field.Name);
                                                Visitor_->OnUint32(v);
@@ -251,7 +251,7 @@ private:
                 break;
             }
             case EType::TYPE_INT64: {
-                VisitScalarField<int64_t>(table.ReadValue<int64_t>(layout, field.Id, type.Default.Int64, &resolver),
+                VisitScalarField<int64_t>(msg.ReadValue<int64_t>(layout, field.Id, type.Default.Int64, &resolver),
                                           [&](int64_t v) {
                                               Visitor_->OnField(field.Name);
                                               Visitor_->OnInt64(v);
@@ -259,7 +259,7 @@ private:
                 break;
             }
             case EType::TYPE_UINT64: {
-                VisitScalarField<uint64_t>(table.ReadValue<uint64_t>(layout, field.Id, type.Default.Uint64, &resolver),
+                VisitScalarField<uint64_t>(msg.ReadValue<uint64_t>(layout, field.Id, type.Default.Uint64, &resolver),
                                            [&](uint64_t v) {
                                                Visitor_->OnField(field.Name);
                                                Visitor_->OnUint64(v);
@@ -267,7 +267,7 @@ private:
                 break;
             }
             case EType::TYPE_FLOAT: {
-                VisitScalarField<float>(table.ReadValue<float>(layout, field.Id, type.Default.Float, &resolver),
+                VisitScalarField<float>(msg.ReadValue<float>(layout, field.Id, type.Default.Float, &resolver),
                                         [&](float v) {
                                             Visitor_->OnField(field.Name);
                                             Visitor_->OnFloat(v);
@@ -275,7 +275,7 @@ private:
                 break;
             }
             case EType::TYPE_DOUBLE: {
-                VisitScalarField<double>(table.ReadValue<double>(layout, field.Id, type.Default.Double, &resolver),
+                VisitScalarField<double>(msg.ReadValue<double>(layout, field.Id, type.Default.Double, &resolver),
                                          [&](double v) {
                                              Visitor_->OnField(field.Name);
                                              Visitor_->OnDouble(v);
@@ -283,7 +283,7 @@ private:
                 break;
             }
             case EType::TYPE_ENUM: {
-                VisitScalarField<int32_t>(table.ReadValue<int32_t>(layout, field.Id, type.Default.Int32, &resolver),
+                VisitScalarField<int32_t>(msg.ReadValue<int32_t>(layout, field.Id, type.Default.Int32, &resolver),
                                           [&](int32_t v) {
                                               Visitor_->OnField(field.Name);
                                               Visitor_->OnEnum(v, ResolveEnum(v, type.Descriptor.Enum));
@@ -303,12 +303,12 @@ public:
     TPrinter(std::ostream& out, const std::string& ident = "\t") : Writer_(out, ident) {
     }
 
-    virtual void OnTableStart() {
+    virtual void OnMessageStart() {
         Writer_ |= "{";
         Writer_.IncrementIdentLevel();
     };
 
-    virtual void OnTableEnd() {
+    virtual void OnMessageEnd() {
         Writer_.DecrementIdentLevel();
         Writer_ |= "}";
     };
@@ -370,10 +370,10 @@ private:
     TCodeWriter Writer_;
 };
 
-inline std::string DebugString(const void* ptr, const TTableDescriptor* desc) {
+inline std::string DebugString(const void* ptr, const TMessageDescriptor* desc) {
     std::ostringstream out;
     TPrinter printer(out);
-    TVisitor{&printer}.VisitTable(ptr, desc);
+    TVisitor{&printer}.VisitMessage(ptr, desc);
     return out.str();
 }
 

@@ -25,7 +25,7 @@ template <typename T>
 struct TSymbolTable {
     std::pair<T*, bool> TryEmplace(T value) {
         std::string key = value.ToString();
-        const auto [it, emplaced] = Table.try_emplace(std::move(key), std::move(value));
+        const auto [it, emplaced] = Symbols.try_emplace(std::move(key), std::move(value));
         return {&it->second, emplaced};
     }
 
@@ -35,22 +35,22 @@ struct TSymbolTable {
     }
 
     T* Get(const T& value) {
-        const auto it = Table.find(value.ToString());
-        return (it != Table.end() ? &it->second : nullptr);
+        const auto it = Symbols.find(value.ToString());
+        return (it != Symbols.end() ? &it->second : nullptr);
     }
 
-    std::map<std::string, T> Table;
+    std::map<std::string, T> Symbols;
 };
 
 struct TEnumDef;
-struct TTableDef;
+struct TMessageDef;
 struct TSchemaDef;
 
 struct TType {
     EType Type = EType::TYPE_NONE;
-    const TType* ElementType = nullptr;   // Not nullptr only for TYPE_VECTOR;
-    const TTableDef* TableDef = nullptr;  // Not nullptr only for TYPE_TABLE;
-    const TEnumDef* EnumDef = nullptr;    // Not nullptr only for TYPE_ENUM;
+    const TType* ElementType = nullptr;       // Not nullptr only for TYPE_VECTOR;
+    const TMessageDef* MessageDef = nullptr;  // Not nullptr only for TYPE_MESSAGE;
+    const TEnumDef* EnumDef = nullptr;        // Not nullptr only for TYPE_ENUM;
 
     std::map<std::string, std::string> Modifiers;
 
@@ -78,8 +78,8 @@ struct TEnumDef : public TDef {
     std::string ToString() const;
 };
 
-struct TTableDef : public TDef {
-    // TFieldDef is not completely independent entity, since it exists only as part of TableDef.
+struct TMessageDef : public TDef {
+    // TFieldDef is not completely independent entity, since it exists only as part of MessageDef.
     struct TFieldDef {
         uint64_t Id = 0;
         std::string Name;
@@ -105,15 +105,16 @@ struct TTableDef : public TDef {
 
     const TSchemaDef* Schema = nullptr;
 
-    ETableLayout Layout = ETableLayout::TABLE_LAYOUT_UNKNOWN;
+    EMessageLayout Layout = EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
     std::vector<TFieldDef> Fields;
 
     // This fields are filled during post-processing of the IR.
-    // Exists on TableDef only for optimization.
+    // Exists on MessageDef only for optimization.
     bool AssociativePair = false;
     std::map<std::string, TSharedOffset> SharedOffsets;
 
-    TTableDef(std::string name, const TSchemaDef* schema, ETableLayout layout = ETableLayout::TABLE_LAYOUT_UNKNOWN);
+    TMessageDef(std::string name, const TSchemaDef* schema,
+                EMessageLayout layout = EMessageLayout::MESSAGE_LAYOUT_UNKNOWN);
     std::string ToString() const;
 };
 
@@ -130,7 +131,7 @@ struct TSchemaDef : public TDef {
     std::map<std::string, std::string> Attributes;
 
     std::vector<const TEnumDef*> Enums;
-    std::vector<const TTableDef*> Tables;
+    std::vector<const TMessageDef*> Messages;
 
     explicit TSchemaDef(std::string name);
     std::string ToString() const;
@@ -148,31 +149,31 @@ struct TIR {
 
     TSymbolTable<TType> Types;
     TSymbolTable<TEnumDef> Enums;
-    TSymbolTable<TTableDef> Tables;
+    TSymbolTable<TMessageDef> Messages;
     TSymbolTable<TSchemaDef> Schemas;
 };
 
-const NIR::TTableDef* ExtractTableDef(const NIR::TType& type);
+const NIR::TMessageDef* ExtractMessageDef(const NIR::TType& type);
 
 bool IsBasic(const EType type);
 bool IsScalar(const EType type);
 size_t InlineSize(const EType type);
-size_t FixedTableSize(const TTableDef& table);
+size_t FixedMessageSize(const TMessageDef& msg);
 
-bool IsFixedTable(const TTableDef& table);
-bool IsDynamicTable(const TTableDef& table);
-bool IsStaticMetaTable(const TTableDef& table);
-bool IsAssociativePair(const TTableDef& table);
-bool IsGapTable(const TTableDef& table);
+bool IsFixedMessage(const TMessageDef& msg);
+bool IsDynamicMessage(const TMessageDef& msg);
+bool IsStaticMetaMessage(const TMessageDef& msg);
+bool IsAssociativePair(const TMessageDef& msg);
+bool IsGapMessage(const TMessageDef& msg);
 
 bool IsScalarVector(const TType& type);
 bool IsInline(const TType& type);
 bool IsAssociative(const TType& type);
-bool IsSequentialTable(const TType& type);
-bool IsSortedSequentialTable(const TType& type);
-bool IsFixedTable(const TType& type);
-bool IsSharedOffsetField(const TTableDef::TFieldDef& field);
-bool IsExplicitField(const TTableDef::TFieldDef& field);
+bool IsSequentialMessage(const TType& type);
+bool IsSortedSequentialMessage(const TType& type);
+bool IsFixedMessage(const TType& type);
+bool IsSharedOffsetField(const TMessageDef::TFieldDef& field);
+bool IsExplicitField(const TMessageDef::TFieldDef& field);
 
 std::string TypeToString(const EType type);
 EType TypeFromString(const std::string& value);

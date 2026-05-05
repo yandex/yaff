@@ -4,7 +4,7 @@ import "yaff/proto/options.proto";
 
 package NTestYaFF;
 
-message TFlatTable {
+message TFlatMessage {
     optional uint64 SomeValue1 = 1;
     optional uint64 SomeValue2 = 2;
     optional uint64 SomeValue3 = 3;
@@ -17,22 +17,22 @@ message TFlatTable {
     optional uint64 SomeValue10 = 10;
 };
 
-message TIntermediateTable {
-    optional TFlatTable FlatBase = 1;
+message TIntermediateMessage {
+    optional TFlatMessage FlatBase = 1;
     optional uint64 SomeValue0 = 2;
 };
 
-message THierarchyTable {
-    optional TIntermediateTable Intermediate = 1;
+message THierarchyMessage {
+    optional TIntermediateMessage Intermediate = 1;
 };
 
-message TSimpleTable {
+message TSimpleMessage {
     optional sfixed32 SignedField = 1;
     optional uint32 SmallField = 2 [default = 0xAF];
     optional uint64 LargeField = 3 [default = 0x6789];
 };
 
-message TSimpleFixedTable {
+message TSimpleFixedMessage {
     option (yaff.proto.message) = {layout: LAYOUT_FIXED};
 
     optional uint64 Scalar1 = 1;
@@ -42,65 +42,65 @@ message TSimpleFixedTable {
     optional uint64 Scalar5 = 5 [default = 0xA];
 };
 
-message TStaticFixedTable {
+message TStaticFixedMessage {
     option (yaff.proto.message) = {layout: LAYOUT_FIXED};
 
     optional uint64 Scalar = 1;
-    optional TSimpleTable Nested = 2;
+    optional TSimpleMessage Nested = 2;
 };
 
-message TStaticFlatTable {
+message TStaticFlatMessage {
     option (yaff.proto.message) = {layout: LAYOUT_FLAT};
 
     optional uint64 Scalar = 1;
     optional uint32 OtherScalar = 2 [default = 0x5];
-    optional TSimpleTable Nested = 3;
+    optional TSimpleMessage Nested = 3;
 };
 
-message TStaticSparseTable {
+message TStaticSparseMessage {
     option (yaff.proto.message) = {layout: LAYOUT_SPARSE};
 
     optional uint64 Scalar = 1;
-    optional TSimpleTable Nested = 2;
+    optional TSimpleMessage Nested = 2;
 };
 
-message TFloatTable {
+message TFloatMessage {
     optional float FloatField = 1 [default = 0.1234];
     optional double DoubleField = 2 [default = 0.000001];
 };
 
-message TNestedTable {
-    optional TSimpleTable Nested1 = 1;
+message TNestedMessage {
+    optional TSimpleMessage Nested1 = 1;
     optional uint64 ScalarField = 2;
-    optional TSimpleTable Nested2 = 3;
+    optional TSimpleMessage Nested2 = 3;
 };
 
 message TNestedUnused {
-    message TTable {
+    message TMessage {
         optional int32 SomeField = 1;
     }
 };
 
-message TVectorTable {
+message TVectorMessage {
     repeated uint64 IntegerVec = 1;
     repeated string StringVec = 2;
-    repeated TFlatTable TableVec = 3;
+    repeated TFlatMessage MessageVec = 3;
     repeated bool BoolVec = 4;
-    repeated TStaticFixedTable FixedTableVec = 5;
+    repeated TStaticFixedMessage FixedMessageVec = 5;
 };
 
-message TUnionTable {
+message TUnionMessage {
     optional uint32 SomeValue = 1;
     oneof Union {
-        TSimpleTable Nested1 = 2;
+        TSimpleMessage Nested1 = 2;
         string StringVec = 3;
-        TSimpleTable Nested2 = 4;
+        TSimpleMessage Nested2 = 4;
         int32 MediumField = 5 [default = -1];
         uint64 LargeField = 6;
     }
 }
 
-message TAlternativeTable {
+message TAlternativeMessage {
     oneof Alternatives {
         int32 One = 1 [default = -10];
         uint64 Two = 2 [default = 20];
@@ -108,7 +108,7 @@ message TAlternativeTable {
     optional uint64 Three = 3;
 }
 
-message TMapTable {
+message TMapMessage {
     message TCompositeValue {
         optional int32 SomeField = 1;
         optional int64 AnotherField = 2;
@@ -127,7 +127,7 @@ message TOneOfMix {
     }
 }
 
-message TGappedTable {
+message TGappedMessage {
     optional uint64 Field1 = 1;
     optional uint64 Field3 = 3;
     optional uint64 Field5 = 5;
