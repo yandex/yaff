@@ -4,16 +4,12 @@ function(yaff_generate)
 
     cmake_parse_arguments(YAFF "" "${_singleargs}" "${_multiargs}" "${ARGN}")
 
-    # Optional plugin tag (slice). When set, generated files are named
-    # <name>_<tag>.yaff.h/.cpp, matching the protoc plugin behaviour.
     if(YAFF_TAG)
         set(_yaff_suffix "_${YAFF_TAG}")
     else()
         set(_yaff_suffix "")
     endif()
 
-    # Build the plugin parameter string ("k1=v1,k2=v2") that protoc passes
-    # through to protoc-gen-yaff via the option syntax.
     set(_plugin_options "")
     if(YAFF_TAG)
         list(APPEND _plugin_options "tag=${YAFF_TAG}")
@@ -80,9 +76,6 @@ function(yaff_generate)
         else()
             set(_out_dir "${YAFF_OUT_DIR}")
         endif()
-        # protoc does not create output directories on its own, so we ensure
-        # the directory exists at configure time.
-        file(MAKE_DIRECTORY "${_out_dir}")
 
         set(_out_h "${_out_dir}/${_name}${_yaff_suffix}.yaff.h")
         set(_out_cpp "${_out_dir}/${_name}${_yaff_suffix}.yaff.cpp")
