@@ -184,7 +184,7 @@ public:
         return CreateVector(elements);
     }
 
-    // TODO: (gavrilovsky): move this function to private section;
+    // TODO: move this function to private section;
     template <typename T, typename F>
         requires CElementProducer<T, F>
     TInternalOffset<TVector<T>> CreateVector(F&& produce) {
@@ -213,7 +213,7 @@ public:
             YAFF_REQUIRE(len <= std::numeric_limits<uint32_t>::max());
         }
         Buf_.RightPushSmall<uint32_t>(len);
-        // TODO: (gavrilovsky): support better interface to enable deduplication where it possible.
+        // TODO: support better interface to enable deduplication where it possible.
         return TInternalOffset<TVector<T>>(FinishVector(start, /* noDedup */ true));
     }
 
@@ -502,7 +502,7 @@ private:
 
     struct TSparseMessageBuilder {
         inline static constexpr TFieldId TINY_OFFSET_MAX_ID = 0x20;
-        inline static constexpr TFieldOffset SPARSE_META_OFFSET = sizeof(TFieldId);
+        inline static constexpr TFieldOffset SPARSE_META_OFFSET = sizeof(TSignedOffset);
 
         static constexpr size_t CalculateMetaSize(const TFieldId maxId) {
             return (maxId - 0x1) + (maxId > TINY_OFFSET_MAX_ID ? maxId - TINY_OFFSET_MAX_ID : 0x0);
@@ -560,30 +560,28 @@ private:
 
             if (IsEmpty()) {
                 YAFF_REQUIRE(Buf.RightSize() == RightStart);
-                Buf.RightPushSmall<TFieldId>(0x1);
+                Buf.RightPushSmall<TFieldId>(0x2);
                 return ToCheckedOffset(Buf.RightSize());
             }
 
-            Buf.RightPushSmall<TSignedOffset>(0);
-            Buf.RightPushSmall<TFieldId>((MaxId << 0x2) | 0x1);
+            Buf.RightPushSmall<TFieldId>((MaxId << 0x2) | 0x3);
             const size_t msgStart = Buf.RightSize();
 
             const size_t metaSize = CalculateMetaSize(MaxId);
+            Buf.RightPushSmall<TSignedOffset>(0);
             Buf.RightFill(metaSize);
 
             const size_t metaStart = Buf.RightSize();
+            const size_t metaEnd = Buf.RightSize() - metaSize;
             for (uint16_t i = 0; i < FieldsAdded; ++i) {
                 const auto* field = ReadLayout<TField>(Buf.LeftDataAt(LeftStart + i * sizeof(TField)));
 
+                const TFieldOffset offset = (msgStart - field->Offset);
                 if (field->Id < TINY_OFFSET_MAX_ID) {
-                    YAFF_REQUIRE(msgStart >= field->Offset &&
-                                 msgStart - field->Offset <= std::numeric_limits<uint8_t>::max());
-                    WriteValue<uint8_t>(Buf.RightDataAt(metaStart - (field->Id - 0x1)), msgStart - field->Offset);
+                    WriteValue<uint8_t>(Buf.RightDataAt(metaEnd + field->Id), offset);
                 } else {
-                    YAFF_REQUIRE(msgStart >= field->Offset &&
-                                 msgStart - field->Offset <= std::numeric_limits<uint16_t>::max());
-                    WriteValue<uint16_t>(Buf.RightDataAt(metaStart - (field->Id << 0x1) + (TINY_OFFSET_MAX_ID + 1)),
-                                         msgStart - field->Offset);
+                    WriteValue<uint16_t>(Buf.RightDataAt(metaEnd + (field->Id << 0x1) - (TINY_OFFSET_MAX_ID - 1)),
+                                         offset);
                 }
 
                 if (!field->IsScalar) {
@@ -621,8 +619,8 @@ private:
             }
 
             YAFF_REQUIRE(sizeof(msgStart) < sizeof(int64_t) || msgStart <= std::numeric_limits<int64_t>::max());
-            WriteValue<TSignedOffset>(Buf.RightDataAt(msgStart - SPARSE_META_OFFSET),
-                                      ToCheckedSignedOffset(static_cast<int64_t>(msgStart) - metaOffset));
+            WriteValue<TSignedOffset>(Buf.RightDataAt(msgStart + SPARSE_META_OFFSET),
+                                      ToCheckedSignedOffset(static_cast<int64_t>(msgStart) - (metaOffset - metaSize)));
 
             return ToCheckedOffset(msgStart);
         }

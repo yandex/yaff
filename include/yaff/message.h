@@ -220,32 +220,26 @@ private:
         return ((id << 0x2) | 0x3);
     }
 
-    inline static constexpr bool IsSparse(const TFieldId id) noexcept {
-        return (id & 0x3) == 0x1;
-    }
-
     inline static constexpr TFieldId TINY_OFFSET_MAX_ID = 0x20;
+    inline static constexpr TFieldOffset SPARSE_META_OFFSET = sizeof(TSignedOffset);
 
     YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
     }
 
-    YAFF_PURE const std::byte* Data() const noexcept {
-        return reinterpret_cast<const std::byte*>(this + 1);
-    }
-
-    YAFF_PURE const char* ReadMeta() const noexcept {
-        return ResolveOffset<char>(Message(), NYaFF::ReadValue<TSignedOffset>(Data()));
+    YAFF_PURE const std::byte* ReadMeta() const noexcept {
+        const TSignedOffset offset = NYaFF::ReadValue<TSignedOffset>(Message() - SPARSE_META_OFFSET);
+        return ResolveOffset<std::byte>(Message(), offset);
     }
 
     YAFF_PURE TFieldOffset ReadTinyOffset(const TFieldId id) const noexcept {
-        const char* meta = ReadMeta();
-        return NYaFF::ReadValue<uint8_t>(meta + (id - 0x1));
+        const std::byte* meta = ReadMeta();
+        return NYaFF::ReadValue<uint8_t>(meta - id);
     }
 
     YAFF_PURE TFieldOffset ReadOffset(const TFieldId id) const noexcept {
-        const char* meta = ReadMeta();
-        return NYaFF::ReadValue<uint16_t>(meta + (id << 0x1) - (TINY_OFFSET_MAX_ID + 0x1));
+        const std::byte* meta = ReadMeta();
+        return NYaFF::ReadValue<uint16_t>(meta - (id << 0x1) + (TINY_OFFSET_MAX_ID - 0x1));
     }
 
     YAFF_PURE TFieldOffset ResolveField(const TFieldId id) const noexcept {
