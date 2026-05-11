@@ -161,7 +161,15 @@ private:
         }
     };
 
+    struct TMessageMeta {
+        std::vector<TFieldOffset> FlatOffsets;
+        std::vector<TFieldId> DeletedIds;
+        std::vector<bool> StaticFlags;
+    };
+
     using TMessageLayoutGenerator = std::function<void(EMessageType, const NIR::TMessageDef&)>;
+
+    static TMessageMeta GenerateMessageMeta(const NIR::TMessageDef& msgDef);
 
     // External experimental generators;
     static std::string GenerateMessageColumnName(const NIR::TMessageDef& msgDef);
@@ -611,17 +619,27 @@ void TCppGenerator::TImpl::GenerateMessageStaticMeta(const NIR::TMessageDef& msg
     Writer_.IncrementIdentLevel();
 
     if (NIR::IsFixedMessage(msgDef)) {
-        Writer_ |= "inline static constexpr size_t LIMIT = " + std::to_string(NIR::FixedMessageSize(msgDef)) + ";";
+        Writer_ |= "inline static constexpr size_t LIMIT = " + std::to_string(NIR::MaxMessageSize(msgDef)) + ";";
     }
-
-    Writer_ |= "inline static constexpr std::array<NYaFF::TFieldOffset, " + std::to_string(msgDef.Fields.size()) +
+    const auto meta = GenerateMessageMeta(msgDef);
+    Writer_ |= "inline static constexpr std::array<NYaFF::TFieldOffset, " + std::to_string(meta.FlatOffsets.size()) +
                "> FLAT_OFFSETS = {\\";
-    ForFields(msgDef, [&](const auto& fieldDef) { Writer_ >= std::to_string(fieldDef.FlatOffset) + ", \\"; });
-    Writer_ |= "};\n";
-
-    Writer_ |= "inline static constexpr NYaFF::TFieldOffset ResolveField(const NYaFF::TFieldId id) {";
-    Writer_ >= "return FLAT_OFFSETS[id - 1];";
-    Writer_ |= "}";
+    for (const auto offset : meta.FlatOffsets) {
+        Writer_ >= std::to_string(offset) + ", \\";
+    }
+    Writer_ |= "};";
+    Writer_ |= "inline static constexpr std::array<NYaFF::TFieldId, " + std::to_string(meta.DeletedIds.size()) +
+               "> DELETED_IDS = {\\";
+    for (const auto id : meta.DeletedIds) {
+        Writer_ >= std::to_string(id) + ", \\";
+    }
+    Writer_ |= "};";
+    Writer_ |=
+        "inline static constexpr std::array<bool, " + std::to_string(meta.StaticFlags.size()) + "> STATIC_FLAGS = {\\";
+    for (const auto flag : meta.StaticFlags) {
+        Writer_ >= std::to_string(flag) + ", \\";
+    }
+    Writer_ |= "};";
 
     Writer_.DecrementIdentLevel();
     Writer_ |= "};\n";
@@ -636,17 +654,23 @@ void TCppGenerator::TImpl::GenerateMessageBuilder(EMessageType msgType, const NI
 
     Writer_ |= "::NYaFF::TBuilder& B;\n";
 
-    const std::string templateArgs =
-        (msgType == EMessageType::FIXED || msgType == EMessageType::FLAT ? "<" + msgDef.Name + "::TMetaType" + ">"
-                                                                         : "");
-    const std::string callArgs =
-        ((msgType == EMessageType::FLAT || msgType == EMessageType::SPARSE) && !HasExplicitFields(msgDef)
-             ? "/* implicit */ true"
-             : "");
     Writer_ |= "explicit " + builderName + "(::NYaFF::TBuilder& yffb)";
     Writer_ >= ": B(yffb)";
     Writer_ |= "{";
-    Writer_ >= "B.Start" + messageSuffix + "Message" + templateArgs + "(" + callArgs + ");";
+    Writer_ >= "B.Start" + messageSuffix + "Message\\";
+    if (msgType == EMessageType::FIXED || msgType == EMessageType::FLAT) {
+        Writer_ |= "<" + msgDef.Name + "::TMetaType" + ">\\";
+    }
+    Writer_ |= "(\\";
+    if (msgType == EMessageType::FLAT || msgType == EMessageType::SPARSE) {
+        const std::string arg = (HasExplicitFields(msgDef) ? "/* implicit */ false" : "/* implicit */ true");
+        Writer_ |= arg + "\\";
+    }
+    if (msgType == EMessageType::FLAT) {
+        const std::string arg = (NIR::IsDynamicMessage(msgDef) ? "/* sized */ true" : "/* sized */ false");
+        Writer_ |= ", " + arg + "\\";
+    }
+    Writer_ |= ");";
     Writer_ |= "}\n";
 
     ForRealFields(msgDef, [&](const auto& fieldDef) { GenerateMessageFieldAdd(msgDef.Name, fieldDef); });
@@ -1575,11 +1599,8 @@ std::string TCppGenerator::TImpl::GenerateMessageBaseClass(const NIR::TMessageDe
             return "::NYaFF::TFlatMessage<" + GenerateMessageStaticMetaName(msgDef) + ">";
         case EMessageLayout::MESSAGE_LAYOUT_SPARSE:
             return "::NYaFF::TSparseMessage";
-        case EMessageLayout::MESSAGE_LAYOUT_DYNAMIC: {
-            const std::string templateArgs =
-                (!NIR::IsGapMessage(msgDef) ? GenerateMessageStaticMetaName(msgDef) : "void");
-            return "::NYaFF::TDynamicMessage<" + templateArgs + ">";
-        }
+        case EMessageLayout::MESSAGE_LAYOUT_DYNAMIC:
+            return "::NYaFF::TDynamicMessage<" + GenerateMessageStaticMetaName(msgDef) + ">";
         default:
             YAFF_THROW("unknown message layout");
     }
@@ -1728,6 +1749,25 @@ std::string TCppGenerator::TImpl::GenerateMessageBuilderName(EMessageType msgTyp
 
 std::string TCppGenerator::TImpl::GenerateWithNamespaceName(const std::string& ns, const std::string& name) {
     return ns + "::" + name;
+}
+
+TCppGenerator::TImpl::TMessageMeta TCppGenerator::TImpl::GenerateMessageMeta(const NIR::TMessageDef& msg) {
+    TMessageMeta meta;
+    const size_t maxId = NIR::MaxFieldId(msg);
+    meta.FlatOffsets.reserve(maxId);
+    meta.StaticFlags.reserve(maxId);
+    for (size_t i = 1, j = 0; i <= maxId; ++i) {
+        const auto& fieldDef = msg.Fields[j];
+        meta.FlatOffsets.emplace_back(fieldDef.FlatOffset);
+        meta.StaticFlags.emplace_back(meta.DeletedIds.empty());
+        if (fieldDef.Id != i) {
+            meta.DeletedIds.emplace_back(i);
+        } else {
+            ++j;
+        }
+    }
+    meta.FlatOffsets.emplace_back(NIR::MaxMessageSize(msg));
+    return meta;
 }
 
 TCppGenerator::TCppGenerator(std::ostream& out, TCppGenerationOptions opts)

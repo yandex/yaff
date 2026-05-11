@@ -20,7 +20,7 @@
 #endif
 
 // TODO: support standard likely, unlikely;
-#if defined(__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 #define YAFF_LIKELY(Cond) __builtin_expect(!!(Cond), 1)
 #define YAFF_UNLIKELY(Cond) __builtin_expect(!!(Cond), 0)
 #else
@@ -33,6 +33,14 @@
 #define YAFF_MEMCPY __builtin_memcpy
 #else
 #define YAFF_MEMCPY std::memcpy
+#endif
+
+#if defined(__clang__) || defined(__GNUC__)
+#define YAFF_BSWAP16(x) __builtin_bswap16(static_cast<uint16_t>(x))
+#elif defined(_MSC_VER)
+#define YAFF_BSWAP16(x) _byteswap_ushort(static_cast<uint16_t>(x))
+#else
+#define YAFF_BSWAP16(x) ((static_cast<uint16_t>(x) << 8) | (static_cast<uint16_t>(x) >> 8))
 #endif
 
 // TODO: think about may_alias hacks for msvc;

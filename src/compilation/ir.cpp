@@ -21,13 +21,19 @@ static std::string TypeString(const TType& type) {
     }
 }
 
-size_t FixedMessageSize(const TMessageDef& msg) {
-    YAFF_REQUIRE(IsFixedMessage(msg));
+size_t MaxMessageSize(const TMessageDef& msg) {
     if (msg.Fields.empty()) {
         return 0;
     }
     const auto& last = msg.Fields.back();
     return last.FlatOffset + last.Type->InlineSize();
+}
+size_t MaxFieldId(const TMessageDef& msg) {
+    if (msg.Fields.empty()) {
+        return 0;
+    }
+    const auto& last = msg.Fields.back();
+    return last.Id;
 }
 
 size_t InlineSize(const EType type) {
@@ -62,7 +68,7 @@ size_t TType::InlineSize() const {
     if (Type == EType::TYPE_MESSAGE) {
         if (IsInline(*this)) {
             YAFF_REQUIRE(MessageDef);
-            return FixedMessageSize(*MessageDef);
+            return MaxMessageSize(*MessageDef);
         }
         return sizeof(TOffset);
     }
@@ -224,8 +230,7 @@ bool IsDynamicMessage(const TMessageDef& msg) {
 }
 
 bool IsStaticMetaMessage(const TMessageDef& msg) {
-    return msg.Layout == EMessageLayout::MESSAGE_LAYOUT_FIXED || msg.Layout == EMessageLayout::MESSAGE_LAYOUT_FLAT ||
-           (msg.Layout == EMessageLayout::MESSAGE_LAYOUT_DYNAMIC && !NIR::IsGapMessage(msg));
+    return msg.Layout != EMessageLayout::MESSAGE_LAYOUT_SPARSE;
 }
 
 bool IsAssociativePair(const TMessageDef& msg) {

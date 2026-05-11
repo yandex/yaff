@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <unordered_set>
 #include <variant>
 #include <vector>
@@ -87,7 +88,7 @@ public:
         // Nesting is possible for this call, but not another message, since no TFieldOffset is set.
         YAFF_REQUIRE(std::holds_alternative<TDummyMessageBuilder>(MessageBuilder_));
         Buf_.RightFill(M::LIMIT);
-        StartMessageDispatch<TFixedMessageBuilder>(Buf_, Buf_.RightSize(), &M::ResolveField);
+        StartMessageDispatch<TFixedMessageBuilder>(Buf_, Buf_.RightSize(), M::FLAT_OFFSETS);
     }
 
     TOffset FinishFixedMessage() {
@@ -95,9 +96,10 @@ public:
     }
 
     template <typename M>
-    void StartFlatMessage(bool implicit = false) {
+        requires(M::DELETED_IDS.empty())
+    void StartFlatMessage(bool implicit = false, bool sized = false) {
         CheckNotNested();
-        StartMessageDispatch<TFlatMessageBuilder>(Buf_, implicit, &M::ResolveField);
+        StartMessageDispatch<TFlatMessageBuilder>(Buf_, sized, implicit, M::FLAT_OFFSETS);
     }
 
     TOffset FinishFlatMessage() {
@@ -306,6 +308,8 @@ public:
 private:
     friend class NYaFF::NExp::TBuilder;
 
+    using TOffsetsView = std::span<const TFieldOffset>;
+
     struct TObjectOffset {
         // It is possible that the message size will exceed the allowed MAX_OFFSET,
         // but due to deduplication it will return to normal.
@@ -342,8 +346,8 @@ private:
     };
 
     struct TFixedMessageBuilder {
-        TFixedMessageBuilder(TDualBuffer& buffer, size_t loc, TFieldResolverFunc resolver)
-            : Buf(buffer), Loc(loc), ResolverFunc(std::move(resolver)) {
+        TFixedMessageBuilder(TDualBuffer& buffer, size_t loc, TOffsetsView offsets)
+            : Buf(buffer), Loc(loc), Offsets(offsets) {
         }
 
         TFixedMessageBuilder(const TFixedMessageBuilder&) = delete;
@@ -372,36 +376,58 @@ private:
 
         template <typename T>
         void WriteField(TFieldId id, T value) {
-            const TFieldOffset fieldOffset = ResolverFunc(id);
+            const TFieldOffset fieldOffset = Offsets[id - 1];
             YAFF_REQUIRE(Loc >= fieldOffset);
             WriteValue<T>(Buf.RightDataAt(Loc - fieldOffset), value);
         }
 
         TDualBuffer& Buf;
         size_t Loc;
-        TFieldResolverFunc ResolverFunc;
+        TOffsetsView Offsets;
     };
 
     struct TFlatMessageBuilder {
         inline static constexpr size_t TYPED_LIMIT_SIZE = sizeof(TFieldId);
 
-        static constexpr size_t CalculatePresenceSize(const TFieldId maxId) {
-            return (maxId + 0x7) >> 0x3;
+        static constexpr size_t CalculateFieldMetaSize(const bool expl, const bool sized) {
+            return static_cast<size_t>(expl) | (static_cast<size_t>(sized) << 1);
         }
 
-        static void SetPresence(char* maskStart, TFieldId id) {
-            maskStart[-((id - 0x1) >> 0x3) - 0x1] |= (static_cast<char>(0x1) << ((id - 0x1) & 0x7));
+        static constexpr size_t CalculateMetaSize(const TFieldId maxId, const bool expl, const bool sized) {
+            return (maxId * CalculateFieldMetaSize(expl, sized) + 7) >> 3;
         }
 
-        TFlatMessageBuilder(TDualBuffer& buffer, bool implicit, TFieldResolverFunc resolver)
+        static constexpr size_t CalculateCorrection(const size_t size) {
+            return (size > 0) + (size > 1) + (size > 4);
+        }
+
+        static void SetPresence(char* maskStart, const TFieldId id, const bool sized) {
+            const size_t index = (id - 1) * CalculateFieldMetaSize(true, sized);
+            maskStart[-(index >> 3) - 1] |= (static_cast<char>(1) << (index & 7));
+        }
+
+        static void SetSize(char* maskStart, const TFieldId id, const size_t size, const bool expl) {
+            const size_t corr = CalculateCorrection(size);
+            if (corr == 0) {
+                return;
+            }
+            const size_t index = (id - 1) * CalculateFieldMetaSize(expl, true) + expl;
+            maskStart[-(index >> 3) - 1] |= (static_cast<char>(corr) << (index & 7));
+            if ((index & 7) == 7) {
+                maskStart[-(index >> 3) - 2] |= (static_cast<char>(corr) >> 1);
+            }
+        }
+
+        TFlatMessageBuilder(TDualBuffer& buffer, bool sized, bool implicit, TOffsetsView offsets)
             : Buf(buffer),
               Start(Buf.RightSize()),
               End(0),
               MaxId(0),
               PrevOffset(0),
+              EnableSizes(sized),
               EnableExplicit(!implicit),
               NeedExplicit(false),
-              ResolverFunc(std::move(resolver)) {
+              Offsets(offsets) {
         }
 
         TFlatMessageBuilder(const TFlatMessageBuilder&) = delete;
@@ -415,7 +441,7 @@ private:
             if (!EnableExplicit && IsEqual(value, def)) {
                 return;
             }
-            const TFieldOffset offset = ResolverFunc(id);
+            const TFieldOffset offset = Offsets[id - 1];
             TrackField<T>(id, offset, value, def);
             WriteField<T>(offset, XorDef(value, def));
         }
@@ -425,7 +451,7 @@ private:
             if (value.IsNull()) {
                 return;
             }
-            const TFieldOffset offset = ResolverFunc(id);
+            const TFieldOffset offset = Offsets[id - 1];
             TrackField<TOffset>(id, offset, value.O, 0);
             YAFF_REQUIRE(End >= value.O);
             WriteField<TOffset>(offset, ToCheckedOffset(End - value.O));
@@ -433,6 +459,7 @@ private:
 
         TOffset Finish() && {
             YAFF_REQUIRE(MaxId < 0x2000);
+            const bool trulyExplicit = (EnableExplicit && NeedExplicit);
 
             if (IsEmpty()) {
                 YAFF_REQUIRE(Buf.RightSize() == Start);
@@ -440,12 +467,22 @@ private:
                 return ToCheckedOffset(Buf.RightSize());
             }
 
-            if (EnableExplicit && !NeedExplicit) {
+            if (EnableExplicit && !trulyExplicit) {
                 YAFF_REQUIRE(Buf.RightSize() >= End);
                 Buf.RightPop(Buf.RightSize() - End);
             }
 
-            const TFieldId typedLimit = ((MaxId << 0x2) | (0x8000 | (EnableExplicit && NeedExplicit)));
+            if (EnableSizes) {
+                // N.B.: This line ensures that the buffer is allocated
+                // when we have not allocated or discarded the meta information.
+                Buf.RightFill(!trulyExplicit * CalculateMetaSize(MaxId - 1, false, true));
+                for (size_t i = 0; i < MaxId - 1; ++i) {
+                    const size_t size = Offsets[i + 1] - Offsets[i];
+                    SetSize(Buf.RightDataAt(End), i + 1, size, trulyExplicit);
+                }
+            }
+
+            const TFieldId typedLimit = ((MaxId << 2) | (0x8000 | (EnableSizes << 1) | trulyExplicit));
             WriteValue<TFieldId>(Buf.RightDataAt(End), typedLimit);
 
             return ToCheckedOffset(End);
@@ -459,8 +496,8 @@ private:
                 YAFF_REQUIRE(Buf.RightSize() == Start);
 
                 const size_t dataSize = TYPED_LIMIT_SIZE + offset + sizeof(T);
-                const size_t presenceSize = EnableExplicit * CalculatePresenceSize(id);
-                Buf.RightFill(dataSize + presenceSize);
+                const size_t metaSize = EnableExplicit * CalculateMetaSize(id, EnableExplicit, EnableSizes);
+                Buf.RightFill(dataSize + metaSize);
 
                 End = Start + dataSize;
                 MaxId = id + 1;
@@ -471,9 +508,9 @@ private:
             }
             PrevOffset = offset;
 
-            NeedExplicit |= IsEqual<T>(val, def);
+            NeedExplicit = (NeedExplicit || IsEqual<T>(val, def));
             if (EnableExplicit) {
-                SetPresence(Buf.RightDataAt(End), id);
+                SetPresence(Buf.RightDataAt(End), id, EnableSizes);
             }
         }
 
@@ -494,10 +531,11 @@ private:
         TFieldId MaxId;
         TFieldOffset PrevOffset;
 
+        bool EnableSizes;
         bool EnableExplicit;
         bool NeedExplicit;
 
-        TFieldResolverFunc ResolverFunc;
+        TOffsetsView Offsets;
     };
 
     struct TSparseMessageBuilder {
@@ -505,7 +543,7 @@ private:
         inline static constexpr TFieldOffset SPARSE_META_OFFSET = sizeof(TSignedOffset);
 
         static constexpr size_t CalculateMetaSize(const TFieldId maxId) {
-            return (maxId - 0x1) + (maxId > TINY_OFFSET_MAX_ID ? maxId - TINY_OFFSET_MAX_ID : 0x0);
+            return (maxId - 1) + (maxId > TINY_OFFSET_MAX_ID ? maxId - TINY_OFFSET_MAX_ID : 0);
         }
 
         YAFF_LAYOUT_BEGIN(TField) {
@@ -560,11 +598,11 @@ private:
 
             if (IsEmpty()) {
                 YAFF_REQUIRE(Buf.RightSize() == RightStart);
-                Buf.RightPushSmall<TFieldId>(0x2);
+                Buf.RightPushSmall<TFieldId>(2);
                 return ToCheckedOffset(Buf.RightSize());
             }
 
-            Buf.RightPushSmall<TFieldId>((MaxId << 0x2) | 0x3);
+            Buf.RightPushSmall<TFieldId>((MaxId << 2) | 3);
             const size_t msgStart = Buf.RightSize();
 
             const size_t metaSize = CalculateMetaSize(MaxId);
@@ -580,7 +618,7 @@ private:
                 if (field->Id < TINY_OFFSET_MAX_ID) {
                     WriteValue<uint8_t>(Buf.RightDataAt(metaEnd + field->Id), offset);
                 } else {
-                    WriteValue<uint16_t>(Buf.RightDataAt(metaEnd + (field->Id << 0x1) - (TINY_OFFSET_MAX_ID - 1)),
+                    WriteValue<uint16_t>(Buf.RightDataAt(metaEnd + (field->Id << 1) - (TINY_OFFSET_MAX_ID - 1)),
                                          offset);
                 }
 

@@ -21,7 +21,7 @@ TEST(DynMessage, NestedMessageFlatRoot) {
     auto root = CreateTNestedMessage<TNestedMessageFlatBuilder>(yffb, nested1, 0x1234, nested2);
     yffb.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 52ULL);
+    EXPECT_EQ(yffb.GetSize(), 54ULL);
 
     const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x1234ULL);
@@ -38,7 +38,7 @@ TEST(DynMessage, NestedMessageSparseRoot) {
     auto root = CreateTNestedMessage<TNestedMessageSparseBuilder>(yffb, nested1);
     yffb.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 33ULL);
+    EXPECT_EQ(yffb.GetSize(), 34ULL);
 
     const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
@@ -74,7 +74,7 @@ TEST(Vector, SimpleVec) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, yffb.CreateVector(vec)));
 
-    EXPECT_EQ(yffb.GetSize(), 46ULL);
+    EXPECT_EQ(yffb.GetSize(), 47ULL);
 
     const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
     const auto& vectorField = vectorMessage.GetIntegerVec();
@@ -98,7 +98,7 @@ TEST(Vector, StringVec) {
 
     yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, yffb.CreateVector(strings)));
 
-    EXPECT_EQ(yffb.GetSize(), 253ULL);
+    EXPECT_EQ(yffb.GetSize(), 254ULL);
     const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
     const auto& stringVectorField = vectorMessage.GetStringVec();
     EXPECT_EQ(stringVectorField.Size(), expected.size());
@@ -123,7 +123,7 @@ TEST(Vector, MessageVec) {
     }
     yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, 0, yffb.CreateVector(messages)));
 
-    EXPECT_EQ(yffb.GetSize(), 2025ULL);  // Meta should be deduplicated for sparse messages;
+    EXPECT_EQ(yffb.GetSize(), 2075ULL);  // Meta should be deduplicated for sparse messages;
     const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
     const auto& messageVectorField = vectorMessage.GetMessageVec();
     EXPECT_EQ(messageVectorField.Size(), 100U);
@@ -142,7 +142,7 @@ TEST(Vector, FixedMessageVec) {
         });
     yffb.Finish(CreateTVectorMessage(yffb, 0, 0, 0, 0, vec));
 
-    EXPECT_EQ(yffb.GetSize(), 210ULL);
+    EXPECT_EQ(yffb.GetSize(), 222ULL);
 
     const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
     const auto& fixedMessageVectorField = vectorMessage.GetFixedMessageVec();
@@ -162,7 +162,7 @@ TEST(Vector, BoolVec) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, 0, 0, yffb.CreateVector(flags)));
 
-    EXPECT_EQ(yffb.GetSize(), 36ULL);
+    EXPECT_EQ(yffb.GetSize(), 37ULL);
     const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
     const auto& boolVectorField = vectorMessage.GetBoolVec();
     EXPECT_EQ(boolVectorField.Size(), 10U);
@@ -201,7 +201,7 @@ TEST(Vector, VectorDedupByteSize) {
     std::vector<NYaFF::TInternalOffset<NYaFF::TString>> strings{strOffset};
     yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, intsOffset, yffb.CreateVector(strings)));
 
-    EXPECT_EQ(yffb.GetSize(), 40ULL);
+    EXPECT_EQ(yffb.GetSize(), 41ULL);
 
     const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
     const auto& stringVectorField = vectorMessage.GetStringVec();

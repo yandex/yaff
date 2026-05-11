@@ -69,7 +69,7 @@ public:
 
     template <NYaFF::EMessageLayout Layout, size_t Size>
     std::string GenerateYaFFMessages() {
-        static const uint64_t YAFF_SIZE = (Layout == NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT ? 218 : 239);
+        static const uint64_t YAFF_SIZE = (Layout == NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT ? 227 : 239);
         const uint64_t n = (static_cast<double>(Size) / YAFF_SIZE) + 1;
         const auto& perm = GenerateCyclePermutation(n);
 

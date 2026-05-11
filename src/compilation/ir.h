@@ -158,7 +158,9 @@ const NIR::TMessageDef* ExtractMessageDef(const NIR::TType& type);
 bool IsBasic(const EType type);
 bool IsScalar(const EType type);
 size_t InlineSize(const EType type);
-size_t FixedMessageSize(const TMessageDef& msg);
+
+size_t MaxMessageSize(const TMessageDef& msg);
+size_t MaxFieldId(const TMessageDef& msg);
 
 bool IsFixedMessage(const TMessageDef& msg);
 bool IsDynamicMessage(const TMessageDef& msg);

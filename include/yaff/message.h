@@ -21,12 +21,12 @@ public:
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
-        return ReadValueUnsafe<T>(M::ResolveField(id), defaultVal);
+        return ReadValueUnsafe<T>(ResolveField(id), defaultVal);
     }
 
     template <typename T>
     YAFF_PURE const T* ReadLayout(const TFieldId id, const T* defaultPtr = nullptr) const noexcept {
-        return ReadLayoutUnsafe<T>(M::ResolveField(id), defaultPtr);
+        return ReadLayoutUnsafe<T>(ResolveField(id), defaultPtr);
     }
 
     // N.B.: Fixed layout always works through the implicit presence semantics for scalars and strings (and, of course,
@@ -38,7 +38,7 @@ public:
     // checking for non-zero values is sufficient to ensure the semantics described above.
     template <typename T>
     YAFF_PURE bool ReadPresence(const TFieldId id) const noexcept {
-        return ReadPresenceUnsafe<T>(M::ResolveField(id));
+        return ReadPresenceUnsafe<T>(ResolveField(id));
     }
 
     static const TFixedMessage<M>& Default() noexcept {
@@ -46,7 +46,7 @@ public:
     }
 
 protected:
-    static constexpr size_t MetaLimit() noexcept {
+    inline static constexpr size_t MetaLimit() noexcept {
         if constexpr (not std::is_void_v<M>) {
             return M::LIMIT;
         } else {
@@ -60,6 +60,10 @@ protected:
 
 private:
     friend struct NReflect::TAnyMessage;
+
+    inline static constexpr TFieldOffset ResolveField(const TFieldId id) {
+        return M::FLAT_OFFSETS[id - 1];
+    }
 
     YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
@@ -100,18 +104,20 @@ public:
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
-        return ToTypedLimit(id) < TypedLimit_ ? ReadValueUnsafe<T>(M::ResolveField(id), defaultVal) : defaultVal;
+        const TFieldId tl = TypedLimit_;
+        return ToTypedLimit(id) < tl ? ReadValueUnsafe<T>(ResolveField(tl, id), defaultVal) : defaultVal;
     }
 
     template <typename T>
     YAFF_PURE const T* ReadLayout(const TFieldId id, const T* defaultPtr = nullptr) const noexcept {
-        return ToTypedLimit(id) < TypedLimit_ ? ReadLayoutUnsafe<T>(M::ResolveField(id), defaultPtr) : defaultPtr;
+        const TFieldId tl = TypedLimit_;
+        return ToTypedLimit(id) < tl ? ReadLayoutUnsafe<T>(ResolveField(tl, id), defaultPtr) : defaultPtr;
     }
 
     template <typename T>
     YAFF_PURE bool ReadPresence(const TFieldId id) const noexcept {
-        const TFieldId typedLimit = TypedLimit_;
-        return ToTypedLimit(id) < typedLimit && ReadPresenceUnsafe<T>(typedLimit, id, M::ResolveField(id));
+        const TFieldId tl = TypedLimit_;
+        return ToTypedLimit(id) < tl && ReadPresenceUnsafe<T>(tl, id, ResolveField(tl, id));
     }
 
     static const TFlatMessage<M>& Default() noexcept {
@@ -129,12 +135,37 @@ private:
     template <typename T>
     friend struct TDynamicMessage;
 
+    // N.B.: It relies on the fact that the inline part of the data
+    // can only be 1, 4, or 8 in size due to the underlying protobuf types.
+    inline static constexpr std::array<TFieldOffset, 4> CORRECTION_DICTIONARY = {0, 1, 4, 8};
+
     inline static constexpr TFieldId ToTypedLimit(const TFieldId id) noexcept {
         return ((id << 0x2) | 0x8003);
     }
 
-    inline static constexpr bool IsExplicit(const TFieldId id) noexcept {
-        return id & 0x1;
+    inline static constexpr bool IsFlat(const TFieldId id) noexcept {
+        return id & 0x8000;
+    }
+
+    inline static constexpr bool IsImplicit(const TFieldId id) noexcept {
+        return (id & 0x1) == 0;
+    }
+
+    inline static constexpr bool IsSized(const TFieldId id) noexcept {
+        return id & 0x2;
+    }
+
+    inline static constexpr bool IsStatic(const TFieldId id) noexcept {
+        return M::STATIC_FLAGS[id - 1];
+    }
+
+    inline static constexpr TFieldOffset ResolveStaticField(const TFieldId id) noexcept {
+        return M::FLAT_OFFSETS[id - 1];
+    }
+
+    inline static constexpr size_t CalculateDeletedIndex(const TFieldId id) noexcept {
+        const auto idx = std::lower_bound(M::DELETED_IDS.begin(), M::DELETED_IDS.end(), id);
+        return std::distance(M::DELETED_IDS.begin(), idx);
     }
 
     YAFF_PURE const std::byte* Fields() const noexcept {
@@ -143,6 +174,67 @@ private:
 
     YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
+    }
+
+// N.B.: The calculation of correction relies on compiler optimizations.
+// The optimization is based on two assumptions:
+//  * field id and static metadata are known at compile time;
+//  * this code is activated for backward compatibility during the first removals
+//    of fields in a dense schema, so the number of skip corrections is low.
+// Therefore, loop unrolling and reads at known compile-time offsets are expected,
+// along with a small number of fast arithmetic operations.
+//
+// A macro approach is used to explicitly branch outside the loop,
+// as we cannot rely on the optimizer's pass at this point.
+//
+// TODO: For a large number of skipped fields, an approach that calculates the correction by counting
+// the number of ones in the field's bitmask is more efficient.
+// Since we know the number of skips statically,
+// we can perform static dispatching in future.
+//
+// TODO: The current correction is calculated by reading from the static CORRECTION_DICTIONARY.
+// It might be worth trying an alternative that uses arithmetic:
+// (meta & 1) + ((meta >> 1) << 2) + 3 * ((meta & 1) & (meta >> 1));
+#define YAFF_RETURN_RESOLVED_CORRECTION(expression)          \
+    do {                                                     \
+        TFieldOffset correction = 0;                         \
+        const size_t end = CalculateDeletedIndex(id);        \
+        for (size_t i = 0; i < end; ++i) {                   \
+            const TFieldId del = M::DELETED_IDS[i] - 1;      \
+            correction += CORRECTION_DICTIONARY[expression]; \
+        }                                                    \
+        return correction;                                   \
+    } while (0)
+
+    YAFF_PURE TFieldOffset ResolveImplicitCorrection(const TFieldId id) const noexcept {
+        YAFF_RETURN_RESOLVED_CORRECTION((static_cast<uint8_t>(Message()[-(del >> 2) - 1]) >> ((del & 3) << 1)) & 3);
+    }
+
+    YAFF_PURE TFieldOffset ResolveExplicitCorrection(const TFieldId id) const noexcept {
+        YAFF_RETURN_RESOLVED_CORRECTION(
+            (YAFF_BSWAP16(NYaFF::ReadValue<uint16_t>(Message() - ((del * 3) >> 3) - 2)) >> (((del * 3) & 7) + 1)) & 3);
+    }
+
+#undef YAFF_RETURN_RESOLVED_CORRECTION
+
+    YAFF_PURE TFieldOffset ResolveCorrection(const TFieldId tl, const TFieldId id) const noexcept {
+        return YAFF_LIKELY(IsImplicit(tl)) ? ResolveImplicitCorrection(id) : ResolveExplicitCorrection(id);
+    }
+
+    YAFF_PURE TFieldOffset ResolveQuasiStaticField(const TFieldId tl, const TFieldId id) const noexcept {
+        // N.B.: We don't need an explicit dynamic check on IsSized here,
+        // as our compilation rules ensure that the message can only have gaps
+        // only when LAYOUT_FLAT is used as a dynamic alternative,
+        // and in this mode, we always write Sized data.
+        return ResolveStaticField(id) + ResolveCorrection(tl, id);
+    }
+
+    YAFF_PURE TFieldOffset ResolveField(const TFieldId tl, const TFieldId id) const noexcept {
+        // N.B.: Since the id is known during compilation when reading specific fields,
+        // this branching is performed at compile-time:
+        // * for static fields, ResolveField can be replaced with a constant from M::FLAT_OFFSETS[id - 1];
+        // * for quasi-static fields, it can be replaced by a similar constant plus a dynamic correction.
+        return IsStatic(id) ? ResolveStaticField(id) : ResolveQuasiStaticField(tl, id);
     }
 
     template <typename T>
@@ -158,14 +250,21 @@ private:
 
     template <typename T>
     YAFF_PURE bool ReadPresenceUnsafe(const TFieldId tl, const TFieldId id, const TFieldOffset offset) const noexcept {
-        return YAFF_UNLIKELY(IsExplicit(tl)) ? ReadExplicitPresenceUnsafe<T>(id)
-                                             : ReadImplicitPresenceUnsafe<T>(offset);
+        if (YAFF_LIKELY(IsImplicit(tl))) {
+            return ReadImplicitPresenceUnsafe<T>(offset);
+        }
+        // N.B.: Since the id is known during compilation when reading specific fields,
+        // all arithmetic expressions result in reading a single byte at compile time known offset
+        // and testing a single bit at compile time known index.
+        //
+        // TODO: It is possible to make a branchless implementation based on arithmetic with IsSized(tl),
+        // but in this case, we no longer understand the byte index at compile time.
+        return YAFF_LIKELY(IsSized(tl)) ? ReadExplicitPresenceUnsafe<T>(3 * id - 2) : ReadExplicitPresenceUnsafe<T>(id);
     }
 
     template <typename T>
     YAFF_PURE bool ReadExplicitPresenceUnsafe(const TFieldId id) const noexcept {
-        return static_cast<std::uint8_t>(Message()[-((id - 0x1) >> 0x3) - 0x1]) &
-               (static_cast<std::uint8_t>(0x1) << ((id - 0x1) & 0x7));
+        return static_cast<uint8_t>(Message()[-((id - 1) >> 3) - 1]) & (static_cast<uint8_t>(1) << ((id - 1) & 7));
     }
 
     template <typename T>
@@ -271,98 +370,6 @@ template <typename T>
 concept CSparseMessage = std::is_base_of<TSparseMessage, T>::value;
 
 template <typename M>
-struct TDynamicMessage;
-
-template <>
-YAFF_LAYOUT_BEGIN(TDynamicMessage<void>) {
-public:
-    using TMetaType = void;
-
-public:
-    TDynamicMessage(const TDynamicMessage&) = delete;
-    TDynamicMessage& operator=(const TDynamicMessage&) = delete;
-
-    template <typename T>
-    YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
-        return ReadValueDispatch<T>(TypedLimit_, id, defaultVal);
-    }
-
-    template <typename T>
-    YAFF_PURE const T* ReadLayout(const TFieldId id, const T* defaultPtr = nullptr) const noexcept {
-        return ReadLayoutDispatch<T>(TypedLimit_, id, defaultPtr);
-    }
-
-    template <typename T>
-    YAFF_PURE bool ReadPresence(const TFieldId id) const noexcept {
-        return ReadPresenceDispatch<T>(TypedLimit_, id);
-    }
-
-    static const TDynamicMessage<void>& Default() noexcept {
-        return *NYaFF::ReadLayout<TDynamicMessage<void>>(DEFAULT_MESSAGE);
-    }
-
-protected:
-    inline static constexpr std::byte DEFAULT_MESSAGE[] = {std::byte{0x3}, std::byte{0x0}};
-
-    TDynamicMessage() noexcept = default;
-
-private:
-    friend struct NReflect::TAnyMessage;
-
-    template <typename T>
-    friend struct TDynamicMessage;
-
-    inline static constexpr bool IsFlat(const TFieldId id) noexcept {
-        return id & 0x8000;
-    }
-
-    YAFF_PURE const std::byte* Message() const noexcept {
-        return reinterpret_cast<const std::byte*>(this);
-    }
-
-    template <typename T>
-    YAFF_PURE T ReadValueDispatch(const TFieldId typedLimit, const TFieldId id, const T defaultVal) const noexcept {
-        if (YAFF_UNLIKELY(IsFlat(typedLimit))) {
-            return defaultVal;
-        }
-        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < typedLimit)) {
-            return AsSparseMessage()->ReadValueUnsafe<T>(AsSparseMessage()->ResolveField(id), defaultVal);
-        }
-        return defaultVal;
-    }
-
-    template <typename T>
-    YAFF_PURE const T* ReadLayoutDispatch(const TFieldId typedLimit, const TFieldId id, const T* defaultPtr = nullptr)
-        const noexcept {
-        if (YAFF_UNLIKELY(IsFlat(typedLimit))) {
-            return defaultPtr;
-        }
-        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < typedLimit)) {
-            return AsSparseMessage()->ReadLayoutUnsafe<T>(AsSparseMessage()->ResolveField(id), defaultPtr);
-        }
-        return defaultPtr;
-    }
-
-    template <typename T>
-    YAFF_PURE bool ReadPresenceDispatch(const TFieldId typedLimit, const TFieldId id) const noexcept {
-        if (YAFF_UNLIKELY(IsFlat(typedLimit))) {
-            return false;
-        }
-        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < typedLimit)) {
-            return AsSparseMessage()->ReadPresenceUnsafe<T>(AsSparseMessage()->ResolveField(id));
-        }
-        return false;
-    }
-
-    YAFF_PURE const TSparseMessage* AsSparseMessage() const noexcept {
-        return NYaFF::ReadLayout<TSparseMessage>(Message());
-    }
-
-    TFieldId TypedLimit_;
-};
-YAFF_LAYOUT_END
-
-template <typename M>
 YAFF_LAYOUT_BEGIN(TDynamicMessage) {
 public:
     using TMetaType = M;
@@ -373,29 +380,29 @@ public:
 
     template <typename T>
     YAFF_PURE T ReadValue(const TFieldId id, const T defaultVal) const noexcept {
-        const TFieldId typedLimit = TypedLimit_;
-        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < typedLimit)) {
-            return AsFlatMessage()->template ReadValueUnsafe<T>(M::ResolveField(id), defaultVal);
+        const TFieldId tl = TypedLimit_;
+        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < tl)) {
+            return AsFlatMessage()->template ReadValueUnsafe<T>(AsFlatMessage()->ResolveField(tl, id), defaultVal);
         }
-        return AsDynamicMessage()->template ReadValueDispatch<T>(typedLimit, id, defaultVal);
+        return ReadValueDispatch<T>(tl, id, defaultVal);
     }
 
     template <typename T>
     YAFF_PURE const T* ReadLayout(const TFieldId id, const T* defaultPtr = nullptr) const noexcept {
-        const TFieldId typedLimit = TypedLimit_;
-        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < typedLimit)) {
-            return AsFlatMessage()->template ReadLayoutUnsafe<T>(M::ResolveField(id), defaultPtr);
+        const TFieldId tl = TypedLimit_;
+        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < tl)) {
+            return AsFlatMessage()->template ReadLayoutUnsafe<T>(AsFlatMessage()->ResolveField(tl, id), defaultPtr);
         }
-        return AsDynamicMessage()->template ReadLayoutDispatch<T>(typedLimit, id, defaultPtr);
+        return ReadLayoutDispatch<T>(tl, id, defaultPtr);
     }
 
     template <typename T>
     YAFF_PURE bool ReadPresence(const TFieldId id) const noexcept {
-        const TFieldId typedLimit = TypedLimit_;
-        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < typedLimit)) {
-            return AsFlatMessage()->template ReadPresenceUnsafe<T>(typedLimit, id, M::ResolveField(id));
+        const TFieldId tl = TypedLimit_;
+        if (YAFF_LIKELY(TFlatMessage<M>::ToTypedLimit(id) < tl)) {
+            return AsFlatMessage()->template ReadPresenceUnsafe<T>(tl, id, AsFlatMessage()->ResolveField(tl, id));
         }
-        return AsDynamicMessage()->template ReadPresenceDispatch<T>(typedLimit, id);
+        return ReadPresenceDispatch<T>(tl, id);
     }
 
     static const TDynamicMessage<M>& Default() noexcept {
@@ -408,16 +415,52 @@ protected:
     TDynamicMessage() noexcept = default;
 
 private:
+    friend struct NReflect::TAnyMessage;
+
     YAFF_PURE const std::byte* Message() const noexcept {
         return reinterpret_cast<const std::byte*>(this);
+    }
+
+    template <typename T>
+    YAFF_PURE T ReadValueDispatch(const TFieldId tl, const TFieldId id, const T defaultVal) const noexcept {
+        if (YAFF_UNLIKELY(TFlatMessage<M>::IsFlat(tl))) {
+            return defaultVal;
+        }
+        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < tl)) {
+            return AsSparseMessage()->template ReadValueUnsafe<T>(AsSparseMessage()->ResolveField(id), defaultVal);
+        }
+        return defaultVal;
+    }
+
+    template <typename T>
+    YAFF_PURE const T* ReadLayoutDispatch(const TFieldId tl, const TFieldId id, const T* defaultPtr = nullptr)
+        const noexcept {
+        if (YAFF_UNLIKELY(TFlatMessage<M>::IsFlat(tl))) {
+            return defaultPtr;
+        }
+        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < tl)) {
+            return AsSparseMessage()->template ReadLayoutUnsafe<T>(AsSparseMessage()->ResolveField(id), defaultPtr);
+        }
+        return defaultPtr;
+    }
+
+    template <typename T>
+    YAFF_PURE bool ReadPresenceDispatch(const TFieldId tl, const TFieldId id) const noexcept {
+        if (YAFF_UNLIKELY(TFlatMessage<M>::IsFlat(tl))) {
+            return false;
+        }
+        if (YAFF_LIKELY(TSparseMessage::ToTypedLimit(id) < tl)) {
+            return AsSparseMessage()->template ReadPresenceUnsafe<T>(AsSparseMessage()->ResolveField(id));
+        }
+        return false;
     }
 
     YAFF_PURE const TFlatMessage<M>* AsFlatMessage() const noexcept {
         return NYaFF::ReadLayout<TFlatMessage<M>>(Message());
     }
 
-    YAFF_PURE const TDynamicMessage<void>* AsDynamicMessage() const noexcept {
-        return NYaFF::ReadLayout<TDynamicMessage<void>>(Message());
+    YAFF_PURE const TSparseMessage* AsSparseMessage() const noexcept {
+        return NYaFF::ReadLayout<TSparseMessage>(Message());
     }
 
     TFieldId TypedLimit_;

@@ -144,7 +144,7 @@ void TIRProcessor::ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef) {
             fieldDef.SharedOffsetId = it->second.Fields.size();
         }
 
-        fieldDef.FlatOffset = flatOffset * !gapped;
+        fieldDef.FlatOffset = flatOffset;
         flatOffset += fieldDef.Type->InlineSize();
     }
 

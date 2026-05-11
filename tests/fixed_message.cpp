@@ -38,7 +38,7 @@ TEST(FixedMessage, NestedValues) {
         yffb, -0x10, 0xFFFF, 0x3333);
     yffb.Finish(NProtoYaFF::NTestYaFF::CreateTStaticFixedMessage(yffb, 0xFF, nested));
 
-    EXPECT_EQ(yffb.GetSize(), 34ULL);
+    EXPECT_EQ(yffb.GetSize(), 35ULL);
 
     const auto* buf = yffb.GetBufferPointer();
     const auto& root = NYaFF::ReadRoot<NProtoYaFF::NTestYaFF::TStaticFixedMessage>(buf);
@@ -52,17 +52,13 @@ TEST(FixedMessage, NestedValues) {
 
 struct TFixedMeta {
     static constexpr size_t LIMIT = 16;
-    static constexpr std::array<NYaFF::TFieldOffset, 2> FLAT_OFFSETS = {0, 8};
-
-    static NYaFF::TFieldOffset ResolveField(const NYaFF::TFieldId id) {
-        return FLAT_OFFSETS[id - 1];
-    }
+    static constexpr std::array<NYaFF::TFieldOffset, 3> FLAT_OFFSETS = {0, 8, 16};
 };
 
 struct TFlatMeta {
-    static NYaFF::TFieldOffset ResolveField(const NYaFF::TFieldId) {
-        return 0;
-    }
+    static constexpr std::array<NYaFF::TFieldOffset, 2> FLAT_OFFSETS = {0, 4};
+    static constexpr std::array<NYaFF::TFieldId, 0> DELETED_IDS = {};
+    static constexpr std::array<bool, 1> STATIC_FLAGS = {1};
 };
 
 TEST(FixedMessage, FixedValue) {

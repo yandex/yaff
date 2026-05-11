@@ -250,6 +250,22 @@ private:
 };
 
 template <typename T>
+uint64_t SumRawFlat10(const T& root) {
+    uint64_t sum = 0;
+    sum += root.template ReadValue<uint64_t>(1, 0);
+    sum += root.template ReadValue<uint64_t>(2, 0);
+    sum += root.template ReadValue<uint64_t>(3, 0);
+    sum += root.template ReadValue<uint64_t>(4, 0);
+    // Field 5 is removed;
+    sum += root.template ReadValue<uint64_t>(6, 0);
+    sum += root.template ReadValue<uint64_t>(7, 0);
+    sum += root.template ReadValue<uint64_t>(8, 0);
+    sum += root.template ReadValue<uint64_t>(9, 0);
+    sum += root.template ReadValue<uint64_t>(10, 0);
+    return sum;
+}
+
+template <typename T>
 uint64_t SumFlat10(const T& root) {
     uint64_t sum = 0;
     sum += root.v0();
@@ -429,6 +445,23 @@ void BM_Access_Flat10_YaFF(benchmark::State& state) {
     }
 }
 
+struct TFlat10MetaV2 {
+    static constexpr std::array<NYaFF::TFieldOffset, 11> FLAT_OFFSETS = {0, 8, 16, 24, 32, 32, 40, 48, 56, 64, 72};
+    static constexpr std::array<NYaFF::TFieldId, 1> DELETED_IDS = {5};
+    static constexpr std::array<bool, 10> STATIC_FLAGS = {1, 1, 1, 1, 1, 0, 0, 0, 0, 0};
+};
+
+void BM_Access_Flat10V2_YaFF(benchmark::State& state) {
+    auto gen = TDataGenerator(std::random_device{}());
+    const auto msg = gen.GenerateYaFFFlat10<NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT>();
+
+    for (auto _ : state) {
+        const auto& root = NYaFF::ReadRoot<NYaFF::TDynamicMessage<TFlat10MetaV2>>(msg.Buffer.Data());
+        uint64_t sum = SumRawFlat10<NYaFF::TDynamicMessage<TFlat10MetaV2>>(root);
+        benchmark::DoNotOptimize(sum);
+    }
+}
+
 template <NYaFF::EMessageLayout Layout>
 void BM_Access_Flat100_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
@@ -447,6 +480,7 @@ BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_
     ->Name("BM_Access_Flat_YaFF/FlatLayout/FieldCount:10");
 BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Access_Flat_YaFF/SparseLayout/FieldCount:10");
+BENCHMARK(BM_Access_Flat10V2_YaFF)->Name("BM_Access_Flat_YaFF/FlatLayout/CompatibilityMode/FieldCount:10");
 
 BENCHMARK(BM_Access_Flat100_Protobuf)->Name("BM_Access_Flat_Protobuf/FieldCount:100");
 BENCHMARK(BM_Access_Flat100_FlatBuffers)->Name("BM_Access_Flat_FlatBuffers/FieldCount:100");

@@ -12,7 +12,7 @@ TEST(FlatMessage, NestedMessage) {
     const auto nested = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xFFFF, 0x3333);
     yffb.Finish(CreateTStaticFlatMessage(yffb, 0xFF, std::nullopt, nested));
 
-    EXPECT_EQ(yffb.GetSize(), 40ULL);
+    EXPECT_EQ(yffb.GetSize(), 41ULL);
 
     const auto* buf = yffb.GetBufferPointer();
 
@@ -34,7 +34,7 @@ TEST(FlatMessage, ImplicitMessage) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTImplicitMessage(yffb, 0, 1, 0));
 
-    EXPECT_EQ(yffb.GetSize(), 18ULL);
+    EXPECT_EQ(yffb.GetSize(), 19ULL);
 
     const auto* buf = yffb.GetBufferPointer();
     const auto& root = NYaFF::ReadRoot<TImplicitMessage>(buf);
@@ -48,7 +48,7 @@ TEST(FlatDynamicMessage, ImplicitMessage) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xFFFF, 0x3333));
 
-    EXPECT_EQ(yffb.GetSize(), 22ULL);
+    EXPECT_EQ(yffb.GetSize(), 23ULL);
 
     const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
@@ -61,7 +61,7 @@ TEST(FlatDynamicMessage, ExplicitMessage) {
     yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xAF,
                                                                 0x3333));  // Sets second field to default explicitly;
 
-    EXPECT_EQ(yffb.GetSize(), 23ULL);  // Allocates 1 more byte for presence mask;
+    EXPECT_EQ(yffb.GetSize(), 24ULL);  // Allocates 2 more byte for presence and sizes mask;
 
     const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
@@ -76,21 +76,6 @@ TEST(FlatDynamicMessage, BadFillOrder) {
     EXPECT_THROW(yffb.AddField<uint64_t>(TSimpleMessage::ID_LARGEFIELD, 0x3333, 0x6789), std::runtime_error);
 }
 
-struct TBadMessageMeta {
-    static NYaFF::TFieldOffset ResolveField(const NYaFF::TFieldId id) {
-        return (id - 1) * 8;
-    }
-};
-
-TEST(FlatDynamicMessage, BadMessageSize) {
-    NYaFF::TBuilder yffb;
-    yffb.StartFlatMessage<TBadMessageMeta>();
-    for (int i = 0; i < 8192; ++i) {
-        yffb.AddField<uint64_t>(8192 - i, i, 0xFFFFFFFF);
-    }
-    EXPECT_THROW(yffb.FinishFlatMessage(), std::runtime_error);
-}
-
 TEST(FlatDynamicMessage, SkipFields) {
     NYaFF::TBuilder yffb;
     TSimpleMessageFlatBuilder builder(yffb);
@@ -99,7 +84,7 @@ TEST(FlatDynamicMessage, SkipFields) {
     auto root = std::move(builder).Finish();
     yffb.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 22ULL);
+    EXPECT_EQ(yffb.GetSize(), 23ULL);
 
     const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
@@ -114,7 +99,7 @@ TEST(FlatDynamicMessage, SkipFieldsFront) {
     auto root = std::move(builder).Finish();
     yffb.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 22ULL);
+    EXPECT_EQ(yffb.GetSize(), 23ULL);
 
     const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x0);
@@ -126,7 +111,7 @@ TEST(FlatDynamicMessage, SkipFieldsTail) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, 0x17));
 
-    EXPECT_EQ(yffb.GetSize(), 10ULL);  // Tail size optimization;
+    EXPECT_EQ(yffb.GetSize(), 11ULL);  // Tail size optimization;
 
     const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x17);
@@ -137,7 +122,7 @@ TEST(FlatDynamicMessage, DefaultValues) {
     yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, std::nullopt,
                                                                 0x1234));  // Sets empty value for small field
 
-    EXPECT_EQ(yffb.GetSize(), 22ULL);
+    EXPECT_EQ(yffb.GetSize(), 23ULL);
 
     const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
@@ -151,7 +136,7 @@ TEST(FlatDynamicMessage, TailDefaultValues) {
     auto root = std::move(builder).Finish();
     yffb.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 10ULL);  // Does not store empty values in the end of object;
+    EXPECT_EQ(yffb.GetSize(), 11ULL);  // Does not store empty values in the end of object;
 
     const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
@@ -178,7 +163,7 @@ TEST(FlatDynamicMessage, NestedMessages) {
     auto root = CreateTNestedMessage<TNestedMessageFlatBuilder>(yffb, nested1, 0x1234, nested2);
     yffb.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 39ULL);
+    EXPECT_EQ(yffb.GetSize(), 41ULL);
 
     const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x1234ULL);
@@ -194,7 +179,7 @@ TEST(FlatDynamicMessage, NestedMessageEmpty) {
     auto root = CreateTNestedMessage<TNestedMessageFlatBuilder>(yffb, nested);
     yffb.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 29ULL);
+    EXPECT_EQ(yffb.GetSize(), 31ULL);
 
     const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
@@ -207,7 +192,7 @@ TEST(FlatDynamicMessage, FloatMessage) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTFloatMessage<TFloatMessageFlatBuilder>(yffb, 1.1234f, std::nullopt));
 
-    EXPECT_EQ(yffb.GetSize(), 10ULL);  // double empty value is not stored;
+    EXPECT_EQ(yffb.GetSize(), 11ULL);  // double empty value is not stored;
 
     const auto& floatMessage = NYaFF::ReadRoot<TFloatMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(floatMessage.GetFloatField(), 1.1234f);
@@ -217,7 +202,7 @@ TEST(FlatDynamicMessage, FloatMessage) {
 TEST(FlatDynamicMessage, UnionMessageEmpty) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 10));
-    EXPECT_EQ(yffb.GetSize(), 10ULL);  // shared values is not stored;
+    EXPECT_EQ(yffb.GetSize(), 11ULL);  // shared values is not stored;
 
     const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(unionMessage.GetSomeValue(), 10U);
@@ -238,7 +223,7 @@ TEST(FlatDynamicMessage, UnionMessageExplicitPresence) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 10, 0, 0, 0, -1));  // -1 is default value;
 
-    EXPECT_EQ(yffb.GetSize(), 27ULL);
+    EXPECT_EQ(yffb.GetSize(), 28ULL);
 
     const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(unionMessage.GetSomeValue(), 10U);
@@ -252,7 +237,7 @@ TEST(FlatDynamicMessage, UnionMessageNested) {
     auto nested = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, 10);
     yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 12, 0, 0, nested));
 
-    EXPECT_EQ(yffb.GetSize(), 28ULL);
+    EXPECT_EQ(yffb.GetSize(), 30ULL);
 
     const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(unionMessage.GetSomeValue(), 12U);
@@ -268,7 +253,7 @@ TEST(FlatDynamicMessage, UnionMessageString) {
     auto vec = yffb.CreateString(expected);
     yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 14, 0, vec));
 
-    EXPECT_EQ(yffb.GetSize(), 27ULL);
+    EXPECT_EQ(yffb.GetSize(), 28ULL);
 
     const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
     EXPECT_EQ(unionMessage.GetSomeValue(), 14U);
@@ -282,7 +267,7 @@ TEST(FlatDynamicMessage, MixedOneof) {
     NYaFF::TBuilder yffb;
     yffb.Finish(CreateTOneOfMix<TOneOfMixFlatBuilder>(yffb, 1, std::nullopt, 2, 4));
 
-    EXPECT_EQ(yffb.GetSize(), 38ULL);
+    EXPECT_EQ(yffb.GetSize(), 39ULL);
 
     const auto& oneofMix = NYaFF::ReadRoot<TOneOfMix>(yffb.GetBufferPointer());
     EXPECT_EQ(oneofMix.Shared_case(), TOneOfMix::SharedCase::kField4);
@@ -292,4 +277,95 @@ TEST(FlatDynamicMessage, MixedOneof) {
     EXPECT_EQ(oneofMix.GetField3(), 0ULL);
     EXPECT_EQ(oneofMix.HasField4(), true);
     EXPECT_EQ(oneofMix.GetField4(), 4ULL);
+}
+
+// ID=1, uint64;
+// ID=2, uint32;
+// ID=3, uint64;
+// ID=4, bool;
+// ID=5, uint64;
+struct TExplicitMetaV1 {
+    inline static constexpr std::array<NYaFF::TFieldOffset, 6> FLAT_OFFSETS = {0, 8, 12, 20, 21, 29};
+    inline static constexpr std::array<NYaFF::TFieldId, 0> DELETED_IDS = {};
+    inline static constexpr std::array<bool, 5> STATIC_FLAGS = {1, 1, 1, 1, 1};
+};
+
+// ID=1, uint64;
+// ID=2, removed;
+// ID=3, removed;
+// ID=4, bool;
+// ID=5, uint64;
+// ID=6, (added) uint32;
+struct TExplicitMetaV2 {
+    inline static constexpr std::array<NYaFF::TFieldOffset, 7> FLAT_OFFSETS = {0, 8, 8, 8, 9, 17, 21};
+    inline static constexpr std::array<NYaFF::TFieldId, 2> DELETED_IDS = {2, 3};
+    inline static constexpr std::array<bool, 6> STATIC_FLAGS = {1, 1, 1, 0, 0, 0};
+};
+
+TEST(FlatDynamicMessage, ExplicitSparseCompatibility) {
+    // Writes message with dense message info;
+    NYaFF::TBuilder yffb;
+    yffb.StartFlatMessage<TExplicitMetaV1>(/*implicit*/ false, /*sized*/ true);
+    yffb.AddField<uint64_t>(5, 10, 10);
+    yffb.AddField<bool>(4, true, false);
+    yffb.AddField<uint64_t>(3, 15, 10);
+    yffb.AddField<uint32_t>(2, 0, 0);
+    yffb.AddField<uint64_t>(1, 20, 0);
+    yffb.Finish(NYaFF::TInternalOffset<>{yffb.FinishFlatMessage()});
+
+    EXPECT_EQ(yffb.GetSize(), 37ULL);
+
+    // Reads message with updated sparse message info;
+    const auto& msg = NYaFF::ReadRoot<NYaFF::TDynamicMessage<TExplicitMetaV2>>(yffb.GetBufferPointer());
+    EXPECT_TRUE(msg.ReadPresence<uint64_t>(1));
+    EXPECT_EQ(msg.ReadValue<uint64_t>(1, 0), 20ULL);
+
+    EXPECT_TRUE(msg.ReadPresence<uint64_t>(4));
+    EXPECT_EQ(msg.ReadValue<bool>(4, false), true);
+
+    EXPECT_TRUE(msg.ReadPresence<uint64_t>(5));
+    EXPECT_EQ(msg.ReadValue<uint64_t>(5, 10), 10ULL);
+
+    EXPECT_FALSE(msg.ReadPresence<uint32_t>(6));
+    EXPECT_EQ(msg.ReadValue<uint32_t>(6, 1337), 1337U);
+}
+
+// ID=1, bool;
+// ID=2, uint32;
+// ID=3, uint32;
+// ID=4, uint64;
+struct TImplicitMetaV1 {
+    inline static constexpr std::array<NYaFF::TFieldOffset, 5> FLAT_OFFSETS = {0, 1, 5, 9, 17};
+    inline static constexpr std::array<NYaFF::TFieldId, 0> DELETED_IDS = {};
+    inline static constexpr std::array<bool, 4> STATIC_FLAGS = {1, 1, 1, 1};
+};
+
+// ID=1, removed;
+// ID=2, uint32;
+// ID=3, uint32;
+// ID=4, removed;
+struct TImplicitMetaV2 {
+    inline static constexpr std::array<NYaFF::TFieldOffset, 4> FLAT_OFFSETS = {0, 0, 4, 8};
+    inline static constexpr std::array<NYaFF::TFieldId, 1> DELETED_IDS = {1};
+    inline static constexpr std::array<bool, 3> STATIC_FLAGS = {1, 0, 0};
+};
+
+TEST(FlatDynamicMessage, ImplicitSparseCompatibility) {
+    NYaFF::TBuilder yffb;
+    yffb.StartFlatMessage<TImplicitMetaV1>(/*implicit*/ true, /*sized*/ true);
+    yffb.AddField<uint64_t>(4, 10, 0);
+    yffb.AddField<uint32_t>(3, 8, 8);
+    yffb.AddField<uint32_t>(2, 1, 2);
+    yffb.AddField<bool>(1, false, false);
+    yffb.Finish(NYaFF::TInternalOffset<>{yffb.FinishFlatMessage()});
+
+    EXPECT_EQ(yffb.GetSize(), 24ULL);
+
+    // Reads message with updated sparse message info;
+    const auto& msg = NYaFF::ReadRoot<NYaFF::TDynamicMessage<TImplicitMetaV2>>(yffb.GetBufferPointer());
+    EXPECT_TRUE(msg.ReadPresence<uint64_t>(2));
+    EXPECT_EQ(msg.ReadValue<uint32_t>(2, 1), 2U);
+
+    EXPECT_TRUE(msg.ReadPresence<uint64_t>(3));
+    EXPECT_EQ(msg.ReadValue<uint32_t>(3, 8), 8U);
 }
