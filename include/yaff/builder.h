@@ -403,7 +403,7 @@ private:
 
         static void SetPresence(char* maskStart, const TFieldId id, const bool sized) {
             const size_t index = (id - 1) * CalculateFieldMetaSize(true, sized);
-            maskStart[-(index >> 3) - 1] |= (static_cast<char>(1) << (index & 7));
+            *(maskStart - (index >> 3) - 1) |= (static_cast<char>(1) << (index & 7));
         }
 
         static void SetSize(char* maskStart, const TFieldId id, const size_t size, const bool expl) {
@@ -412,9 +412,9 @@ private:
                 return;
             }
             const size_t index = (id - 1) * CalculateFieldMetaSize(expl, true) + expl;
-            maskStart[-(index >> 3) - 1] |= (static_cast<char>(corr) << (index & 7));
+            *(maskStart - (index >> 3) - 1) |= (static_cast<char>(corr) << (index & 7));
             if ((index & 7) == 7) {
-                maskStart[-(index >> 3) - 2] |= (static_cast<char>(corr) >> 1);
+                *(maskStart - (index >> 3) - 2) |= (static_cast<char>(corr) >> 1);
             }
         }
 

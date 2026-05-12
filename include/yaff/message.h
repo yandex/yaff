@@ -195,7 +195,7 @@ private:
 // TODO: The current correction is calculated by reading from the static CORRECTION_DICTIONARY.
 // It might be worth trying an alternative that uses arithmetic:
 // (meta & 1) + ((meta >> 1) << 2) + 3 * ((meta & 1) & (meta >> 1));
-#define YAFF_RETURN_RESOLVED_CORRECTION(expression)          \
+#define YAFF_RETURN_CORRECTION(expression)                   \
     do {                                                     \
         TFieldOffset correction = 0;                         \
         const size_t end = CalculateDeletedIndex(id);        \
@@ -207,15 +207,15 @@ private:
     } while (0)
 
     YAFF_PURE TFieldOffset ResolveImplicitCorrection(const TFieldId id) const noexcept {
-        YAFF_RETURN_RESOLVED_CORRECTION((static_cast<uint8_t>(Message()[-(del >> 2) - 1]) >> ((del & 3) << 1)) & 3);
+        YAFF_RETURN_CORRECTION((NYaFF::ReadValue<uint8_t>(Message() - (del >> 2) - 1) >> ((del & 3) << 1)) & 3);
     }
 
     YAFF_PURE TFieldOffset ResolveExplicitCorrection(const TFieldId id) const noexcept {
-        YAFF_RETURN_RESOLVED_CORRECTION(
+        YAFF_RETURN_CORRECTION(
             (YAFF_BSWAP16(NYaFF::ReadValue<uint16_t>(Message() - ((del * 3) >> 3) - 2)) >> (((del * 3) & 7) + 1)) & 3);
     }
 
-#undef YAFF_RETURN_RESOLVED_CORRECTION
+#undef YAFF_RETURN_CORRECTION
 
     YAFF_PURE TFieldOffset ResolveCorrection(const TFieldId tl, const TFieldId id) const noexcept {
         return YAFF_LIKELY(IsImplicit(tl)) ? ResolveImplicitCorrection(id) : ResolveExplicitCorrection(id);
@@ -264,7 +264,7 @@ private:
 
     template <typename T>
     YAFF_PURE bool ReadExplicitPresenceUnsafe(const TFieldId id) const noexcept {
-        return static_cast<uint8_t>(Message()[-((id - 1) >> 3) - 1]) & (static_cast<uint8_t>(1) << ((id - 1) & 7));
+        return NYaFF::ReadValue<uint8_t>(Message() - ((id - 1) >> 3) - 1) & (static_cast<uint8_t>(1) << ((id - 1) & 7));
     }
 
     template <typename T>
