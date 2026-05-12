@@ -369,6 +369,12 @@ void CppGenerator::Impl::GenerateHeader() {
     if (!Opts_.ExternalIncludes.empty()) {
         Writer_ |= "";
     }
+
+    Writer_ |= "#if YAFF_VERSION != " YAFF_STRINGIFY(YAFF_VERSION);
+    Writer_ |= "#error \"YaFF version mismatch: this generated file requires another version of support library.\"";
+    Writer_ |= "#error \"Regenerate this file with the matching YaFF compiler";
+    Writer_ |= "#error \"or link against a compatible YaFF support library.\"";
+    Writer_ |= "#endif\n";
 }
 
 void CppGenerator::Impl::GenerateIncludes(const ir::SchemaDef& schema) {
