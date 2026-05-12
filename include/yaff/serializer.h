@@ -1,25 +1,26 @@
 #pragma once
 
-#include <span>
+#include <array>
+#include <cstddef>
 #include <unordered_set>
 #include <variant>
 #include <vector>
 
+#include "array.h"
 #include "base.h"
 #include "buffer.h"
-#include "vector.h"
 
-namespace NYaFF::NExp {
+namespace yaff::exp {
 
-class TBuilder;
+class Serializer;
 
 }
 
-namespace NYaFF {
+namespace yaff {
 
-enum class EBuilderType : int32_t {
-    BUILDER_TYPE_DEFAULT = 0,
-    BUILDER_TYPE_EXPERIMENTAL = 1,
+enum class SerializerType : int32_t {
+    SERIALIZER_TYPE_DEFAULT = 0,
+    SERIALIZER_TYPE_EXPERIMENTAL = 1,
 };
 
 template <typename P, typename E>
@@ -38,25 +39,25 @@ template <typename E, typename U, typename D>
 concept CElementDeferrer =
     std::invocable<D, const U&> and std::convertible_to<std::invoke_result_t<std::invoke_result_t<D, const U&>>, E>;
 
-class TBuilder {
+class Serializer {
 public:
-    explicit TBuilder(size_t initialSize = 0, bool = false)
-        : TBuilder(EBuilderType::BUILDER_TYPE_DEFAULT, initialSize) {
+    explicit Serializer(size_t initialSize = 0, bool = false)
+        : Serializer(SerializerType::SERIALIZER_TYPE_DEFAULT, initialSize) {
     }
 
-    TBuilder(const TBuilder&) = delete;
-    TBuilder& operator=(const TBuilder&) = delete;
+    Serializer(const Serializer&) = delete;
+    Serializer& operator=(const Serializer&) = delete;
 
-    TBuilder(TBuilder&& other) = delete;
-    TBuilder& operator=(TBuilder&& other) = delete;
+    Serializer(Serializer&& other) = delete;
+    Serializer& operator=(Serializer&& other) = delete;
 
-    ~TBuilder() = default;
+    ~Serializer() = default;
 
-    void EnforceDynamicAlternative(EMessageLayout layout) noexcept {
+    void EnforceDynamicAlternative(MessageLayout layout) noexcept {
         ForcedAlternative_ = layout;
     }
 
-    EMessageLayout GetForcedDynamicAlternative() const noexcept {
+    MessageLayout GetForcedDynamicAlternative() const noexcept {
         return ForcedAlternative_;
     }
 
@@ -67,114 +68,113 @@ public:
 
     void Clear() noexcept {
         Buf_.Clear();
-        MessageBuilder_.emplace<TDummyMessageBuilder>();
+        MessageSerializer_.emplace<DummyMessageSerializer>();
         Depth_ = 0;
         Finished_ = false;
         ObjectSet_.clear();
     }
 
     template <typename T>
-    void AddField(TFieldId fieldId, T value, T def) {
+    void AddField(FieldId fieldId, T value, T def) {
         AddFieldDispatch<T>(fieldId, value, def);
     }
 
     template <typename T>
-    void AddField(TFieldId fieldId, TInternalOffset<T> offset) {
+    void AddField(FieldId fieldId, InternalOffset<T> offset) {
         AddFieldDispatch<T>(fieldId, offset);
     }
 
     template <typename M>
     void StartFixedMessage() {
-        // Nesting is possible for this call, but not another message, since no TFieldOffset is set.
-        YAFF_REQUIRE(std::holds_alternative<TDummyMessageBuilder>(MessageBuilder_));
+        // Nesting is possible for this call, but not another message, since no FieldOffset is set.
+        YAFF_REQUIRE(std::holds_alternative<DummyMessageSerializer>(MessageSerializer_));
         Buf_.RightFill(M::LIMIT);
-        StartMessageDispatch<TFixedMessageBuilder>(Buf_, Buf_.RightSize(), M::FLAT_OFFSETS);
+        StartMessageDispatch<FixedMessageSerializer>(Buf_, Buf_.RightSize(), M::FLAT_OFFSETS);
     }
 
-    TOffset FinishFixedMessage() {
-        return FinishMessageDispatch<TFixedMessageBuilder>();
+    Offset FinishFixedMessage() {
+        return FinishMessageDispatch<FixedMessageSerializer>();
     }
 
     template <typename M>
         requires(M::DELETED_IDS.empty())
     void StartFlatMessage(bool implicit = false, bool sized = false) {
         CheckNotNested();
-        StartMessageDispatch<TFlatMessageBuilder>(Buf_, sized, implicit, M::FLAT_OFFSETS);
+        StartMessageDispatch<FlatMessageSerializer>(Buf_, sized, implicit, M::FLAT_OFFSETS);
     }
 
-    TOffset FinishFlatMessage() {
-        return FinishMessageDispatch<TFlatMessageBuilder>();
+    Offset FinishFlatMessage() {
+        return FinishMessageDispatch<FlatMessageSerializer>();
     }
 
     void StartSparseMessage(bool implicit = false) {
         CheckNotNested();
-        StartMessageDispatch<TSparseMessageBuilder>(Buf_, implicit);
+        StartMessageDispatch<SparseMessageSerializer>(Buf_, implicit);
     }
 
-    TOffset FinishSparseMessage() {
-        return FinishMessageDispatch<TSparseMessageBuilder>();
+    Offset FinishSparseMessage() {
+        return FinishMessageDispatch<SparseMessageSerializer>();
     }
 
     template <typename T>
-    TInternalOffset<TVector<T>> CreateVector(const T* data, size_t len) {
+    InternalOffset<Array<T>> SerializeArray(const T* data, size_t len) {
         CheckNotFinished();
         CheckNotNested();
         CheckLength(len);
         if (len == 0) {
             return 0;
         }
-        const size_t start = StartVector();
+        const size_t start = StartArray();
         Buf_.RightPush(reinterpret_cast<const std::byte*>(data), len * sizeof(T));
         Buf_.RightPushSmall<uint32_t>(len);
-        return TInternalOffset<TVector<T>>(FinishVector(start));
+        return InternalOffset<Array<T>>(FinishArray(start));
     }
 
     template <typename T>
-    TInternalOffset<TVector<TInternalOffset<T>>> CreateVector(const TInternalOffset<T>* data, size_t len) {
+    InternalOffset<Array<InternalOffset<T>>> SerializeArray(const InternalOffset<T>* data, size_t len) {
         CheckNotFinished();
         CheckNotNested();
         CheckLength(len);
         if (len == 0) {
             return 0;
         }
-        const size_t start = StartVector();
-        const size_t objectStart = Buf_.RightSize() + len * sizeof(TOffset);
+        const size_t start = StartArray();
+        const size_t objectStart = Buf_.RightSize() + len * sizeof(Offset);
         size_t idx = len;
         while (idx > 0) {
-            const TInternalOffset<T> offset = data[--idx];
+            const InternalOffset<T> offset = data[--idx];
             YAFF_REQUIRE(objectStart >= offset.O);
-            Buf_.RightPushSmall<TOffset>(!offset.IsNull() ? ToCheckedOffset(objectStart - offset.O) : offset.O);
+            Buf_.RightPushSmall<Offset>(!offset.IsNull() ? ToCheckedOffset(objectStart - offset.O) : offset.O);
         }
         Buf_.RightPushSmall<uint32_t>(len);
         // Disable deduplication for offset vectors because it breaks the relational offset logic.
-        return TInternalOffset<TVector<TInternalOffset<T>>>(FinishVector(start, /* noDedup */ true));
+        return InternalOffset<Array<InternalOffset<T>>>(FinishArray(start, /* noDedup */ true));
     }
 
     template <typename T>
-    TInternalOffset<TVector<T>> CreateVector(const std::vector<T>& vec) {
-        return CreateVector(vec.data(), vec.size());
+    InternalOffset<Array<T>> SerializeArray(const std::vector<T>& vec) {
+        return SerializeArray(vec.data(), vec.size());
     }
 
-    // May be implemented using a bit-set.
-    TInternalOffset<TVector<bool>> CreateVector(const std::vector<bool>& vec) {
+    InternalOffset<Array<bool>> SerializeArray(const std::vector<bool>& vec) {
         CheckNotFinished();
         CheckNotNested();
         CheckLength(vec.size());
         if (vec.size() == 0) {
             return 0;
         }
-        const size_t start = StartVector();
+        const size_t start = StartArray();
         size_t idx = vec.size();
         while (idx > 0) {
             Buf_.RightPushSmall<uint8_t>(vec[--idx]);
         }
         Buf_.RightPushSmall<uint32_t>(vec.size());
-        return TInternalOffset<TVector<bool>>(FinishVector(start));
+        return InternalOffset<Array<bool>>(FinishArray(start));
     }
 
     template <typename T, typename F>
         requires CElementGenerator<T, F>
-    TInternalOffset<TVector<T>> CreateVector(size_t len, F&& gen) {
+    InternalOffset<Array<T>> SerializeArray(size_t len, F&& gen) {
         if (len == 0) {
             return 0;
         }
@@ -183,20 +183,19 @@ public:
         for (size_t i = 0; i < len; ++i) {
             elements.emplace_back(gen(i));
         }
-        return CreateVector(elements);
+        return SerializeArray(elements);
     }
 
-    // TODO: move this function to private section;
     template <typename T, typename F>
         requires CElementProducer<T, F>
-    TInternalOffset<TVector<T>> CreateVector(F&& produce) {
+    InternalOffset<Array<T>> SerializeArray(F&& produce) {
         // N.B.: This function cannot produce empty vectors, so the length must be checked on caller side.
         CheckNotFinished();
         CheckNotNested();
         bool next = true;
         size_t len = 0;
         size_t elementSize = 0;
-        const size_t start = StartVector();
+        const size_t start = StartArray();
         while (next) {
             size_t before = Buf_.RightSize();
             std::tie(std::ignore, next) = produce(len++);
@@ -216,12 +215,12 @@ public:
         }
         Buf_.RightPushSmall<uint32_t>(len);
         // TODO: support better interface to enable deduplication where it possible.
-        return TInternalOffset<TVector<T>>(FinishVector(start, /* noDedup */ true));
+        return InternalOffset<Array<T>>(FinishArray(start, /* noDedup */ true));
     }
 
     template <typename T, typename F>
         requires CElementDeferrer<T, size_t, F>
-    TInternalOffset<TVector<T>> CreateVector(size_t len, F&& deferrer) {
+    InternalOffset<Array<T>> SerializeArray(size_t len, F&& deferrer) {
         if (len == 0) {
             return 0;
         }
@@ -230,7 +229,7 @@ public:
         for (size_t i = 0; i < len; ++i) {
             producers.emplace_back(deferrer(i));
         }
-        return CreateVector<T>([&](size_t i) {
+        return SerializeArray<T>([&](size_t i) {
             YAFF_REQUIRE(i + 1 <= producers.size());
             return std::make_pair(static_cast<T>(producers[producers.size() - i - 1]()), i + 1 < producers.size());
         });
@@ -238,7 +237,7 @@ public:
 
     template <typename T, typename U, typename F>
         requires CElementDeferrer<T, U, F>
-    TInternalOffset<TVector<T>> CreateVector(const std::vector<U>& args, F&& deferrer) {
+    InternalOffset<Array<T>> SerializeArray(const std::vector<U>& args, F&& deferrer) {
         if (args.size() == 0) {
             return 0;
         }
@@ -247,70 +246,77 @@ public:
         for (const auto& arg : args) {
             producers.emplace_back(deferrer(arg));
         }
-        return CreateVector<T>([&](size_t i) {
+        return SerializeArray<T>([&](size_t i) {
             YAFF_REQUIRE(i + 1 <= producers.size());
             return std::make_pair(static_cast<T>(producers[producers.size() - i - 1]()), i + 1 < producers.size());
         });
     }
 
     template <std::convertible_to<std::string_view> T>
-    TInternalOffset<TString> CreateString(const T& str) {
+    InternalOffset<String> SerializeString(const T& str) {
         const auto sv = static_cast<std::string_view>(str);
 
         CheckNotFinished();
         CheckNotNested();
         CheckLength(sv.size());
-        const size_t start = StartVector(/*nullTerminated*/ true);
+        const size_t start = StartArray(/*nullTerminated*/ true);
         if (sv.size() > 0) {
             Buf_.RightPush(sv.data(), sv.size());
         }
         Buf_.RightPushSmall<uint32_t>(sv.size());
-        return TInternalOffset<TString>(FinishVector(start));
-    }
-
-    // Incorrect use of this version of Finish function may result in UB.
-    // Use this version of function only if you know exactly what you're doing.
-    void Finish() {
-        CheckNotFinished();
-        CheckNotNested();
-        Buf_.LeftClear();
-        Finished_ = true;
+        return InternalOffset<String>(FinishArray(start));
     }
 
     template <typename T>
-    void Finish(TInternalOffset<T> root) {
+    void Finish(InternalOffset<T> root) {
         CheckNotFinished();
         CheckNotNested();
         YAFF_REQUIRE(!root.IsNull());
         Buf_.LeftClear();
-        YAFF_REQUIRE(Buf_.RightSize() + sizeof(TOffset) >= root.O);
-        Buf_.RightPushSmall<TOffset>(ToCheckedOffset((Buf_.RightSize() + sizeof(TOffset)) - root.O));
+        YAFF_REQUIRE(Buf_.RightSize() + sizeof(Offset) >= root.O);
+        Buf_.RightPushSmall<Offset>(ToCheckedOffset((Buf_.RightSize() + sizeof(Offset)) - root.O));
         Finished_ = true;
     }
 
-    TDetachedSegment Release() {
+    // N.B.: Incorrect use of this version of Finish function may result in UB.
+    // Use this version of function only if you know exactly what you're doing.
+    void FinishRootless() {
+        CheckNotFinished();
+        CheckNotNested();
+        Buf_.LeftClear();
+        Finished_ = true;
+    }
+
+    DetachedSegment Release() {
         CheckFinished();
         auto buffer = Buf_.RightDetach();
         Clear();
         return buffer;
     }
 
-    char* GetBufferPointer() const {
+    const std::byte* Data() const {
         CheckFinished();
         return Buf_.RightData();
     }
 
-    size_t GetSize() const {
+    size_t Size() const {
         CheckFinished();
         return Buf_.RightSize();
     }
 
 private:
-    friend class NYaFF::NExp::TBuilder;
+    friend class yaff::exp::Serializer;
 
-    using TOffsetsView = std::span<const TFieldOffset>;
+    struct OffsetsView {
+        const FieldOffset* Data;
+        size_t Size;
 
-    struct TObjectOffset {
+        template <size_t N>
+        OffsetsView(const std::array<FieldOffset, N>& o) : Data(o.data()), Size(o.size()) {
+        }
+    };
+
+    struct ObjectOffset {
         // It is possible that the message size will exceed the allowed MAX_OFFSET,
         // but due to deduplication it will return to normal.
         // To handle this case, Offset uses size_t to store offsets.
@@ -318,82 +324,83 @@ private:
         size_t ByteSize = 0;
     };
 
-    struct TObjectOffsetHash {
-        inline size_t operator()(const TObjectOffset& offset) const noexcept {
-            return std::hash<std::string_view>{}({Buf.RightDataAt(offset.Offset), offset.ByteSize});
+    struct ObjectOffsetHash {
+        inline size_t operator()(const ObjectOffset& offset) const noexcept {
+            return std::hash<std::string_view>{}(
+                {reinterpret_cast<const char*>(Buf.RightDataAt(offset.Offset)), offset.ByteSize});
         }
-        TDualBuffer& Buf;
+        DualBuffer& Buf;
     };
 
-    struct TObjectOffsetEqual {
-        inline bool operator()(const TObjectOffset& lhs, const TObjectOffset& rhs) const noexcept {
+    struct ObjectOffsetEqual {
+        inline bool operator()(const ObjectOffset& lhs, const ObjectOffset& rhs) const noexcept {
             return lhs.ByteSize == rhs.ByteSize &&
                    memcmp(Buf.RightDataAt(lhs.Offset), Buf.RightDataAt(rhs.Offset), lhs.ByteSize) == 0;
         }
-        TDualBuffer& Buf;
+        DualBuffer& Buf;
     };
 
-    using TObjectOffsetSet = std::unordered_set<TObjectOffset, TObjectOffsetHash, TObjectOffsetEqual>;
+    using ObjectOffsetSet = std::unordered_set<ObjectOffset, ObjectOffsetHash, ObjectOffsetEqual>;
 
-    struct TDummyMessageBuilder {
+    struct DummyMessageSerializer {
         template <typename T, typename... Ps>
-        void AddField(TFieldId, Ps&&...) {
+        void AddField(FieldId, Ps&&...) {
             YAFF_THROW("impossible control flow");
         }
-        TOffset Finish() && {
+        Offset Finish() && {
             YAFF_THROW("impossible control flow");
         }
     };
 
-    struct TFixedMessageBuilder {
-        TFixedMessageBuilder(TDualBuffer& buffer, size_t loc, TOffsetsView offsets)
+    struct FixedMessageSerializer {
+        FixedMessageSerializer(DualBuffer& buffer, size_t loc, OffsetsView offsets)
             : Buf(buffer), Loc(loc), Offsets(offsets) {
         }
 
-        TFixedMessageBuilder(const TFixedMessageBuilder&) = delete;
-        TFixedMessageBuilder& operator=(const TFixedMessageBuilder&) = delete;
+        FixedMessageSerializer(const FixedMessageSerializer&) = delete;
+        FixedMessageSerializer& operator=(const FixedMessageSerializer&) = delete;
 
-        TFixedMessageBuilder(TFixedMessageBuilder&& other) = delete;
-        TFixedMessageBuilder& operator=(TFixedMessageBuilder&& other) = delete;
+        FixedMessageSerializer(FixedMessageSerializer&& other) = delete;
+        FixedMessageSerializer& operator=(FixedMessageSerializer&& other) = delete;
 
         template <typename T>
-        void AddField(TFieldId id, T value, T def) {
+        void AddField(FieldId id, T value, T def) {
             WriteField<T>(id, XorDef(value, def));
         }
 
         template <typename T>
-        void AddField(TFieldId id, TInternalOffset<T> offset) {
+        void AddField(FieldId id, InternalOffset<T> offset) {
             if (offset.IsNull()) {
                 return;
             }
             YAFF_REQUIRE(Loc >= offset.O);
-            WriteField<TOffset>(id, ToCheckedOffset(Loc - offset.O));
+            WriteField<Offset>(id, ToCheckedOffset(Loc - offset.O));
         }
 
-        TOffset Finish() && {
+        Offset Finish() && {
             return ToCheckedOffset(Loc);
         }
 
         template <typename T>
-        void WriteField(TFieldId id, T value) {
-            const TFieldOffset fieldOffset = Offsets[id - 1];
+        void WriteField(FieldId id, T value) {
+            const FieldOffset fieldOffset = Offsets.Data[id - 1];
             YAFF_REQUIRE(Loc >= fieldOffset);
             WriteValue<T>(Buf.RightDataAt(Loc - fieldOffset), value);
         }
 
-        TDualBuffer& Buf;
+        DualBuffer& Buf;
         size_t Loc;
-        TOffsetsView Offsets;
+        OffsetsView Offsets;
     };
 
-    struct TFlatMessageBuilder {
-        inline static constexpr size_t TYPED_LIMIT_SIZE = sizeof(TFieldId);
+    struct FlatMessageSerializer {
+        inline static constexpr size_t TYPED_LIMIT_SIZE = sizeof(FieldId);
 
         static constexpr size_t CalculateFieldMetaSize(const bool expl, const bool sized) {
             return static_cast<size_t>(expl) | (static_cast<size_t>(sized) << 1);
         }
 
-        static constexpr size_t CalculateMetaSize(const TFieldId maxId, const bool expl, const bool sized) {
+        static constexpr size_t CalculateMetaSize(const FieldId maxId, const bool expl, const bool sized) {
             return (maxId * CalculateFieldMetaSize(expl, sized) + 7) >> 3;
         }
 
@@ -401,24 +408,24 @@ private:
             return (size > 0) + (size > 1) + (size > 4);
         }
 
-        static void SetPresence(char* maskStart, const TFieldId id, const bool sized) {
+        static void SetPresence(std::byte* maskStart, const FieldId id, const bool sized) {
             const size_t index = (id - 1) * CalculateFieldMetaSize(true, sized);
-            *(maskStart - (index >> 3) - 1) |= (static_cast<char>(1) << (index & 7));
+            *(maskStart - (index >> 3) - 1) |= (static_cast<std::byte>(1) << (index & 7));
         }
 
-        static void SetSize(char* maskStart, const TFieldId id, const size_t size, const bool expl) {
+        static void SetSize(std::byte* maskStart, const FieldId id, const size_t size, const bool expl) {
             const size_t corr = CalculateCorrection(size);
             if (corr == 0) {
                 return;
             }
             const size_t index = (id - 1) * CalculateFieldMetaSize(expl, true) + expl;
-            *(maskStart - (index >> 3) - 1) |= (static_cast<char>(corr) << (index & 7));
+            *(maskStart - (index >> 3) - 1) |= (static_cast<std::byte>(corr) << (index & 7));
             if ((index & 7) == 7) {
-                *(maskStart - (index >> 3) - 2) |= (static_cast<char>(corr) >> 1);
+                *(maskStart - (index >> 3) - 2) |= (static_cast<std::byte>(corr) >> 1);
             }
         }
 
-        TFlatMessageBuilder(TDualBuffer& buffer, bool sized, bool implicit, TOffsetsView offsets)
+        FlatMessageSerializer(DualBuffer& buffer, bool sized, bool implicit, OffsetsView offsets)
             : Buf(buffer),
               Start(Buf.RightSize()),
               End(0),
@@ -430,40 +437,40 @@ private:
               Offsets(offsets) {
         }
 
-        TFlatMessageBuilder(const TFlatMessageBuilder&) = delete;
-        TFlatMessageBuilder& operator=(const TFlatMessageBuilder&) = delete;
+        FlatMessageSerializer(const FlatMessageSerializer&) = delete;
+        FlatMessageSerializer& operator=(const FlatMessageSerializer&) = delete;
 
-        TFlatMessageBuilder(TFlatMessageBuilder&& other) = delete;
-        TFlatMessageBuilder& operator=(TFlatMessageBuilder&& other) = delete;
+        FlatMessageSerializer(FlatMessageSerializer&& other) = delete;
+        FlatMessageSerializer& operator=(FlatMessageSerializer&& other) = delete;
 
         template <typename T>
-        void AddField(const TFieldId id, const T value, const T def) {
+        void AddField(const FieldId id, const T value, const T def) {
             if (!EnableExplicit && IsEqual(value, def)) {
                 return;
             }
-            const TFieldOffset offset = Offsets[id - 1];
+            const FieldOffset offset = Offsets.Data[id - 1];
             TrackField<T>(id, offset, value, def);
             WriteField<T>(offset, XorDef(value, def));
         }
 
         template <typename T>
-        void AddField(const TFieldId id, const TInternalOffset<T> value) {
+        void AddField(const FieldId id, const InternalOffset<T> value) {
             if (value.IsNull()) {
                 return;
             }
-            const TFieldOffset offset = Offsets[id - 1];
-            TrackField<TOffset>(id, offset, value.O, 0);
+            const FieldOffset offset = Offsets.Data[id - 1];
+            TrackField<Offset>(id, offset, value.O, 0);
             YAFF_REQUIRE(End >= value.O);
-            WriteField<TOffset>(offset, ToCheckedOffset(End - value.O));
+            WriteField<Offset>(offset, ToCheckedOffset(End - value.O));
         }
 
-        TOffset Finish() && {
+        Offset Finish() && {
             YAFF_REQUIRE(MaxId < 0x2000);
             const bool trulyExplicit = (EnableExplicit && NeedExplicit);
 
             if (IsEmpty()) {
                 YAFF_REQUIRE(Buf.RightSize() == Start);
-                Buf.RightPushSmall<TFieldId>(0x8000);
+                Buf.RightPushSmall<FieldId>(0x8000);
                 return ToCheckedOffset(Buf.RightSize());
             }
 
@@ -477,19 +484,19 @@ private:
                 // when we have not allocated or discarded the meta information.
                 Buf.RightFill(!trulyExplicit * CalculateMetaSize(MaxId - 1, false, true));
                 for (size_t i = 0; i < MaxId - 1; ++i) {
-                    const size_t size = Offsets[i + 1] - Offsets[i];
+                    const size_t size = Offsets.Data[i + 1] - Offsets.Data[i];
                     SetSize(Buf.RightDataAt(End), i + 1, size, trulyExplicit);
                 }
             }
 
-            const TFieldId typedLimit = ((MaxId << 2) | (0x8000 | (EnableSizes << 1) | trulyExplicit));
-            WriteValue<TFieldId>(Buf.RightDataAt(End), typedLimit);
+            const FieldId typedLimit = ((MaxId << 2) | (0x8000 | (EnableSizes << 1) | trulyExplicit));
+            WriteValue<FieldId>(Buf.RightDataAt(End), typedLimit);
 
             return ToCheckedOffset(End);
         }
 
         template <typename T>
-        void TrackField(const TFieldId id, const TFieldOffset offset, const T val, const T def) {
+        void TrackField(const FieldId id, const FieldOffset offset, const T val, const T def) {
             YAFF_REQUIRE(id > 0);
 
             if (IsEmpty()) {
@@ -515,7 +522,7 @@ private:
         }
 
         template <typename T>
-        void WriteField(const TFieldOffset offset, T value) {
+        void WriteField(const FieldOffset offset, T value) {
             YAFF_REQUIRE(End >= offset + TYPED_LIMIT_SIZE);
             WriteValue<T>(Buf.RightDataAt(End - offset - TYPED_LIMIT_SIZE), value);
         }
@@ -524,42 +531,42 @@ private:
             return MaxId == 0;
         }
 
-        TDualBuffer& Buf;
+        DualBuffer& Buf;
         size_t Start;
         size_t End;
 
-        TFieldId MaxId;
-        TFieldOffset PrevOffset;
+        FieldId MaxId;
+        FieldOffset PrevOffset;
 
         bool EnableSizes;
         bool EnableExplicit;
         bool NeedExplicit;
 
-        TOffsetsView Offsets;
+        OffsetsView Offsets;
     };
 
-    struct TSparseMessageBuilder {
-        inline static constexpr TFieldId TINY_OFFSET_MAX_ID = 0x20;
-        inline static constexpr TFieldOffset SPARSE_META_OFFSET = sizeof(TSignedOffset);
+    struct SparseMessageSerializer {
+        inline static constexpr FieldId TINY_OFFSET_MAX_ID = 0x20;
+        inline static constexpr FieldOffset SPARSE_META_OFFSET = sizeof(SignedOffset);
 
-        static constexpr size_t CalculateMetaSize(const TFieldId maxId) {
+        static constexpr size_t CalculateMetaSize(const FieldId maxId) {
             return (maxId - 1) + (maxId > TINY_OFFSET_MAX_ID ? maxId - TINY_OFFSET_MAX_ID : 0);
         }
 
         YAFF_LAYOUT_BEGIN(TField) {
-            TOffset Offset;
-            TFieldId Id;
+            Offset Offset;
+            FieldId Id;
             bool IsScalar;
         };
         YAFF_LAYOUT_END
 
         YAFF_LAYOUT_BEGIN(TMeta) {
-            TOffset Offset;
-            TFieldId MaxId;
+            Offset Offset;
+            FieldId MaxId;
         };
         YAFF_LAYOUT_END
 
-        TSparseMessageBuilder(TDualBuffer& buffer, bool implicit)
+        SparseMessageSerializer(DualBuffer& buffer, bool implicit)
             : Buf(buffer),
               LeftStart(Buf.LeftSize()),
               RightStart(Buf.RightSize()),
@@ -569,14 +576,14 @@ private:
               Implicit(implicit) {
         }
 
-        TSparseMessageBuilder(const TSparseMessageBuilder&) = delete;
-        TSparseMessageBuilder& operator=(const TSparseMessageBuilder&) = delete;
+        SparseMessageSerializer(const SparseMessageSerializer&) = delete;
+        SparseMessageSerializer& operator=(const SparseMessageSerializer&) = delete;
 
-        TSparseMessageBuilder(TSparseMessageBuilder&& other) = delete;
-        TSparseMessageBuilder& operator=(TSparseMessageBuilder&& other) = delete;
+        SparseMessageSerializer(SparseMessageSerializer&& other) = delete;
+        SparseMessageSerializer& operator=(SparseMessageSerializer&& other) = delete;
 
         template <typename T>
-        void AddField(TFieldId id, T value, T def) {
+        void AddField(FieldId id, T value, T def) {
             if (Implicit && IsEqual(value, def)) {
                 return;
             }
@@ -585,28 +592,28 @@ private:
         }
 
         template <typename T>
-        void AddField(TFieldId id, TInternalOffset<T> offset) {
+        void AddField(FieldId id, InternalOffset<T> offset) {
             if (offset.IsNull()) {
                 return;
             }
-            Buf.RightPushSmall<TOffset>(offset.O);
+            Buf.RightPushSmall<Offset>(offset.O);
             TrackField(id, Buf.RightSize(), /*isScalar*/ false);
         }
 
-        TOffset Finish() && {
+        Offset Finish() && {
             YAFF_REQUIRE(MaxId < 0x2000);
 
             if (IsEmpty()) {
                 YAFF_REQUIRE(Buf.RightSize() == RightStart);
-                Buf.RightPushSmall<TFieldId>(2);
+                Buf.RightPushSmall<FieldId>(2);
                 return ToCheckedOffset(Buf.RightSize());
             }
 
-            Buf.RightPushSmall<TFieldId>((MaxId << 2) | 3);
+            Buf.RightPushSmall<FieldId>((MaxId << 2) | 3);
             const size_t msgStart = Buf.RightSize();
 
             const size_t metaSize = CalculateMetaSize(MaxId);
-            Buf.RightPushSmall<TSignedOffset>(0);
+            Buf.RightPushSmall<SignedOffset>(0);
             Buf.RightFill(metaSize);
 
             const size_t metaStart = Buf.RightSize();
@@ -614,7 +621,7 @@ private:
             for (uint16_t i = 0; i < FieldsAdded; ++i) {
                 const auto* field = ReadLayout<TField>(Buf.LeftDataAt(LeftStart + i * sizeof(TField)));
 
-                const TFieldOffset offset = (msgStart - field->Offset);
+                const FieldOffset offset = (msgStart - field->Offset);
                 if (field->Id < TINY_OFFSET_MAX_ID) {
                     WriteValue<uint8_t>(Buf.RightDataAt(metaEnd + field->Id), offset);
                 } else {
@@ -623,15 +630,15 @@ private:
                 }
 
                 if (!field->IsScalar) {
-                    char* loc = Buf.RightDataAt(field->Offset);
-                    const TOffset offset = ReadValue<TOffset>(loc);
+                    std::byte* loc = Buf.RightDataAt(field->Offset);
+                    const Offset offset = ReadValue<Offset>(loc);
                     YAFF_REQUIRE(msgStart >= offset);
-                    WriteValue<TOffset>(loc, ToCheckedOffset(msgStart - offset));
+                    WriteValue<Offset>(loc, ToCheckedOffset(msgStart - offset));
                 }
             }
             Buf.LeftPop(FieldsAdded * sizeof(TField));
 
-            TOffset metaOffset = 0;  // Offset of meta can not be zero;
+            Offset metaOffset = 0;  // Offset of meta can not be zero;
             for (size_t i = 0; i < Buf.LeftSize(); i += sizeof(TMeta)) {
                 const auto* candidate = ReadLayout<TMeta>(Buf.LeftDataAt(i));
                 const size_t candidateSize = CalculateMetaSize(candidate->MaxId);
@@ -639,8 +646,8 @@ private:
                     continue;
                 }
 
-                const char* candidateMeta = Buf.RightDataAt(candidate->Offset);
-                const char* meta = Buf.RightDataAt(metaStart);
+                const std::byte* candidateMeta = Buf.RightDataAt(candidate->Offset);
+                const std::byte* meta = Buf.RightDataAt(metaStart);
                 if (memcmp(candidateMeta, meta, metaSize)) {
                     continue;
                 }
@@ -657,13 +664,13 @@ private:
             }
 
             YAFF_REQUIRE(sizeof(msgStart) < sizeof(int64_t) || msgStart <= std::numeric_limits<int64_t>::max());
-            WriteValue<TSignedOffset>(Buf.RightDataAt(msgStart + SPARSE_META_OFFSET),
-                                      ToCheckedSignedOffset(static_cast<int64_t>(msgStart) - (metaOffset - metaSize)));
+            WriteValue<SignedOffset>(Buf.RightDataAt(msgStart + SPARSE_META_OFFSET),
+                                     ToCheckedSignedOffset(static_cast<int64_t>(msgStart) - (metaOffset - metaSize)));
 
             return ToCheckedOffset(msgStart);
         }
 
-        void TrackField(TFieldId id, size_t offset, bool isScalar = true) {
+        void TrackField(FieldId id, size_t offset, bool isScalar = true) {
             YAFF_REQUIRE(id > 0);
             YAFF_REQUIRE(PrevId == 0 || PrevId > id);
 
@@ -683,27 +690,27 @@ private:
             return MaxId == 0;
         }
 
-        TDualBuffer& Buf;
+        DualBuffer& Buf;
         size_t LeftStart;
         size_t RightStart;
 
         uint16_t FieldsAdded;
-        TFieldId PrevId;
-        TFieldId MaxId;
+        FieldId PrevId;
+        FieldId MaxId;
 
         bool Implicit;
     };
 
-    using TMessageBuilder =
-        std::variant<TDummyMessageBuilder, TFixedMessageBuilder, TFlatMessageBuilder, TSparseMessageBuilder>;
+    using MessageSerializer =
+        std::variant<DummyMessageSerializer, FixedMessageSerializer, FlatMessageSerializer, SparseMessageSerializer>;
 
-    explicit TBuilder(EBuilderType type, size_t initialSize = 0, bool = false)
+    explicit Serializer(SerializerType type, size_t initialSize = 0, bool = false)
         : Type_(type),
           Buf_(initialSize),
-          MessageBuilder_(),
+          MessageSerializer_(),
           Depth_(0),
-          ForcedAlternative_(EMessageLayout::MESSAGE_LAYOUT_FLAT),
-          ObjectSet_(8, TObjectOffsetHash(Buf_), TObjectOffsetEqual(Buf_)),
+          ForcedAlternative_(MessageLayout::MESSAGE_LAYOUT_FLAT),
+          ObjectSet_(8, ObjectOffsetHash(Buf_), ObjectOffsetEqual(Buf_)),
           Finished_(false) {
     }
 
@@ -737,48 +744,48 @@ private:
     }
 
     template <typename T, typename... Ps>
-    void AddFieldDispatch(TFieldId fieldId, Ps&&... params) {
+    void AddFieldDispatch(FieldId fieldId, Ps&&... params) {
         CheckNotFinished();
         CheckNested();
-        std::visit([&](auto& b) { b.template AddField<T>(fieldId, std::forward<Ps>(params)...); }, MessageBuilder_);
+        std::visit([&](auto& b) { b.template AddField<T>(fieldId, std::forward<Ps>(params)...); }, MessageSerializer_);
     }
 
     template <typename T, typename... Ps>
     void StartMessageDispatch(Ps&&... params) {
         CheckNotFinished();
         IncrementDepth();
-        MessageBuilder_.emplace<T>(std::forward<Ps>(params)...);
+        MessageSerializer_.emplace<T>(std::forward<Ps>(params)...);
     }
 
     template <typename T>
-    TOffset FinishMessageDispatch() {
+    Offset FinishMessageDispatch() {
         CheckNotFinished();
         CheckNested();
         DecrementDepth();
-        YAFF_REQUIRE(std::holds_alternative<T>(MessageBuilder_));
-        const auto offset = std::visit([](auto&& b) { return std::move(b).Finish(); }, std::move(MessageBuilder_));
-        MessageBuilder_.emplace<TDummyMessageBuilder>();
+        YAFF_REQUIRE(std::holds_alternative<T>(MessageSerializer_));
+        const auto offset = std::visit([](auto&& b) { return std::move(b).Finish(); }, std::move(MessageSerializer_));
+        MessageSerializer_.emplace<DummyMessageSerializer>();
         return offset;
     }
 
     template <typename S>
-    TOffset ToDeduplicatedOffset(S& pool, size_t start, bool noDedup = false) {
+    Offset ToDeduplicatedOffset(S& pool, size_t start, bool noDedup = false) {
         const size_t offset = Buf_.RightSize();
         if (noDedup) {
             return ToCheckedOffset(offset);
         }
         const size_t byteSize = Buf_.RightSize() - start;
-        auto it = pool.find(TObjectOffset{offset, byteSize});
+        auto it = pool.find(ObjectOffset{offset, byteSize});
         if (it != pool.end()) {
             Buf_.RightPop(byteSize);
             return ToCheckedOffset(it->Offset);
         }
-        const TOffset checked = ToCheckedOffset(offset);
+        const Offset checked = ToCheckedOffset(offset);
         pool.insert({checked, byteSize});
         return checked;
     }
 
-    size_t StartVector(bool nullTerminated = false) {
+    size_t StartArray(bool nullTerminated = false) {
         IncrementDepth();
         const size_t start = Buf_.RightSize();
         if (nullTerminated) {
@@ -787,21 +794,21 @@ private:
         return start;
     }
 
-    TOffset FinishVector(size_t start, bool noDedup = false) {
+    Offset FinishArray(size_t start, bool noDedup = false) {
         DecrementDepth();
         return ToDeduplicatedOffset(ObjectSet_, start, noDedup);
     }
 
-    EBuilderType Type_;
+    SerializerType Type_;
 
-    TDualBuffer Buf_;
-    TMessageBuilder MessageBuilder_;
+    DualBuffer Buf_;
+    MessageSerializer MessageSerializer_;
     size_t Depth_;
 
-    EMessageLayout ForcedAlternative_;
-    TObjectOffsetSet ObjectSet_;
+    MessageLayout ForcedAlternative_;
+    ObjectOffsetSet ObjectSet_;
 
     bool Finished_;
 };
 
-}  // namespace NYaFF
+}  // namespace yaff

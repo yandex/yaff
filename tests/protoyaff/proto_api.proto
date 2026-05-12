@@ -1,16 +1,16 @@
 syntax = "proto3";
 
-package NTestYaFF;
+package test;
 
-enum EEnumeration {
+enum Enumeration {
     ENUMERATION_UNSPECIFIED = 0;
     ENUMERATION_VALUE = 1;
     ENUMERATION_OTHER_VALUE = 2;
     auto = 3; // Example of keyword as enum name;
 }
 
-message TUniversalMessage {
-    message TEmbeddedMessage { }
+message UniversalMessage {
+    message EmbeddedMessage { }
 
     int32 implicit_numeric_field = 1;
     optional int32 explicit_numeric_field_1 = 2;
@@ -24,29 +24,29 @@ message TUniversalMessage {
     optional bytes explicit_bytes_field_1 = 8;
     optional bytes explicit_bytes_field_2 = 9;
 
-    EEnumeration implicit_enum_field = 10;
-    optional EEnumeration explicit_enum_field_1 = 11;
-    optional EEnumeration explicit_enum_field_2 = 12;
+    Enumeration implicit_enum_field = 10;
+    optional Enumeration explicit_enum_field_1 = 11;
+    optional Enumeration explicit_enum_field_2 = 12;
 
     reserved 13, 14;
     reserved "reserved_field_1", "reserved_field_2";
 
     // Embedded Message always (in all versions of protobuf) works through explicit presence,
     // so optional label is only here for all version compatibility.
-    optional TEmbeddedMessage embedded_message_field_1 = 15;
-    optional TEmbeddedMessage embedded_message_field_2 = 16;
+    optional EmbeddedMessage embedded_message_field_1 = 15;
+    optional EmbeddedMessage embedded_message_field_2 = 16;
 
     repeated int32 repeated_numeric_field = 17;
     repeated string repeated_string_field = 18;
     repeated bytes repeated_bytes_field = 19;
-    repeated EEnumeration repeated_enum_field = 20;
-    repeated TEmbeddedMessage repeated_embedded_message_field = 21;
+    repeated Enumeration repeated_enum_field = 20;
+    repeated EmbeddedMessage repeated_embedded_message_field = 21;
 
     oneof example_name {
         int32 oneof_numeric_field = 22;
         string oneof_string_field = 23;
         bytes oneof_bytes_field = 24;
-        EEnumeration oneof_enum_field = 25;
-        TEmbeddedMessage oneof_embedded_message_field = 26;
+        Enumeration oneof_enum_field = 25;
+        EmbeddedMessage oneof_embedded_message_field = 26;
     }
 }

@@ -6,12 +6,12 @@
 #include "proto/document_full_view.yaff.h"
 #include "proto/document_light_view.yaff.h"
 
-NDocument::TDocument LoadDocumentFromStorage() {
-    NDocument::TDocument doc;
+document::Document LoadDocumentFromStorage() {
+    document::Document doc;
     doc.set_doc_id(100500);
 
     // Light fields.
-    doc.set_category(NDocument::CATEGORY_NEWS);
+    doc.set_category(document::CATEGORY_NEWS);
     doc.set_bid_micros(1500000);
     doc.set_region_id(213);
     doc.set_is_active(true);
@@ -34,20 +34,20 @@ NDocument::TDocument LoadDocumentFromStorage() {
     return doc;
 }
 
-NYaFF::TDetachedBuffer BuildLightView(const NDocument::TDocument& proto) {
-    NYaFF::TBuilder builder;
-    builder.Finish(NLightView::NDocument::CreateTDocument(builder, proto));
-    return builder.Release();
+yaff::DetachedBuffer BuildLightView(const document::Document& proto) {
+    yaff::Serializer ys;
+    ys.Finish(NLightView::document::SerializeDocument(ys, proto));
+    return ys.Release();
 }
 
-NYaFF::TDetachedBuffer BuildFullView(const NDocument::TDocument& proto) {
-    NYaFF::TBuilder builder;
-    builder.Finish(NFullView::NDocument::CreateTDocument(builder, proto));
-    return builder.Release();
+yaff::DetachedBuffer BuildFullView(const document::Document& proto) {
+    yaff::Serializer ys;
+    ys.Finish(NFullView::document::SerializeDocument(ys, proto));
+    return ys.Release();
 }
 
-void DemoLightView(const NYaFF::TDetachedBuffer& buffer) {
-    const auto& view = NYaFF::ReadRoot<NLightView::NDocument::TDocument>(buffer.Data());
+void DemoLightView(const yaff::DetachedBuffer& buffer) {
+    const auto& view = yaff::ReadRoot<NLightView::document::Document>(buffer.Data());
 
     std::cout << "=== Light View (early-stage filtering) ===\n";
     std::cout << "Size: " << buffer.Size() << " bytes\n";
@@ -57,11 +57,11 @@ void DemoLightView(const NYaFF::TDetachedBuffer& buffer) {
     std::cout << "region_id: " << view.region_id() << "\n";
     std::cout << "is_active: " << view.is_active() << "\n";
     std::cout << "\nHuman Readable:\n";
-    std::cout << NYaFF::NReflect::DebugString(&view, NLightView::NDocument::TDocument::Descriptor()) << "\n\n";
+    std::cout << yaff::reflect::DebugString(&view, NLightView::document::Document::Descriptor()) << "\n\n";
 }
 
-void DemoFullView(const NYaFF::TDetachedBuffer& buffer) {
-    const auto& view = NYaFF::ReadRoot<NFullView::NDocument::TDocument>(buffer.Data());
+void DemoFullView(const yaff::DetachedBuffer& buffer) {
+    const auto& view = yaff::ReadRoot<NFullView::document::Document>(buffer.Data());
 
     std::cout << "=== Full View (late-stage ranking) ===\n";
     std::cout << "Size: " << buffer.Size() << " bytes\n";
@@ -92,16 +92,16 @@ void DemoFullView(const NYaFF::TDetachedBuffer& buffer) {
     std::cout << "]\n";
 
     std::cout << "\nHuman Readable:\n";
-    std::cout << NYaFF::NReflect::DebugString(&view, NFullView::NDocument::TDocument::Descriptor()) << "\n\n";
+    std::cout << yaff::reflect::DebugString(&view, NFullView::document::Document::Descriptor()) << "\n\n";
 }
 
-void VerifyRoundTrip(const NDocument::TDocument& original, const NYaFF::TDetachedBuffer& lightBuf,
-                     const NYaFF::TDetachedBuffer& fullBuf) {
+void VerifyRoundTrip(const document::Document& original, const yaff::DetachedBuffer& lightBuf,
+                     const yaff::DetachedBuffer& fullBuf) {
     // Verify light view round-trip.
     {
-        const auto& view = NYaFF::ReadRoot<NLightView::NDocument::TDocument>(lightBuf.Data());
-        NDocument::TDocument restored;
-        view.TransformTo(restored);
+        const auto& view = yaff::ReadRoot<NLightView::document::Document>(lightBuf.Data());
+        document::Document restored;
+        view.ParseTo(restored);
 
         YAFF_REQUIRE(original.doc_id() == restored.doc_id());
         YAFF_REQUIRE(original.category() == restored.category());
@@ -115,9 +115,9 @@ void VerifyRoundTrip(const NDocument::TDocument& original, const NYaFF::TDetache
 
     // Verify full view round-trip.
     {
-        const auto& view = NYaFF::ReadRoot<NFullView::NDocument::TDocument>(fullBuf.Data());
-        NDocument::TDocument restored;
-        view.TransformTo(restored);
+        const auto& view = yaff::ReadRoot<NFullView::document::Document>(fullBuf.Data());
+        document::Document restored;
+        view.ParseTo(restored);
 
         YAFF_REQUIRE(original.doc_id() == restored.doc_id());
         YAFF_REQUIRE(original.title() == restored.title());

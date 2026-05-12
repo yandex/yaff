@@ -1,45 +1,46 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 
 #include "base.h"
 
-namespace NYaFF {
+namespace yaff {
 
-class TDetachedSegment {
+class DetachedSegment {
 public:
-    TDetachedSegment() noexcept : Allocated_(0), Size_(0), Buf_(nullptr), Cur_(nullptr) {
+    DetachedSegment() noexcept : Allocated_(0), Size_(0), Buf_(nullptr), Cur_(nullptr) {
     }
 
-    TDetachedSegment(char* buf, size_t allocated, char* cur, size_t size) noexcept
+    DetachedSegment(std::byte* buf, size_t allocated, std::byte* cur, size_t size) noexcept
         : Allocated_(allocated), Size_(size), Buf_(buf), Cur_(cur) {
     }
 
-    friend void swap(TDetachedSegment& a, TDetachedSegment& b) noexcept {
+    friend void swap(DetachedSegment& a, DetachedSegment& b) noexcept {
         std::swap(a.Allocated_, b.Allocated_);
         std::swap(a.Size_, b.Size_);
         std::swap(a.Buf_, b.Buf_);
         std::swap(a.Cur_, b.Cur_);
     }
 
-    TDetachedSegment(const TDetachedSegment&) = delete;
-    TDetachedSegment& operator=(const TDetachedSegment&) = delete;
+    DetachedSegment(const DetachedSegment&) = delete;
+    DetachedSegment& operator=(const DetachedSegment&) = delete;
 
-    TDetachedSegment(TDetachedSegment&& r) noexcept : TDetachedSegment() {
+    DetachedSegment(DetachedSegment&& r) noexcept : DetachedSegment() {
         swap(*this, r);
     }
 
-    TDetachedSegment& operator=(TDetachedSegment&& r) noexcept {
+    DetachedSegment& operator=(DetachedSegment&& r) noexcept {
         swap(*this, r);
         return *this;
     }
 
-    ~TDetachedSegment() {
+    ~DetachedSegment() {
         Clear();
     }
 
-    const char* Data() const noexcept {
+    const std::byte* Data() const noexcept {
         return Cur_;
     }
 
@@ -59,17 +60,17 @@ private:
     size_t Allocated_;
     size_t Size_;
 
-    char* Buf_;
-    char* Cur_;
+    std::byte* Buf_;
+    std::byte* Cur_;
 };
 
-class TDualBuffer {
+class DualBuffer {
 public:
-    explicit TDualBuffer(size_t initialSize = 0) noexcept
+    explicit DualBuffer(size_t initialSize = 0) noexcept
         : InitialSize_(initialSize), Allocated_(0), Buf_(nullptr), Left_(nullptr), Right_(nullptr) {
     }
 
-    friend void swap(TDualBuffer& a, TDualBuffer& b) noexcept {
+    friend void swap(DualBuffer& a, DualBuffer& b) noexcept {
         std::swap(a.InitialSize_, b.InitialSize_);
         std::swap(a.Allocated_, b.Allocated_);
         std::swap(a.Buf_, b.Buf_);
@@ -77,19 +78,19 @@ public:
         std::swap(a.Right_, b.Right_);
     }
 
-    TDualBuffer(const TDualBuffer&) = delete;
-    TDualBuffer& operator=(const TDualBuffer&) = delete;
+    DualBuffer(const DualBuffer&) = delete;
+    DualBuffer& operator=(const DualBuffer&) = delete;
 
-    TDualBuffer(TDualBuffer&& other) noexcept : TDualBuffer() {
+    DualBuffer(DualBuffer&& other) noexcept : DualBuffer() {
         swap(*this, other);
     }
 
-    TDualBuffer& operator=(TDualBuffer&& other) noexcept {
+    DualBuffer& operator=(DualBuffer&& other) noexcept {
         swap(*this, other);
         return *this;
     }
 
-    ~TDualBuffer() {
+    ~DualBuffer() {
         ClearBuffer();
     }
 
@@ -105,10 +106,10 @@ public:
     }
 
     // Left side: grows upward from the beginning of the buffer.
-    char* LeftAllocate(size_t len) {
+    std::byte* LeftAllocate(size_t len) {
         if (len) {
             EnsureSpace(len);
-            char* ptr = Left_;
+            std::byte* ptr = Left_;
             Left_ += len;
             return ptr;
         }
@@ -142,7 +143,7 @@ public:
         Left_ = Buf_;
     }
 
-    char* LeftData() const noexcept {
+    std::byte* LeftData() const noexcept {
         return Buf_;
     }
 
@@ -150,23 +151,23 @@ public:
         return static_cast<size_t>(Left_ - Buf_);
     }
 
-    char* LeftDataAt(size_t offset) const noexcept {
+    std::byte* LeftDataAt(size_t offset) const noexcept {
         return Buf_ + offset;
     }
 
-    size_t LeftOffsetAt(const char* data) const noexcept {
+    size_t LeftOffsetAt(const std::byte* data) const noexcept {
         return static_cast<size_t>(data - Buf_);
     }
 
-    TDetachedSegment LeftDetach() noexcept {
-        TDetachedSegment detached(Buf_, Allocated_, Left_, LeftSize());
+    DetachedSegment LeftDetach() noexcept {
+        DetachedSegment detached(Buf_, Allocated_, Left_, LeftSize());
         Buf_ = nullptr;
         Clear();
         return detached;
     }
 
     // Right side: grows downward from the end of the buffer.
-    char* RightAllocate(size_t len) {
+    std::byte* RightAllocate(size_t len) {
         if (len) {
             EnsureSpace(len);
             Right_ -= len;
@@ -201,7 +202,7 @@ public:
         Right_ = (Buf_ ? Buf_ + Allocated_ : nullptr);
     }
 
-    char* RightData() const noexcept {
+    std::byte* RightData() const noexcept {
         return Right_;
     }
 
@@ -209,16 +210,16 @@ public:
         return static_cast<size_t>(Buf_ + Allocated_ - Right_);
     }
 
-    char* RightDataAt(size_t offset) const noexcept {
+    std::byte* RightDataAt(size_t offset) const noexcept {
         return Buf_ + Allocated_ - offset;
     }
 
-    size_t RightOffsetAt(const char* data) const noexcept {
+    size_t RightOffsetAt(const std::byte* data) const noexcept {
         return static_cast<size_t>(Buf_ + Allocated_ - data);
     }
 
-    TDetachedSegment RightDetach() noexcept {
-        TDetachedSegment detached(Buf_, Allocated_, Right_, RightSize());
+    DetachedSegment RightDetach() noexcept {
+        DetachedSegment detached(Buf_, Allocated_, Right_, RightSize());
         Buf_ = nullptr;
         Clear();
         return detached;
@@ -251,7 +252,7 @@ private:
         }
         Allocated_ += growth;
 
-        char* newBuf = new char[Allocated_];
+        std::byte* newBuf = new std::byte[Allocated_];
         if (Buf_) {
             YAFF_MEMCPY(newBuf + Allocated_ - rightSize, Buf_ + oldAllocated - rightSize, rightSize);
             YAFF_MEMCPY(newBuf, Buf_, leftSize);
@@ -266,11 +267,11 @@ private:
     size_t InitialSize_;
     size_t Allocated_;
 
-    char* Buf_;
-    char* Left_;
-    char* Right_;
+    std::byte* Buf_;
+    std::byte* Left_;
+    std::byte* Right_;
 };
 
-using TDetachedBuffer = TDetachedSegment;
+using DetachedBuffer = DetachedSegment;
 
-}  // namespace NYaFF
+}  // namespace yaff

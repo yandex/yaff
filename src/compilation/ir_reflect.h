@@ -2,8 +2,8 @@
 
 #include "ir.h"
 
-namespace NYaFF::NCompile::NIR::NReflect {
+namespace yaff::compilation::ir::reflect {
 
-std::vector<uint8_t> GenerateStringDefault(const NIR::TType& type);
+std::vector<uint8_t> GenerateStringDefault(const ir::TypeDef& type);
 
 }

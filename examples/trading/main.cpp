@@ -4,36 +4,36 @@
 
 #include "proto/order.yaff.h"
 
-NYaFF::TDetachedBuffer BuildOrderDirect() {
+yaff::DetachedBuffer BuildOrderDirect() {
     // clang-format off
-    NYaFF::TBuilder yffb;
+    yaff::Serializer ys;
 
     // Pre-create nested objects (strings, vectors, nested messages)
     // before starting the main message.
-    auto symbol = yffb.CreateString("AAPL");
+    auto symbol = ys.SerializeString("AAPL");
 
-    auto exec0 = NProtoYaFF::NTrading::CreateTExecution(yffb,
+    auto exec0 = protoyaff::trading::SerializeExecution(ys,
         /*exec_id=*/           1001ULL,
         /*fill_price_micros=*/ 17325000000ULL,  // $173.25
         /*fill_qty=*/          50U,
         /*exchange_ts_ns=*/    1700000000000000100ULL
     );
 
-    auto exec1 = NProtoYaFF::NTrading::CreateTExecution(yffb,
+    auto exec1 = protoyaff::trading::SerializeExecution(ys,
         /*exec_id=*/           1002ULL,
         /*fill_price_micros=*/ 17326500000ULL,  // $173.265
         /*fill_qty=*/          50U,
         /*exchange_ts_ns=*/    1700000000000000200ULL
     );
 
-    std::vector<NYaFF::TInternalOffset<NProtoYaFF::NTrading::TExecution>> execs{exec0, exec1};
-    auto executions = yffb.CreateVector(execs);
+    std::vector<yaff::InternalOffset<protoyaff::trading::Execution>> execs{exec0, exec1};
+    auto executions = ys.SerializeArray(execs);
 
-    auto root = NProtoYaFF::NTrading::CreateTTradeOrder(yffb,
+    auto root = protoyaff::trading::SerializeTradeOrder(ys,
         /*order_id=*/           7700ULL,
         /*client_order_id=*/    100500ULL,
         /*symbol=*/             symbol,
-        /*side=*/               NProtoYaFF::NTrading::ESide::SIDE_BUY,
+        /*side=*/               protoyaff::trading::Side::SIDE_BUY,
         /*limit_price_micros=*/ 17330000000ULL,  // $173.30 limit
         /*quantity=*/           100U,
         /*account_id=*/         42U,
@@ -42,16 +42,16 @@ NYaFF::TDetachedBuffer BuildOrderDirect() {
     );
     // clang-format on
 
-    yffb.Finish(root);
-    return yffb.Release();
+    ys.Finish(root);
+    return ys.Release();
 }
 
-void DemoOrder(const NYaFF::TDetachedBuffer& buffer) {
-    const auto& order = NYaFF::ReadRoot<NProtoYaFF::NTrading::TTradeOrder>(buffer.Data());
+void DemoOrder(const yaff::DetachedBuffer& buffer) {
+    const auto& order = yaff::ReadRoot<protoyaff::trading::TradeOrder>(buffer.Data());
     std::cout << "order_id:           " << order.order_id() << "\n";
     std::cout << "client_order_id:    " << order.client_order_id() << "\n";
     std::cout << "symbol:             " << order.symbol() << "\n";
-    std::cout << "side:               " << ESide_Name(order.side()) << "\n";
+    std::cout << "side:               " << Side_Name(order.side()) << "\n";
     std::cout << "limit_price_micros: " << order.limit_price_micros() << "\n";
     std::cout << "quantity:           " << order.quantity() << "\n";
     std::cout << "account_id:         " << order.account_id() << "\n";
@@ -66,16 +66,16 @@ void DemoOrder(const NYaFF::TDetachedBuffer& buffer) {
     }
 
     std::cout << "\nHuman Readable:\n";
-    std::cout << NYaFF::NReflect::DebugString(&order, NProtoYaFF::NTrading::TTradeOrder::Descriptor()) << "\n";
+    std::cout << yaff::reflect::DebugString(&order, protoyaff::trading::TradeOrder::Descriptor()) << "\n";
 }
 
-NTrading::TTradeOrder YaffToProto(const NProtoYaFF::NTrading::TTradeOrder& yaff) {
-    NTrading::TTradeOrder proto;
-    yaff.TransformTo(proto);
+trading::TradeOrder YaffToProto(const protoyaff::trading::TradeOrder& yaff) {
+    trading::TradeOrder proto;
+    yaff.ParseTo(proto);
     return proto;
 }
 
-void Verify(const NProtoYaFF::NTrading::TTradeOrder& original, const NTrading::TTradeOrder& restored) {
+void Verify(const protoyaff::trading::TradeOrder& original, const trading::TradeOrder& restored) {
     YAFF_REQUIRE(original.order_id() == restored.order_id());
     YAFF_REQUIRE(original.symbol() == restored.symbol());
     YAFF_REQUIRE(static_cast<int>(original.side()) == static_cast<int>(restored.side()));
@@ -99,7 +99,7 @@ int main() {
     DemoOrder(buffer);
 
     // 3. Transform YaFF -> Protobuf.
-    const auto& yaff = NYaFF::ReadRoot<NProtoYaFF::NTrading::TTradeOrder>(buffer.Data());
+    const auto& yaff = yaff::ReadRoot<protoyaff::trading::TradeOrder>(buffer.Data());
     const auto& proto = YaffToProto(yaff);
     Verify(yaff, proto);
 

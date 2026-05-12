@@ -1,17 +1,17 @@
 syntax = "proto2";
 
-package NDocument;
+package document;
 
 import "yaff/proto/options.proto";
 
-enum ECategory {
+enum Category {
     CATEGORY_UNKNOWN = 0;
     CATEGORY_NEWS = 1;
     CATEGORY_COMMERCE = 2;
     CATEGORY_ENTERTAINMENT = 3;
 }
 
-message TDocument {
+message Document {
     // "light_view": fast checks during early ranking stages.
     option (yaff.proto.message) = {
         slice_name: "light_view"
@@ -22,7 +22,7 @@ message TDocument {
         slice_name: "full_view"
     };
 
-    message TQualityScores {
+    message QualityScores {
         option (yaff.proto.message) = {
             slice_name: "full_view"
         };
@@ -47,7 +47,7 @@ message TDocument {
     ];
 
     // Light view fields: cheap to read, used for early filtering.
-    optional ECategory category = 2 [
+    optional Category category = 2 [
         (yaff.proto.field) = {slice_name: "light_view", id: 2}
     ];
 
@@ -72,7 +72,7 @@ message TDocument {
         (yaff.proto.field) = {slice_name: "full_view", id: 3}
     ];
 
-    optional TQualityScores quality = 8 [
+    optional QualityScores quality = 8 [
         (yaff.proto.field) = {slice_name: "full_view", id: 4}
     ];
 

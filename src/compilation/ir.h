@@ -6,7 +6,7 @@
 #include <set>
 #include <string>
 
-namespace NYaFF::NCompile::NIR {
+namespace yaff::compilation::ir {
 
 inline constexpr const char* PROTO_FILE_ATTRIBUTE_NAME = "ProtoFile";
 inline constexpr const char* PROTO_NAMESPACE_ATTRIBUTE_NAME = "ProtoNamespace";
@@ -22,7 +22,7 @@ inline constexpr const char* DEFAULT_STREAM_TYPE_MODIFIER_NAME = "DefaultStreamT
 inline constexpr const char* SORT_ORDER_MODIFIER_NAME = "SortOrder";
 
 template <typename T>
-struct TSymbolTable {
+struct SymbolTable {
     std::pair<T*, bool> TryEmplace(T value) {
         std::string key = value.ToString();
         const auto [it, emplaced] = Symbols.try_emplace(std::move(key), std::move(value));
@@ -42,15 +42,15 @@ struct TSymbolTable {
     std::map<std::string, T> Symbols;
 };
 
-struct TEnumDef;
-struct TMessageDef;
-struct TSchemaDef;
+struct EnumDef;
+struct MessageDef;
+struct SchemaDef;
 
-struct TType {
-    EType Type = EType::TYPE_NONE;
-    const TType* ElementType = nullptr;       // Not nullptr only for TYPE_VECTOR;
-    const TMessageDef* MessageDef = nullptr;  // Not nullptr only for TYPE_MESSAGE;
-    const TEnumDef* EnumDef = nullptr;        // Not nullptr only for TYPE_ENUM;
+struct TypeDef {
+    Type Type = Type::TYPE_NONE;
+    const TypeDef* ElementType = nullptr;    // Not nullptr only for TYPE_VECTOR;
+    const MessageDef* MessageDef = nullptr;  // Not nullptr only for TYPE_MESSAGE;
+    const EnumDef* EnumDef = nullptr;        // Not nullptr only for TYPE_ENUM;
 
     std::map<std::string, std::string> Modifiers;
 
@@ -58,129 +58,128 @@ struct TType {
     std::string ToString() const;
 };
 
-struct TDef {
+struct BaseDef {
     std::string Name;
     bool Defined = false;
 
-    explicit TDef(std::string name);
+    explicit BaseDef(std::string name);
 };
 
-struct TEnumDef : public TDef {
+struct EnumDef : public BaseDef {
     struct TEnumVal {
         std::string Name;
         int32_t Value;
     };
 
-    const TSchemaDef* Schema = nullptr;
+    const SchemaDef* Schema = nullptr;
     std::vector<TEnumVal> Values;
 
-    TEnumDef(std::string name, const TSchemaDef* schema);
+    EnumDef(std::string name, const SchemaDef* schema);
     std::string ToString() const;
 };
 
-struct TMessageDef : public TDef {
-    // TFieldDef is not completely independent entity, since it exists only as part of MessageDef.
-    struct TFieldDef {
+struct MessageDef : public BaseDef {
+    // FieldDef is not completely independent entity, since it exists only as part of MessageDef.
+    struct FieldDef {
         uint64_t Id = 0;
         std::string Name;
 
-        const TType* Type = nullptr;
+        const TypeDef* Type = nullptr;
 
-        EPresence Presence = EPresence::PRESENCE_NONE;
+        Presence Presence = Presence::PRESENCE_NONE;
         bool Deprecated = false;
 
-        std::string SharedOffsetVia;
+        std::string OneOf;
 
         // These fields are filled during post-processing of the IR.
         uint64_t ActiveIndex = 0;
         uint64_t FlatOffset = 0;
-        uint64_t SharedOffsetId = 0;
+        uint64_t OneOfId = 0;
     };
 
     // This is not real definition. This structure is filled in during post-processing of the IR for optimizations.
-    struct TSharedOffset {
+    struct OneOfDef {
         std::string Name;
-        std::vector<const TFieldDef*> Fields;
+        std::vector<const FieldDef*> Fields;
     };
 
-    const TSchemaDef* Schema = nullptr;
+    const SchemaDef* Schema = nullptr;
 
-    EMessageLayout Layout = EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
-    std::vector<TFieldDef> Fields;
+    MessageLayout Layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN;
+    std::vector<FieldDef> Fields;
 
     // This fields are filled during post-processing of the IR.
     // Exists on MessageDef only for optimization.
     bool AssociativePair = false;
-    std::map<std::string, TSharedOffset> SharedOffsets;
+    std::map<std::string, OneOfDef> OneOfs;
 
-    TMessageDef(std::string name, const TSchemaDef* schema,
-                EMessageLayout layout = EMessageLayout::MESSAGE_LAYOUT_UNKNOWN);
+    MessageDef(std::string name, const SchemaDef* schema, MessageLayout layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN);
     std::string ToString() const;
 };
 
-struct TSchemaDef : public TDef {
-    struct TSchemaOrder {
-        bool operator()(const TSchemaDef* a, const TSchemaDef* b) const {
+struct SchemaDef : public BaseDef {
+    struct SchemaOrder {
+        bool operator()(const SchemaDef* a, const SchemaDef* b) const {
             return a->Name < b->Name;
         }
     };
 
     std::string Namespace;
 
-    std::set<const TSchemaDef*, TSchemaOrder> Dependencies;
+    std::set<const SchemaDef*, SchemaOrder> Dependencies;
     std::map<std::string, std::string> Attributes;
 
-    std::vector<const TEnumDef*> Enums;
-    std::vector<const TMessageDef*> Messages;
+    std::vector<const EnumDef*> Enums;
+    std::vector<const MessageDef*> Messages;
 
-    explicit TSchemaDef(std::string name);
+    explicit SchemaDef(std::string name);
     std::string ToString() const;
 };
 
-struct TIR {
-    TIR() = default;
-    ~TIR() = default;
+struct IR {
+    IR() = default;
+    ~IR() = default;
 
-    TIR(TIR&&) = default;
-    TIR& operator=(TIR&&) = default;
+    IR(IR&&) = default;
+    IR& operator=(IR&&) = default;
 
-    TIR(const TIR&) = delete;
-    TIR& operator=(const TIR&) = delete;
+    IR(const IR&) = delete;
+    IR& operator=(const IR&) = delete;
 
-    TSymbolTable<TType> Types;
-    TSymbolTable<TEnumDef> Enums;
-    TSymbolTable<TMessageDef> Messages;
-    TSymbolTable<TSchemaDef> Schemas;
+    SymbolTable<TypeDef> Types;
+    SymbolTable<EnumDef> Enums;
+    SymbolTable<MessageDef> Messages;
+    SymbolTable<SchemaDef> Schemas;
 };
 
-const NIR::TMessageDef* ExtractMessageDef(const NIR::TType& type);
+const ir::MessageDef* ExtractMessageDef(const ir::TypeDef& type);
 
-bool IsBasic(const EType type);
-bool IsScalar(const EType type);
-size_t InlineSize(const EType type);
+bool IsBasic(const Type type);
+bool IsScalar(const Type type);
+size_t InlineSize(const Type type);
 
-size_t MaxMessageSize(const TMessageDef& msg);
-size_t MaxFieldId(const TMessageDef& msg);
+size_t MaxMessageSize(const MessageDef& msg);
+size_t MaxFieldId(const MessageDef& msg);
 
-bool IsFixedMessage(const TMessageDef& msg);
-bool IsDynamicMessage(const TMessageDef& msg);
-bool IsStaticMetaMessage(const TMessageDef& msg);
-bool IsAssociativePair(const TMessageDef& msg);
-bool IsGapMessage(const TMessageDef& msg);
+bool IsFixedMessage(const MessageDef& msg);
+bool IsDynamicMessage(const MessageDef& msg);
+bool IsStaticMetaMessage(const MessageDef& msg);
+bool IsAssociativePair(const MessageDef& msg);
+bool IsGapMessage(const MessageDef& msg);
 
-bool IsScalarVector(const TType& type);
-bool IsInline(const TType& type);
-bool IsAssociative(const TType& type);
-bool IsSequentialMessage(const TType& type);
-bool IsSortedSequentialMessage(const TType& type);
-bool IsFixedMessage(const TType& type);
-bool IsSharedOffsetField(const TMessageDef::TFieldDef& field);
-bool IsExplicitField(const TMessageDef::TFieldDef& field);
+bool IsScalarArray(const TypeDef& type);
+bool IsInline(const TypeDef& type);
+bool IsAssociative(const TypeDef& type);
+bool IsSequentialMessage(const TypeDef& type);
+bool IsSortedSequentialMessage(const TypeDef& type);
+bool IsFixedMessage(const TypeDef& type);
+bool IsOneOfField(const MessageDef::FieldDef& field);
+bool IsExplicitField(const MessageDef::FieldDef& field);
 
-std::string TypeToString(const EType type);
-EType TypeFromString(const std::string& value);
+std::string TypeToString(const Type type);
+Type TypeFromString(const std::string& value);
 
-std::string PresenceToString(const EPresence type);
-EPresence PresenceFromString(const std::string& value);
+std::string PresenceToString(const Presence type);
+Presence PresenceFromString(const std::string& value);
 
-}  // namespace NYaFF::NCompile::NIR
+}  // namespace yaff::compilation::ir

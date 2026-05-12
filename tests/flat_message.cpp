@@ -1,22 +1,22 @@
 #include <gtest/gtest.h>
-#include <yaff/builder.h>
 #include <yaff/message.h>
+#include <yaff/serializer.h>
 
 #include "protoyaff/proto2.yaff.h"
 #include "protoyaff/proto3.yaff.h"
 
-using namespace NProtoYaFF::NTestYaFF;
+using namespace protoyaff::test;
 
 TEST(FlatMessage, NestedMessage) {
-    NYaFF::TBuilder yffb;
-    const auto nested = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xFFFF, 0x3333);
-    yffb.Finish(CreateTStaticFlatMessage(yffb, 0xFF, std::nullopt, nested));
+    yaff::Serializer ys;
+    const auto nested = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, 0xFFFF, 0x3333);
+    ys.Finish(SerializeStaticFlatMessage(ys, 0xFF, std::nullopt, nested));
 
-    EXPECT_EQ(yffb.GetSize(), 41ULL);
+    EXPECT_EQ(ys.Size(), 41ULL);
 
-    const auto* buf = yffb.GetBufferPointer();
+    const auto* buf = ys.Data();
 
-    const auto& root = NYaFF::ReadRoot<TStaticFlatMessage>(buf);
+    const auto& root = yaff::ReadRoot<StaticFlatMessage>(buf);
 
     const auto& simpleMessage = root.GetNested();
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
@@ -31,13 +31,13 @@ TEST(FlatMessage, NestedMessage) {
 }
 
 TEST(FlatMessage, ImplicitMessage) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTImplicitMessage(yffb, 0, 1, 0));
+    yaff::Serializer ys;
+    ys.Finish(SerializeImplicitMessage(ys, 0, 1, 0));
 
-    EXPECT_EQ(yffb.GetSize(), 19ULL);
+    EXPECT_EQ(ys.Size(), 19ULL);
 
-    const auto* buf = yffb.GetBufferPointer();
-    const auto& root = NYaFF::ReadRoot<TImplicitMessage>(buf);
+    const auto* buf = ys.Data();
+    const auto& root = yaff::ReadRoot<ImplicitMessage>(buf);
 
     EXPECT_EQ(root.GetStringField(), "");
     EXPECT_EQ(root.GetSignedField(), 1LL);
@@ -45,127 +45,127 @@ TEST(FlatMessage, ImplicitMessage) {
 }
 
 TEST(FlatDynamicMessage, ImplicitMessage) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xFFFF, 0x3333));
+    yaff::Serializer ys;
+    ys.Finish(SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, 0xFFFF, 0x3333));
 
-    EXPECT_EQ(yffb.GetSize(), 23ULL);
+    EXPECT_EQ(ys.Size(), 23ULL);
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xFFFFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
 }
 
 TEST(FlatDynamicMessage, ExplicitMessage) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xAF,
-                                                                0x3333));  // Sets second field to default explicitly;
+    yaff::Serializer ys;
+    ys.Finish(SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, 0xAF,
+                                                                  0x3333));  // Sets second field to default explicitly;
 
-    EXPECT_EQ(yffb.GetSize(), 24ULL);  // Allocates 2 more byte for presence and sizes mask;
+    EXPECT_EQ(ys.Size(), 24ULL);  // Allocates 2 more byte for presence and sizes mask;
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
 }
 
 TEST(FlatDynamicMessage, BadFillOrder) {
-    NYaFF::TBuilder yffb;
-    yffb.StartFlatMessage<TSimpleMessage::TMetaType>();
-    yffb.AddField<int32_t>(TSimpleMessage::ID_SIGNEDFIELD, -0x10, 0);
-    EXPECT_THROW(yffb.AddField<uint64_t>(TSimpleMessage::ID_LARGEFIELD, 0x3333, 0x6789), std::runtime_error);
+    yaff::Serializer ys;
+    ys.StartFlatMessage<SimpleMessage::MetaType>();
+    ys.AddField<int32_t>(SimpleMessage::ID_SIGNEDFIELD, -0x10, 0);
+    EXPECT_THROW(ys.AddField<uint64_t>(SimpleMessage::ID_LARGEFIELD, 0x3333, 0x6789), std::runtime_error);
 }
 
 TEST(FlatDynamicMessage, SkipFields) {
-    NYaFF::TBuilder yffb;
-    TSimpleMessageFlatBuilder builder(yffb);
-    builder.add_largefield(0x3333);
-    builder.add_signedfield(-0x10);
-    auto root = std::move(builder).Finish();
-    yffb.Finish(root);
+    yaff::Serializer ys;
+    SimpleMessageFlatSerializer serializer(ys);
+    serializer.add_largefield(0x3333);
+    serializer.add_signedfield(-0x10);
+    auto root = std::move(serializer).Finish();
+    ys.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 23ULL);
+    EXPECT_EQ(ys.Size(), 23ULL);
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
 }
 
 TEST(FlatDynamicMessage, SkipFieldsFront) {
-    NYaFF::TBuilder yffb;
-    TSimpleMessageFlatBuilder builder(yffb);
-    builder.add_largefield(0x3333);
-    auto root = std::move(builder).Finish();
-    yffb.Finish(root);
+    yaff::Serializer ys;
+    SimpleMessageFlatSerializer serializer(ys);
+    serializer.add_largefield(0x3333);
+    auto root = std::move(serializer).Finish();
+    ys.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 23ULL);
+    EXPECT_EQ(ys.Size(), 23ULL);
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x0);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
 }
 
 TEST(FlatDynamicMessage, SkipFieldsTail) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, 0x17));
+    yaff::Serializer ys;
+    ys.Finish(SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, 0x17));
 
-    EXPECT_EQ(yffb.GetSize(), 11ULL);  // Tail size optimization;
+    EXPECT_EQ(ys.Size(), 11ULL);  // Tail size optimization;
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x17);
 }
 
 TEST(FlatDynamicMessage, DefaultValues) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, std::nullopt,
-                                                                0x1234));  // Sets empty value for small field
+    yaff::Serializer ys;
+    ys.Finish(SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, std::nullopt,
+                                                                  0x1234));  // Sets empty value for small field
 
-    EXPECT_EQ(yffb.GetSize(), 23ULL);
+    EXPECT_EQ(ys.Size(), 23ULL);
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x1234ULL);
 }
 
 TEST(FlatDynamicMessage, TailDefaultValues) {
-    NYaFF::TBuilder yffb;
-    TSimpleMessageFlatBuilder builder(yffb);
-    builder.add_signedfield(-0x10);
-    auto root = std::move(builder).Finish();
-    yffb.Finish(root);
+    yaff::Serializer ys;
+    SimpleMessageFlatSerializer serializer(ys);
+    serializer.add_signedfield(-0x10);
+    auto root = std::move(serializer).Finish();
+    ys.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 11ULL);  // Does not store empty values in the end of object;
+    EXPECT_EQ(ys.Size(), 11ULL);  // Does not store empty values in the end of object;
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x6789ULL);
 }
 
 TEST(FlatDynamicMessage, AllDefaultValues) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb));
+    yaff::Serializer ys;
+    ys.Finish(SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys));
 
-    EXPECT_EQ(yffb.GetSize(), 6ULL);  // root offset + flat message typed size;
+    EXPECT_EQ(ys.Size(), 6ULL);  // root offset + flat message typed size;
 
-    const auto& simpleMessage = NYaFF::ReadRoot<TSimpleMessage>(yffb.GetBufferPointer());
+    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x0);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x6789ULL);
 }
 
 TEST(FlatDynamicMessage, NestedMessages) {
-    NYaFF::TBuilder yffb;
-    auto nested1 = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, 0, 0xFFFF);
-    auto nested2 = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, 0x17);
-    auto root = CreateTNestedMessage<TNestedMessageFlatBuilder>(yffb, nested1, 0x1234, nested2);
-    yffb.Finish(root);
+    yaff::Serializer ys;
+    auto nested1 = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, 0, 0xFFFF);
+    auto nested2 = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, 0x17);
+    auto root = SerializeNestedMessage<NestedMessageFlatSerializer>(ys, nested1, 0x1234, nested2);
+    ys.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 41ULL);
+    EXPECT_EQ(ys.Size(), 41ULL);
 
-    const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
+    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x1234ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSmallField(), 0xFFFFU);
     EXPECT_EQ(nestedMessage.GetNested2().GetSignedField(), 0x17);
@@ -174,14 +174,14 @@ TEST(FlatDynamicMessage, NestedMessages) {
 }
 
 TEST(FlatDynamicMessage, NestedMessageEmpty) {
-    NYaFF::TBuilder yffb;
-    auto nested = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, 0, 0xAF, 0x5678);
-    auto root = CreateTNestedMessage<TNestedMessageFlatBuilder>(yffb, nested);
-    yffb.Finish(root);
+    yaff::Serializer ys;
+    auto nested = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, 0, 0xAF, 0x5678);
+    auto root = SerializeNestedMessage<NestedMessageFlatSerializer>(ys, nested);
+    ys.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 31ULL);
+    EXPECT_EQ(ys.Size(), 31ULL);
 
-    const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
+    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x5678ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSignedField(), 0x0);
@@ -189,24 +189,24 @@ TEST(FlatDynamicMessage, NestedMessageEmpty) {
 }
 
 TEST(FlatDynamicMessage, FloatMessage) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTFloatMessage<TFloatMessageFlatBuilder>(yffb, 1.1234f, std::nullopt));
+    yaff::Serializer ys;
+    ys.Finish(SerializeFloatMessage<FloatMessageFlatSerializer>(ys, 1.1234f, std::nullopt));
 
-    EXPECT_EQ(yffb.GetSize(), 11ULL);  // double empty value is not stored;
+    EXPECT_EQ(ys.Size(), 11ULL);  // double empty value is not stored;
 
-    const auto& floatMessage = NYaFF::ReadRoot<TFloatMessage>(yffb.GetBufferPointer());
+    const auto& floatMessage = yaff::ReadRoot<FloatMessage>(ys.Data());
     EXPECT_EQ(floatMessage.GetFloatField(), 1.1234f);
     EXPECT_EQ(floatMessage.GetDoubleField(), 1e-6);
 }
 
 TEST(FlatDynamicMessage, UnionMessageEmpty) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 10));
-    EXPECT_EQ(yffb.GetSize(), 11ULL);  // shared values is not stored;
+    yaff::Serializer ys;
+    ys.Finish(SerializeUnionMessage<UnionMessageFlatSerializer>(ys, 10));
+    EXPECT_EQ(ys.Size(), 11ULL);  // shared values is not stored;
 
-    const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
+    const auto& unionMessage = yaff::ReadRoot<UnionMessage>(ys.Data());
     EXPECT_EQ(unionMessage.GetSomeValue(), 10U);
-    EXPECT_EQ(unionMessage.Union_case(), TUnionMessage::UnionCase::UNION_NOT_SET);
+    EXPECT_EQ(unionMessage.Union_case(), UnionMessage::UnionCase::UNION_NOT_SET);
 
     EXPECT_EQ(unionMessage.HasNested1(), false);
     EXPECT_EQ(unionMessage.HasStringVec(), false);
@@ -220,28 +220,28 @@ TEST(FlatDynamicMessage, UnionMessageEmpty) {
 }
 
 TEST(FlatDynamicMessage, UnionMessageExplicitPresence) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 10, 0, 0, 0, -1));  // -1 is default value;
+    yaff::Serializer ys;
+    ys.Finish(SerializeUnionMessage<UnionMessageFlatSerializer>(ys, 10, 0, 0, 0, -1));  // -1 is default value;
 
-    EXPECT_EQ(yffb.GetSize(), 28ULL);
+    EXPECT_EQ(ys.Size(), 28ULL);
 
-    const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
+    const auto& unionMessage = yaff::ReadRoot<UnionMessage>(ys.Data());
     EXPECT_EQ(unionMessage.GetSomeValue(), 10U);
-    EXPECT_EQ(unionMessage.Union_case(), TUnionMessage::UnionCase::kMediumField);
+    EXPECT_EQ(unionMessage.Union_case(), UnionMessage::UnionCase::kMediumField);
     EXPECT_EQ(unionMessage.GetMediumField(), -1);
     EXPECT_EQ(unionMessage.GetNested1().GetLargeField(), 0x6789ULL);
 }
 
 TEST(FlatDynamicMessage, UnionMessageNested) {
-    NYaFF::TBuilder yffb;
-    auto nested = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, 10);
-    yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 12, 0, 0, nested));
+    yaff::Serializer ys;
+    auto nested = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, 10);
+    ys.Finish(SerializeUnionMessage<UnionMessageFlatSerializer>(ys, 12, 0, 0, nested));
 
-    EXPECT_EQ(yffb.GetSize(), 30ULL);
+    EXPECT_EQ(ys.Size(), 30ULL);
 
-    const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
+    const auto& unionMessage = yaff::ReadRoot<UnionMessage>(ys.Data());
     EXPECT_EQ(unionMessage.GetSomeValue(), 12U);
-    EXPECT_EQ(unionMessage.Union_case(), TUnionMessage::UnionCase::kNested2);
+    EXPECT_EQ(unionMessage.Union_case(), UnionMessage::UnionCase::kNested2);
     EXPECT_EQ(unionMessage.GetNested2().GetSignedField(), 10);
     EXPECT_EQ(unionMessage.GetNested1().GetSignedField(), 0);
 }
@@ -249,28 +249,28 @@ TEST(FlatDynamicMessage, UnionMessageNested) {
 TEST(FlatDynamicMessage, UnionMessageString) {
     std::string expected = "aaaa";
 
-    NYaFF::TBuilder yffb;
-    auto vec = yffb.CreateString(expected);
-    yffb.Finish(CreateTUnionMessage<TUnionMessageFlatBuilder>(yffb, 14, 0, vec));
+    yaff::Serializer ys;
+    auto vec = ys.SerializeString(expected);
+    ys.Finish(SerializeUnionMessage<UnionMessageFlatSerializer>(ys, 14, 0, vec));
 
-    EXPECT_EQ(yffb.GetSize(), 28ULL);
+    EXPECT_EQ(ys.Size(), 28ULL);
 
-    const auto& unionMessage = NYaFF::ReadRoot<TUnionMessage>(yffb.GetBufferPointer());
+    const auto& unionMessage = yaff::ReadRoot<UnionMessage>(ys.Data());
     EXPECT_EQ(unionMessage.GetSomeValue(), 14U);
-    EXPECT_EQ(unionMessage.Union_case(), TUnionMessage::UnionCase::kStringVec);
+    EXPECT_EQ(unionMessage.Union_case(), UnionMessage::UnionCase::kStringVec);
 
     std::string str(unionMessage.GetStringVec());
     EXPECT_EQ(str, expected);
 }
 
 TEST(FlatDynamicMessage, MixedOneof) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTOneOfMix<TOneOfMixFlatBuilder>(yffb, 1, std::nullopt, 2, 4));
+    yaff::Serializer ys;
+    ys.Finish(SerializeOneOfMix<OneOfMixFlatSerializer>(ys, 1, std::nullopt, 2, 4));
 
-    EXPECT_EQ(yffb.GetSize(), 39ULL);
+    EXPECT_EQ(ys.Size(), 39ULL);
 
-    const auto& oneofMix = NYaFF::ReadRoot<TOneOfMix>(yffb.GetBufferPointer());
-    EXPECT_EQ(oneofMix.Shared_case(), TOneOfMix::SharedCase::kField4);
+    const auto& oneofMix = yaff::ReadRoot<OneOfMix>(ys.Data());
+    EXPECT_EQ(oneofMix.Shared_case(), OneOfMix::SharedCase::kField4);
     EXPECT_EQ(oneofMix.GetField1(), 1ULL);
     EXPECT_EQ(oneofMix.GetField2(), 2ULL);
     EXPECT_EQ(oneofMix.HasField3(), false);
@@ -285,8 +285,8 @@ TEST(FlatDynamicMessage, MixedOneof) {
 // ID=4, bool;
 // ID=5, uint64;
 struct TExplicitMetaV1 {
-    inline static constexpr std::array<NYaFF::TFieldOffset, 6> FLAT_OFFSETS = {0, 8, 12, 20, 21, 29};
-    inline static constexpr std::array<NYaFF::TFieldId, 0> DELETED_IDS = {};
+    inline static constexpr std::array<yaff::FieldOffset, 6> FLAT_OFFSETS = {0, 8, 12, 20, 21, 29};
+    inline static constexpr std::array<yaff::FieldId, 0> DELETED_IDS = {};
     inline static constexpr std::array<bool, 5> STATIC_FLAGS = {1, 1, 1, 1, 1};
 };
 
@@ -297,26 +297,26 @@ struct TExplicitMetaV1 {
 // ID=5, uint64;
 // ID=6, (added) uint32;
 struct TExplicitMetaV2 {
-    inline static constexpr std::array<NYaFF::TFieldOffset, 7> FLAT_OFFSETS = {0, 8, 8, 8, 9, 17, 21};
-    inline static constexpr std::array<NYaFF::TFieldId, 2> DELETED_IDS = {2, 3};
+    inline static constexpr std::array<yaff::FieldOffset, 7> FLAT_OFFSETS = {0, 8, 8, 8, 9, 17, 21};
+    inline static constexpr std::array<yaff::FieldId, 2> DELETED_IDS = {2, 3};
     inline static constexpr std::array<bool, 6> STATIC_FLAGS = {1, 1, 1, 0, 0, 0};
 };
 
 TEST(FlatDynamicMessage, ExplicitSparseCompatibility) {
     // Writes message with dense message info;
-    NYaFF::TBuilder yffb;
-    yffb.StartFlatMessage<TExplicitMetaV1>(/*implicit*/ false, /*sized*/ true);
-    yffb.AddField<uint64_t>(5, 10, 10);
-    yffb.AddField<bool>(4, true, false);
-    yffb.AddField<uint64_t>(3, 15, 10);
-    yffb.AddField<uint32_t>(2, 0, 0);
-    yffb.AddField<uint64_t>(1, 20, 0);
-    yffb.Finish(NYaFF::TInternalOffset<>{yffb.FinishFlatMessage()});
+    yaff::Serializer ys;
+    ys.StartFlatMessage<TExplicitMetaV1>(/*implicit*/ false, /*sized*/ true);
+    ys.AddField<uint64_t>(5, 10, 10);
+    ys.AddField<bool>(4, true, false);
+    ys.AddField<uint64_t>(3, 15, 10);
+    ys.AddField<uint32_t>(2, 0, 0);
+    ys.AddField<uint64_t>(1, 20, 0);
+    ys.Finish(yaff::InternalOffset<>{ys.FinishFlatMessage()});
 
-    EXPECT_EQ(yffb.GetSize(), 37ULL);
+    EXPECT_EQ(ys.Size(), 37ULL);
 
     // Reads message with updated sparse message info;
-    const auto& msg = NYaFF::ReadRoot<NYaFF::TDynamicMessage<TExplicitMetaV2>>(yffb.GetBufferPointer());
+    const auto& msg = yaff::ReadRoot<yaff::DynamicMessage<TExplicitMetaV2>>(ys.Data());
     EXPECT_TRUE(msg.ReadPresence<uint64_t>(1));
     EXPECT_EQ(msg.ReadValue<uint64_t>(1, 0), 20ULL);
 
@@ -335,8 +335,8 @@ TEST(FlatDynamicMessage, ExplicitSparseCompatibility) {
 // ID=3, uint32;
 // ID=4, uint64;
 struct TImplicitMetaV1 {
-    inline static constexpr std::array<NYaFF::TFieldOffset, 5> FLAT_OFFSETS = {0, 1, 5, 9, 17};
-    inline static constexpr std::array<NYaFF::TFieldId, 0> DELETED_IDS = {};
+    inline static constexpr std::array<yaff::FieldOffset, 5> FLAT_OFFSETS = {0, 1, 5, 9, 17};
+    inline static constexpr std::array<yaff::FieldId, 0> DELETED_IDS = {};
     inline static constexpr std::array<bool, 4> STATIC_FLAGS = {1, 1, 1, 1};
 };
 
@@ -345,24 +345,24 @@ struct TImplicitMetaV1 {
 // ID=3, uint32;
 // ID=4, removed;
 struct TImplicitMetaV2 {
-    inline static constexpr std::array<NYaFF::TFieldOffset, 4> FLAT_OFFSETS = {0, 0, 4, 8};
-    inline static constexpr std::array<NYaFF::TFieldId, 1> DELETED_IDS = {1};
+    inline static constexpr std::array<yaff::FieldOffset, 4> FLAT_OFFSETS = {0, 0, 4, 8};
+    inline static constexpr std::array<yaff::FieldId, 1> DELETED_IDS = {1};
     inline static constexpr std::array<bool, 3> STATIC_FLAGS = {1, 0, 0};
 };
 
 TEST(FlatDynamicMessage, ImplicitSparseCompatibility) {
-    NYaFF::TBuilder yffb;
-    yffb.StartFlatMessage<TImplicitMetaV1>(/*implicit*/ true, /*sized*/ true);
-    yffb.AddField<uint64_t>(4, 10, 0);
-    yffb.AddField<uint32_t>(3, 8, 8);
-    yffb.AddField<uint32_t>(2, 1, 2);
-    yffb.AddField<bool>(1, false, false);
-    yffb.Finish(NYaFF::TInternalOffset<>{yffb.FinishFlatMessage()});
+    yaff::Serializer ys;
+    ys.StartFlatMessage<TImplicitMetaV1>(/*implicit*/ true, /*sized*/ true);
+    ys.AddField<uint64_t>(4, 10, 0);
+    ys.AddField<uint32_t>(3, 8, 8);
+    ys.AddField<uint32_t>(2, 1, 2);
+    ys.AddField<bool>(1, false, false);
+    ys.Finish(yaff::InternalOffset<>{ys.FinishFlatMessage()});
 
-    EXPECT_EQ(yffb.GetSize(), 24ULL);
+    EXPECT_EQ(ys.Size(), 24ULL);
 
     // Reads message with updated sparse message info;
-    const auto& msg = NYaFF::ReadRoot<NYaFF::TDynamicMessage<TImplicitMetaV2>>(yffb.GetBufferPointer());
+    const auto& msg = yaff::ReadRoot<yaff::DynamicMessage<TImplicitMetaV2>>(ys.Data());
     EXPECT_TRUE(msg.ReadPresence<uint64_t>(2));
     EXPECT_EQ(msg.ReadValue<uint32_t>(2, 1), 2U);
 

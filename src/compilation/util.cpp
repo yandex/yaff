@@ -1,10 +1,9 @@
 #include "util.h"
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-static void GetSchemaDependencyOrderImpl(const NIR::TSchemaDef* schemaDef,
-                                         std::unordered_set<const NIR::TSchemaDef*>& used,
-                                         std::vector<const NIR::TSchemaDef*>& order) {
+static void GetSchemaDependencyOrderImpl(const ir::SchemaDef* schemaDef, std::unordered_set<const ir::SchemaDef*>& used,
+                                         std::vector<const ir::SchemaDef*>& order) {
     YAFF_REQUIRE(schemaDef);
     used.emplace(schemaDef);
     for (const auto* dependency : schemaDef->Dependencies) {
@@ -15,14 +14,13 @@ static void GetSchemaDependencyOrderImpl(const NIR::TSchemaDef* schemaDef,
     order.emplace_back(schemaDef);
 }
 
-static void GetMessageDependencyOrderImpl(const NIR::TMessageDef* msg,
-                                          std::unordered_set<const NIR::TMessageDef*>& used,
-                                          std::vector<const NIR::TMessageDef*>& order) {
+static void GetMessageDependencyOrderImpl(const ir::MessageDef* msg, std::unordered_set<const ir::MessageDef*>& used,
+                                          std::vector<const ir::MessageDef*>& order) {
     YAFF_REQUIRE(msg);
     used.emplace(msg);
     for (const auto& fieldDef : msg->Fields) {
         YAFF_REQUIRE(fieldDef.Type);
-        const auto* next = NIR::ExtractMessageDef(*fieldDef.Type);
+        const auto* next = ir::ExtractMessageDef(*fieldDef.Type);
         if (next && next->Schema == msg->Schema && !used.contains(next)) {
             GetMessageDependencyOrderImpl(next, used, order);
         }
@@ -30,12 +28,12 @@ static void GetMessageDependencyOrderImpl(const NIR::TMessageDef* msg,
     order.emplace_back(msg);
 }
 
-std::vector<const NIR::TSchemaDef*> GetSchemaDependencyOrder(const NIR::TIR& ir) {
+std::vector<const ir::SchemaDef*> GetSchemaDependencyOrder(const ir::IR& ir) {
     const size_t schemaCnt = ir.Schemas.Symbols.size();
 
-    std::vector<const NIR::TSchemaDef*> order;
+    std::vector<const ir::SchemaDef*> order;
     order.reserve(schemaCnt);
-    std::unordered_set<const NIR::TSchemaDef*> used;
+    std::unordered_set<const ir::SchemaDef*> used;
     used.reserve(schemaCnt);
 
     for (const auto& [_, schema] : ir.Schemas.Symbols) {
@@ -47,11 +45,11 @@ std::vector<const NIR::TSchemaDef*> GetSchemaDependencyOrder(const NIR::TIR& ir)
     return order;
 }
 
-std::vector<const NIR::TMessageDef*> GetMessageDependencyOrder(const NIR::TSchemaDef& schemaDef) {
+std::vector<const ir::MessageDef*> GetMessageDependencyOrder(const ir::SchemaDef& schemaDef) {
     const size_t msgCount = schemaDef.Messages.size();
-    std::vector<const NIR::TMessageDef*> order;
+    std::vector<const ir::MessageDef*> order;
     order.reserve(msgCount);
-    std::unordered_set<const NIR::TMessageDef*> used;
+    std::unordered_set<const ir::MessageDef*> used;
     used.reserve(msgCount);
 
     for (const auto* msg : schemaDef.Messages) {
@@ -124,4 +122,4 @@ const std::unordered_set<std::string_view>& GetCppKeywords() {
     return keywords;
 }
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

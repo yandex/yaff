@@ -3,18 +3,16 @@
 #include "ir_compat.h"
 #include "ir_processor.h"
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-NIR::TIR ParseIr(std::unique_ptr<IFrontEnd> front) {
+ir::IR ParseIr(std::unique_ptr<AbstractFrontEnd> front) {
     auto ir = front->Parse();
     ProcessIR(ir);
     return ir;
 }
 
-void Compile(std::unique_ptr<IFrontEnd> front, std::vector<std::unique_ptr<IGenerator>> gens,
-             std::unique_ptr<IFrontEnd> baseFront, std::unique_ptr<IErrorHandler> errors) {
-    YAFF_REQUIRE(front);
-
+void Compile(std::unique_ptr<AbstractFrontEnd> front, std::vector<std::unique_ptr<AbstractGenerator>> gens,
+             std::unique_ptr<AbstractFrontEnd> baseFront, std::unique_ptr<AbstractErrorHandler> errors) {
     auto ir = ParseIr(std::move(front));
     if (baseFront) {
         auto baseIr = ParseIr(std::move(baseFront));
@@ -28,4 +26,4 @@ void Compile(std::unique_ptr<IFrontEnd> front, std::vector<std::unique_ptr<IGene
     }
 }
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

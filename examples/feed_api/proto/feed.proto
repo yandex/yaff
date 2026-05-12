@@ -1,26 +1,26 @@
 syntax = "proto3";
 
-package NFeed;
+package feed;
 
-enum EContentType {
+enum ContentType {
     CONTENT_TYPE_UNKNOWN = 0;
     CONTENT_TYPE_ARTICLE = 1;
     CONTENT_TYPE_VIDEO = 2;
     CONTENT_TYPE_PODCAST = 3;
 }
 
-message TAuthor {
+message Author {
     uint64 id = 1;
     optional string name = 2;
     optional bool verified = 3;
 }
 
-message TFeedItem {
+message FeedItem {
     uint64 item_id = 1;
-    optional EContentType content_type = 2;
+    optional ContentType content_type = 2;
     optional string title = 3;
     optional string description = 4;
-    optional TAuthor author = 5;
+    optional Author author = 5;
     optional double relevance_score = 6;
     repeated string tags = 7;
     map<string, string> extra = 8;
@@ -31,7 +31,7 @@ message TFeedItem {
     }
 }
 
-message TFeedResponse {
+message FeedResponse {
     uint64 request_id = 1;
-    repeated TFeedItem items = 2;
+    repeated FeedItem items = 2;
 }

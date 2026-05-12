@@ -1,12 +1,12 @@
 #pragma once
 
-#include "builder.h"
+#include "array.h"
 #include "message.h"
-#include "vector.h"
+#include "serializer.h"
 
-namespace NYaFF::NExp {
+namespace yaff::exp {
 
 template <typename T>
-struct TSizeable;
+struct Sizeable;
 
 }

@@ -67,9 +67,9 @@
         }                                                                 \
     } while (false)
 
-namespace NYaFF {
+namespace yaff {
 
-enum class EType : int32_t {
+enum class Type : int32_t {
     TYPE_NONE = 0,
     TYPE_BOOL = 1,
     TYPE_INT32 = 2,
@@ -84,7 +84,7 @@ enum class EType : int32_t {
     TYPE_MESSAGE = 11,
 };
 
-enum class EMessageLayout : int32_t {
+enum class MessageLayout : int32_t {
     MESSAGE_LAYOUT_UNKNOWN = 0,
     MESSAGE_LAYOUT_FIXED = 1,
     MESSAGE_LAYOUT_FLAT = 2,
@@ -92,7 +92,7 @@ enum class EMessageLayout : int32_t {
     MESSAGE_LAYOUT_DYNAMIC = 4,
 };
 
-enum class EPresence : int32_t {
+enum class Presence : int32_t {
     PRESENCE_NONE = 0,
     PRESENCE_IMPLICIT = 1,
     PRESENCE_EXPLICIT = 2,
@@ -130,17 +130,17 @@ inline bool IsEqual(double a, double b) noexcept {
     return std::fabs(a - b) <= (std::min(std::fabs(a), std::fabs(b)) * std::numeric_limits<double>::epsilon());
 }
 
-using TOffset = uint32_t;
-using TSignedOffset = int32_t;
+using Offset = uint32_t;
+using SignedOffset = int32_t;
 
-inline TOffset ToCheckedOffset(uint64_t v) {
+inline Offset ToCheckedOffset(uint64_t v) {
     YAFF_REQUIRE(v <= ((1ULL << 31ULL) - 1ULL));
-    return static_cast<TOffset>(v);
+    return static_cast<Offset>(v);
 }
 
-inline TSignedOffset ToCheckedSignedOffset(int64_t v) {
+inline SignedOffset ToCheckedSignedOffset(int64_t v) {
     YAFF_REQUIRE(std::numeric_limits<int32_t>::min() <= v && v <= std::numeric_limits<int32_t>::max());
-    return static_cast<TSignedOffset>(v);
+    return static_cast<SignedOffset>(v);
 }
 
 // N.B.: You can work with the data obtained through this call only
@@ -171,12 +171,12 @@ inline void WriteValue(void* ptr, T value) noexcept {
     YAFF_MEMCPY(ptr, &value, sizeof(T));
 }
 
-template <typename T, typename O = TOffset>
+template <typename T, typename O = Offset>
 YAFF_PURE inline const T* ResolveOffset(const void* obj, const O offset) noexcept {
     return ReadLayout<T>(reinterpret_cast<const std::byte*>(obj) + offset);
 }
 
-template <typename T, typename O = TOffset>
+template <typename T, typename O = Offset>
 YAFF_PURE inline const T* ResolveNullableOffset(const void* obj, const O offset, const T* defaultPtr) noexcept {
     if (YAFF_LIKELY(offset != 0)) {
         return ReadLayout<T>(reinterpret_cast<const std::byte*>(obj) + offset);
@@ -184,19 +184,19 @@ YAFF_PURE inline const T* ResolveNullableOffset(const void* obj, const O offset,
     return defaultPtr;
 }
 
-using TFieldId = uint16_t;
-using TFieldOffset = uint16_t;
-using TFieldResolverFunc = std::function<TFieldOffset(const TFieldId)>;
+using FieldId = uint16_t;
+using FieldOffset = uint16_t;
+using FieldResolver = std::function<FieldOffset(const FieldId)>;
 
 template <typename T, typename U>
-struct TWrittenOffset {
-    using TTargetType = T;
-    using TUnderlying = U;
+struct WrittenOffset {
+    using TargetType = T;
+    using Underlying = U;
 
-    constexpr TWrittenOffset() noexcept : O(0) {
+    constexpr WrittenOffset() noexcept : O(0) {
     }
 
-    constexpr TWrittenOffset(U o) noexcept : O(o) {
+    constexpr WrittenOffset(U o) noexcept : O(o) {
     }
 
     constexpr bool IsNull() const noexcept {
@@ -207,21 +207,19 @@ struct TWrittenOffset {
 };
 
 template <typename T>
-concept CWrittenOffset = std::is_base_of_v<TWrittenOffset<typename T::TTargetType, typename T::TUnderlying>, T>;
+concept CWrittenOffset = std::is_base_of_v<WrittenOffset<typename T::TargetType, typename T::Underlying>, T>;
 
 template <typename T = void>
-struct TInlineOffset : public TWrittenOffset<T, TOffset> {
-    using TWrittenOffset<T, TOffset>::TWrittenOffset;
+struct InlineOffset : public WrittenOffset<T, Offset> {
+    using WrittenOffset<T, Offset>::WrittenOffset;
 };
 
 template <typename T = void>
-struct TInternalOffset : public TWrittenOffset<T, TOffset> {
-    using TWrittenOffset<T, TOffset>::TWrittenOffset;
+struct InternalOffset : public WrittenOffset<T, Offset> {
+    using WrittenOffset<T, Offset>::WrittenOffset;
 
-    // Any TInternalOffset can be interpreted as TInlineOffset in the higher composite structure,
-    // since TBuilder is composite structure too.
-    constexpr operator TInlineOffset<T>() const noexcept {
-        return {TWrittenOffset<T, TOffset>::O};
+    constexpr operator InlineOffset<T>() const noexcept {
+        return {WrittenOffset<T, Offset>::O};
     }
 };
 
@@ -247,15 +245,15 @@ YAFF_PURE inline const T& ReadRoot(const void* buf) noexcept {
     if (YAFF_UNLIKELY(!buf)) {
         return T::Default();
     }
-    return *ResolveOffset<T>(buf, ReadValue<TOffset>(buf));
+    return *ResolveOffset<T>(buf, ReadValue<Offset>(buf));
 }
 
 template <typename T>
-YAFF_PURE inline const T& ReadDirect(const void* buf) noexcept {
+YAFF_PURE inline const T& ReadRootless(const void* buf) noexcept {
     if (YAFF_UNLIKELY(!buf)) {
         return T::Default();
     }
     return *ReadLayout<T>(buf);
 }
 
-}  // namespace NYaFF
+}  // namespace yaff

@@ -2,23 +2,23 @@
 
 #include <unordered_set>
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-class TIRProcessor {
+class IRProcessor {
 public:
-    void Process(NIR::TIR& ir) &&;
+    void Process(ir::IR& ir) &&;
 
 private:
     static void Ensure(const bool cond, const std::string& message);
 
-    void ProcessSchema(NIR::TIR& ir, NIR::TSchemaDef& schemaDef);
-    void ProcessEnum(NIR::TIR& ir, NIR::TEnumDef& enumDef);
-    void ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef);
+    void ProcessSchema(ir::IR& ir, ir::SchemaDef& schemaDef);
+    void ProcessEnum(ir::IR& ir, ir::EnumDef& enumDef);
+    void ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef);
 
-    std::unordered_set<const NIR::TMessageDef*> ProcessedMessages_;
+    std::unordered_set<const ir::MessageDef*> ProcessedMessages_;
 };
 
-void TIRProcessor::Process(NIR::TIR& ir) && {
+void IRProcessor::Process(ir::IR& ir) && {
     for (auto& [_, schemaDef] : ir.Schemas.Symbols) {
         ProcessSchema(ir, schemaDef);
     }
@@ -34,15 +34,15 @@ void TIRProcessor::Process(NIR::TIR& ir) && {
     }
 }
 
-void TIRProcessor::ProcessSchema(NIR::TIR&, NIR::TSchemaDef& schemaDef) {
+void IRProcessor::ProcessSchema(ir::IR&, ir::SchemaDef& schemaDef) {
     const bool someEnums = std::any_of(schemaDef.Enums.begin(), schemaDef.Enums.end(),
-                                       [](const NIR::TEnumDef* enm) { return enm->Defined; });
+                                       [](const ir::EnumDef* enm) { return enm->Defined; });
     const bool someMessages = std::any_of(schemaDef.Messages.begin(), schemaDef.Messages.end(),
-                                          [](const NIR::TMessageDef* tbl) { return tbl->Defined; });
+                                          [](const ir::MessageDef* tbl) { return tbl->Defined; });
     schemaDef.Defined = (someEnums || someMessages);
 }
 
-void TIRProcessor::ProcessEnum(NIR::TIR&, NIR::TEnumDef& enumDef) {
+void IRProcessor::ProcessEnum(ir::IR&, ir::EnumDef& enumDef) {
     Ensure(enumDef.Schema, "enum can not be not connected to schema '" + enumDef.Name + "'");
     Ensure(enumDef.Defined == enumDef.Schema->Defined, "incomplete definition of enum '" + enumDef.Name +
                                                            "' in defined schema '" + enumDef.Schema->Namespace + "'");
@@ -54,7 +54,7 @@ void TIRProcessor::ProcessEnum(NIR::TIR&, NIR::TEnumDef& enumDef) {
               [](const auto& l, const auto& r) { return l.Value < r.Value; });
 }
 
-void TIRProcessor::ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef) {
+void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
     if (!messageDef.Defined) {
         return;
     }
@@ -71,40 +71,40 @@ void TIRProcessor::ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef) {
     std::sort(messageDef.Fields.begin(), messageDef.Fields.end(),
               [](const auto& l, const auto& r) { return l.Id < r.Id; });
 
-    const bool gapped = NIR::IsGapMessage(messageDef);
-    Ensure(!gapped || (messageDef.Layout != EMessageLayout::MESSAGE_LAYOUT_FLAT &&
-                       messageDef.Layout != EMessageLayout::MESSAGE_LAYOUT_FIXED),
+    const bool gapped = ir::IsGapMessage(messageDef);
+    Ensure(!gapped || (messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FLAT &&
+                       messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED),
            "message '" + messageDef.Name + "' can not contain any gaps because it has field size based layout");
 
     bool comparable = false;
     uint64_t activeIndex = 1;
-    TFieldOffset flatOffset = 0;
+    FieldOffset flatOffset = 0;
     for (auto& fieldDef : messageDef.Fields) {
         Ensure(!fieldDef.Name.empty() || fieldDef.Deprecated,
                "field with id '" + std::to_string(fieldDef.Id) + "' has empty name");
 
-        if (fieldDef.Type->Modifiers.contains(NIR::DEFAULT_MODIFIER_NAME)) {
-            Ensure(NIR::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == EType::TYPE_STRING,
+        if (fieldDef.Type->Modifiers.contains(ir::DEFAULT_MODIFIER_NAME)) {
+            Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) + ") " +
                        "not allowed to have default value");
         }
 
-        Ensure(!fieldDef.Type->Modifiers.contains(NIR::INLINE_MODIFIER_NAME),
+        Ensure(!fieldDef.Type->Modifiers.contains(ir::INLINE_MODIFIER_NAME),
                "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                    ") is inlined, but inlined fields are not supported yet");
 
-        if (fieldDef.Type->Type == EType::TYPE_VECTOR) {
+        if (fieldDef.Type->Type == Type::TYPE_VECTOR) {
             const auto* elementType = fieldDef.Type->ElementType;
-            Ensure(!elementType || elementType->Type != EType::TYPE_VECTOR,
+            Ensure(!elementType || elementType->Type != Type::TYPE_VECTOR,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is 2d vector, but 2d vectors are not supported");
-            Ensure(fieldDef.Deprecated || fieldDef.Presence == EPresence::PRESENCE_IMPLICIT,
+            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_IMPLICIT,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is vector, but has explicit presence");
         }
 
-        if (fieldDef.Type->Type == EType::TYPE_MESSAGE) {
-            Ensure(fieldDef.Deprecated || fieldDef.Presence == EPresence::PRESENCE_EXPLICIT,
+        if (fieldDef.Type->Type == Type::TYPE_MESSAGE) {
+            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is message, but has implicit presence");
         }
@@ -116,10 +116,10 @@ void TIRProcessor::ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef) {
             fieldDef.ActiveIndex = activeIndex++;
         }
 
-        if (fieldDef.Type->Modifiers.contains(NIR::KEY_MODIFIER_NAME)) {
+        if (fieldDef.Type->Modifiers.contains(ir::KEY_MODIFIER_NAME)) {
             Ensure(!fieldDef.Deprecated,
                    "field (id: " + std::to_string(fieldDef.Id) + ") is deprecated and can not be key");
-            Ensure(NIR::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == EType::TYPE_STRING,
+            Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is not scalar or string and can not be key");
 
@@ -127,21 +127,21 @@ void TIRProcessor::ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef) {
             comparable = true;
         }
 
-        if (!fieldDef.SharedOffsetVia.empty()) {
-            Ensure(messageDef.Layout != EMessageLayout::MESSAGE_LAYOUT_FIXED,
+        if (!fieldDef.OneOf.empty()) {
+            Ensure(messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED,
                    "message '" + messageDef.Name + "' is fixed and can not have any oneof fields");
-            Ensure(fieldDef.Type->Type != EType::TYPE_VECTOR, "field '" + fieldDef.Name +
-                                                                  "' (id: " + std::to_string(fieldDef.Id) +
-                                                                  ") is vector and can not be oneof field");
-            Ensure(fieldDef.Deprecated || fieldDef.Presence == EPresence::PRESENCE_EXPLICIT,
+            Ensure(fieldDef.Type->Type != Type::TYPE_VECTOR, "field '" + fieldDef.Name +
+                                                                 "' (id: " + std::to_string(fieldDef.Id) +
+                                                                 ") is vector and can not be oneof field");
+            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is oneof field, but has implicit presence");
 
-            auto [it, _] = messageDef.SharedOffsets.try_emplace(
-                fieldDef.SharedOffsetVia, NIR::TMessageDef::TSharedOffset{.Name = fieldDef.SharedOffsetVia});
+            auto [it, _] =
+                messageDef.OneOfs.try_emplace(fieldDef.OneOf, ir::MessageDef::OneOfDef{.Name = fieldDef.OneOf});
             it->second.Fields.emplace_back(&fieldDef);
 
-            fieldDef.SharedOffsetId = it->second.Fields.size();
+            fieldDef.OneOfId = it->second.Fields.size();
         }
 
         fieldDef.FlatOffset = flatOffset;
@@ -159,30 +159,30 @@ void TIRProcessor::ProcessMessage(NIR::TIR& ir, NIR::TMessageDef& messageDef) {
             ProcessMessage(ir, *message);
         }
 
-        if (NIR::IsAssociative(*fieldDef.Type)) {
+        if (ir::IsAssociative(*fieldDef.Type)) {
             message->AssociativePair = true;
-            Ensure(message->Layout == EMessageLayout::MESSAGE_LAYOUT_FIXED,
+            Ensure(message->Layout == MessageLayout::MESSAGE_LAYOUT_FIXED,
                    "message '" + message->Name + "' marked as associative pair, but is not fixed");
             Ensure(message->Fields.size() == 2,
                    "message '" + message->Name + "' marked as associative pair, but contains not 2 fields");
 
             const auto& key = message->Fields[0];
             Ensure(!key.Deprecated, "field (id: " + std::to_string(key.Id) + ") is deprecated and can not be map key");
-            Ensure(NIR::IsScalar(key.Type->Type) || key.Type->Type == EType::TYPE_STRING,
+            Ensure(ir::IsScalar(key.Type->Type) || key.Type->Type == Type::TYPE_STRING,
                    "field '" + key.Name + "' (id: " + std::to_string(key.Id) +
                        ") is not scalar or string and can not be map key");
         }
     }
 }
 
-void TIRProcessor::Ensure(const bool cond, const std::string& message) {
+void IRProcessor::Ensure(const bool cond, const std::string& message) {
     if (YAFF_UNLIKELY(!cond)) {
         throw std::runtime_error(message.c_str());
     }
 }
 
-void ProcessIR(NIR::TIR& ir) {
-    TIRProcessor{}.Process(ir);
+void ProcessIR(ir::IR& ir) {
+    IRProcessor{}.Process(ir);
 }
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

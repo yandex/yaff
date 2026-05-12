@@ -14,7 +14,7 @@ public:
     std::string GenerateProtobufFlat5(size_t max, double density) {
         const std::vector<uint64_t> values = GenerateRandomVector(5, max);
 
-        NYaFFBench::TFlat5 proto;
+        benchmark_space::Flat5 proto;
         if (const auto v = WithDensity(values[0], density)) {
             proto.set_v0(*v);
         }
@@ -37,7 +37,7 @@ public:
     std::string GenerateProtobufFlat50(size_t max, double density) {
         const std::vector<uint64_t> values = GenerateRandomVector(50, max);
 
-        NYaFFBench::TFlat50 proto;
+        benchmark_space::Flat50 proto;
         if (const auto v = WithDensity(values[0], density)) {
             proto.set_v0(*v);
         }
@@ -197,7 +197,7 @@ public:
 
         flatbuffers::FlatBufferBuilder fbb;
         fbb.ForceDefaults(false);
-        const auto root = NFlatBuffersBench::CreateTFlat5(
+        const auto root = NFlatBuffersBench::CreateFlat5(
             fbb, WithDensity(values[0], density), WithDensity(values[1], density), WithDensity(values[2], density),
             WithDensity(values[3], density), WithDensity(values[4], density));
         fbb.Finish(root);
@@ -210,7 +210,7 @@ public:
 
         flatbuffers::FlatBufferBuilder fbb;
         fbb.ForceDefaults(false);
-        const auto root = NFlatBuffersBench::CreateTFlat50(
+        const auto root = NFlatBuffersBench::CreateFlat50(
             fbb, WithDensity(values[0], density), WithDensity(values[1], density), WithDensity(values[2], density),
             WithDensity(values[3], density), WithDensity(values[4], density), WithDensity(values[5], density),
             WithDensity(values[6], density), WithDensity(values[7], density), WithDensity(values[8], density),
@@ -233,28 +233,28 @@ public:
         return fbb.Release();
     }
 
-    template <NYaFF::EMessageLayout Layout>
-    NYaFF::TDetachedBuffer GenerateYaFFFlat5(size_t max, double density) {
+    template <yaff::MessageLayout Layout>
+    yaff::DetachedBuffer GenerateYaFFFlat5(size_t max, double density) {
         const std::vector<uint64_t> values = GenerateRandomVector(5, max);
 
-        NYaFF::TBuilder yffb;
-        yffb.EnforceDynamicAlternative(Layout);
-        const auto root = NProtoYaFF::NYaFFBench::CreateTFlat5(
-            yffb, WithDensity(values[0], density), WithDensity(values[1], density), WithDensity(values[2], density),
+        yaff::Serializer ys;
+        ys.EnforceDynamicAlternative(Layout);
+        const auto root = protoyaff::benchmark_space::SerializeFlat5(
+            ys, WithDensity(values[0], density), WithDensity(values[1], density), WithDensity(values[2], density),
             WithDensity(values[3], density), WithDensity(values[4], density));
-        yffb.Finish(root);
+        ys.Finish(root);
 
-        return yffb.Release();
+        return ys.Release();
     }
 
-    template <NYaFF::EMessageLayout Layout>
-    NYaFF::TDetachedBuffer GenerateYaFFFlat50(size_t max, double density) {
+    template <yaff::MessageLayout Layout>
+    yaff::DetachedBuffer GenerateYaFFFlat50(size_t max, double density) {
         const std::vector<uint64_t> values = GenerateRandomVector(50, max);
 
-        NYaFF::TBuilder yffb;
-        yffb.EnforceDynamicAlternative(Layout);
-        const auto root = NProtoYaFF::NYaFFBench::CreateTFlat50(
-            yffb, WithDensity(values[0], density), WithDensity(values[1], density), WithDensity(values[2], density),
+        yaff::Serializer ys;
+        ys.EnforceDynamicAlternative(Layout);
+        const auto root = protoyaff::benchmark_space::SerializeFlat50(
+            ys, WithDensity(values[0], density), WithDensity(values[1], density), WithDensity(values[2], density),
             WithDensity(values[3], density), WithDensity(values[4], density), WithDensity(values[5], density),
             WithDensity(values[6], density), WithDensity(values[7], density), WithDensity(values[8], density),
             WithDensity(values[9], density), WithDensity(values[10], density), WithDensity(values[11], density),
@@ -271,9 +271,9 @@ public:
             WithDensity(values[42], density), WithDensity(values[43], density), WithDensity(values[44], density),
             WithDensity(values[45], density), WithDensity(values[46], density), WithDensity(values[47], density),
             WithDensity(values[48], density), WithDensity(values[49], density));
-        yffb.Finish(root);
+        ys.Finish(root);
 
-        return yffb.Release();
+        return ys.Release();
     }
 
 private:
@@ -342,24 +342,24 @@ void BM_Space_Flat50_FlatBuffers(benchmark::State& state) {
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
 }
 
-template <NYaFF::EMessageLayout Layout>
+template <yaff::MessageLayout Layout>
 void BM_Space_Flat5_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const NYaFF::TDetachedBuffer msg = gen.GenerateYaFFFlat5<Layout>(state.range(0), state.range(1));
+        const yaff::DetachedBuffer msg = gen.GenerateYaFFFlat5<Layout>(state.range(0), state.range(1));
         totalSize += msg.Size();
     }
     state.counters["Size(bytes)"] =
         benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
 }
 
-template <NYaFF::EMessageLayout Layout>
+template <yaff::MessageLayout Layout>
 void BM_Space_Flat50_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
     for (auto _ : state) {
-        const NYaFF::TDetachedBuffer msg = gen.GenerateYaFFFlat50<Layout>(state.range(0), state.range(1));
+        const yaff::DetachedBuffer msg = gen.GenerateYaFFFlat50<Layout>(state.range(0), state.range(1));
         totalSize += msg.Size();
     }
     state.counters["Size(bytes)"] =
@@ -374,11 +374,11 @@ BENCHMARK(BM_Space_Flat5_FlatBuffers)
     ->Name("BM_Space_Flat_FlatBuffers/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Space_Flat_YaFF/FlatLayout/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Space_Flat_YaFF/SparseLayout/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
@@ -391,11 +391,11 @@ BENCHMARK(BM_Space_Flat50_FlatBuffers)
     ->Name("BM_Space_Flat_FlatBuffers/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Space_Flat_YaFF/FlatLayout/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
-BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Space_Flat_YaFF/SparseLayout/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
     ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});

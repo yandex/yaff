@@ -8,7 +8,7 @@
 
 class TDataGenerator {
 public:
-    struct TProtobufMessage {
+    struct ProtobufMessage {
         std::string Buffer;
         std::vector<uint64_t> Values;
     };
@@ -19,7 +19,7 @@ public:
     };
 
     struct TYaFFMessage {
-        NYaFF::TDetachedBuffer Buffer;
+        yaff::DetachedBuffer Buffer;
         std::vector<uint64_t> Values;
     };
 
@@ -27,10 +27,10 @@ public:
     explicit TDataGenerator(uint64_t seed) : Rng_(seed) {
     }
 
-    TProtobufMessage GenerateProtobufFlat10() {
+    ProtobufMessage GenerateProtobufFlat10() {
         std::vector<uint64_t> values = GenerateRandomVector64(10);
 
-        NYaFFBench::TFlat10 proto;
+        benchmark_access::Flat10 proto;
         proto.set_v0(values[0]);
         proto.set_v1(values[1]);
         proto.set_v2(values[2]);
@@ -48,10 +48,10 @@ public:
         };
     }
 
-    TProtobufMessage GenerateProtobufFlat100() {
+    ProtobufMessage GenerateProtobufFlat100() {
         std::vector<uint64_t> values = GenerateRandomVector64(100);
 
-        NYaFFBench::TFlat100 proto;
+        benchmark_access::Flat100 proto;
         proto.set_v0(values[0]);
         proto.set_v1(values[1]);
         proto.set_v2(values[2]);
@@ -163,8 +163,8 @@ public:
         std::vector<uint64_t> values = GenerateRandomVector64(10);
 
         flatbuffers::FlatBufferBuilder fbb;
-        const auto root = NFlatBuffersBench::CreateTFlat10(fbb, values[0], values[1], values[2], values[3], values[4],
-                                                           values[5], values[6], values[7], values[8], values[9]);
+        const auto root = NFlatBuffersBench::CreateFlat10(fbb, values[0], values[1], values[2], values[3], values[4],
+                                                          values[5], values[6], values[7], values[8], values[9]);
         fbb.Finish(root);
 
         return {
@@ -177,7 +177,7 @@ public:
         std::vector<uint64_t> values = GenerateRandomVector64(100);
 
         flatbuffers::FlatBufferBuilder fbb;
-        const auto root = NFlatBuffersBench::CreateTFlat100(
+        const auto root = NFlatBuffersBench::CreateFlat100(
             fbb, values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7], values[8],
             values[9], values[10], values[11], values[12], values[13], values[14], values[15], values[16], values[17],
             values[18], values[19], values[20], values[21], values[22], values[23], values[24], values[25], values[26],
@@ -198,38 +198,38 @@ public:
         };
     }
 
-    template <NYaFF::EMessageLayout Layout>
+    template <yaff::MessageLayout Layout>
     TYaFFMessage GenerateYaFFFlat10() {
-        TProtobufMessage protoMessage = GenerateProtobufFlat10();
+        ProtobufMessage protoMessage = GenerateProtobufFlat10();
 
-        NYaFFBench::TFlat10 proto;
+        benchmark_access::Flat10 proto;
         std::ignore = proto.ParseFromString(protoMessage.Buffer);
 
-        NYaFF::TBuilder yffb;
-        yffb.EnforceDynamicAlternative(Layout);
-        const auto root = NProtoYaFF::NYaFFBench::CreateTFlat10(yffb, proto);
-        yffb.Finish(root);
+        yaff::Serializer ys;
+        ys.EnforceDynamicAlternative(Layout);
+        const auto root = protoyaff::benchmark_access::SerializeFlat10(ys, proto);
+        ys.Finish(root);
 
         return {
-            .Buffer = yffb.Release(),
+            .Buffer = ys.Release(),
             .Values = std::move(protoMessage.Values),
         };
     }
 
-    template <NYaFF::EMessageLayout Layout>
+    template <yaff::MessageLayout Layout>
     TYaFFMessage GenerateYaFFFlat100() {
-        TProtobufMessage protoMessage = GenerateProtobufFlat100();
+        ProtobufMessage protoMessage = GenerateProtobufFlat100();
 
-        NYaFFBench::TFlat100 proto;
+        benchmark_access::Flat100 proto;
         std::ignore = proto.ParseFromString(protoMessage.Buffer);
 
-        NYaFF::TBuilder yffb;
-        yffb.EnforceDynamicAlternative(Layout);
-        const auto root = NProtoYaFF::NYaFFBench::CreateTFlat100(yffb, proto);
-        yffb.Finish(root);
+        yaff::Serializer ys;
+        ys.EnforceDynamicAlternative(Layout);
+        const auto root = protoyaff::benchmark_access::SerializeFlat100(ys, proto);
+        ys.Finish(root);
 
         return {
-            .Buffer = yffb.Release(),
+            .Buffer = ys.Release(),
             .Values = std::move(protoMessage.Values),
         };
     }
@@ -392,7 +392,7 @@ void BM_Access_Flat10_Protobuf(benchmark::State& state) {
     const auto msg = gen.GenerateProtobufFlat10();
 
     for (auto _ : state) {
-        NYaFFBench::TFlat10 proto;
+        benchmark_access::Flat10 proto;
         std::ignore = proto.ParseFromString(msg.Buffer);
         uint64_t sum = SumFlat10(proto);
         benchmark::DoNotOptimize(sum);
@@ -404,7 +404,7 @@ void BM_Access_Flat100_Protobuf(benchmark::State& state) {
     const auto msg = gen.GenerateProtobufFlat100();
 
     for (auto _ : state) {
-        NYaFFBench::TFlat100 proto;
+        benchmark_access::Flat100 proto;
         std::ignore = proto.ParseFromString(msg.Buffer);
         uint64_t sum = SumFlat100(proto);
         benchmark::DoNotOptimize(sum);
@@ -416,8 +416,8 @@ void BM_Access_Flat10_FlatBuffers(benchmark::State& state) {
     const auto msg = gen.GenerateFlatBuffersFlat10();
 
     for (auto _ : state) {
-        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::TFlat10>(msg.Buffer.data());
-        uint64_t sum = SumFlat10<NFlatBuffersBench::TFlat10>(*root);
+        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::Flat10>(msg.Buffer.data());
+        uint64_t sum = SumFlat10<NFlatBuffersBench::Flat10>(*root);
         benchmark::DoNotOptimize(sum);
     }
 }
@@ -427,64 +427,64 @@ void BM_Access_Flat100_FlatBuffers(benchmark::State& state) {
     const auto msg = gen.GenerateFlatBuffersFlat100();
 
     for (auto _ : state) {
-        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::TFlat100>(msg.Buffer.data());
-        uint64_t sum = SumFlat100<NFlatBuffersBench::TFlat100>(*root);
+        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::Flat100>(msg.Buffer.data());
+        uint64_t sum = SumFlat100<NFlatBuffersBench::Flat100>(*root);
         benchmark::DoNotOptimize(sum);
     }
 }
 
-template <NYaFF::EMessageLayout Layout>
+template <yaff::MessageLayout Layout>
 void BM_Access_Flat10_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     const auto msg = gen.GenerateYaFFFlat10<Layout>();
 
     for (auto _ : state) {
-        const auto& root = NYaFF::ReadRoot<NProtoYaFF::NYaFFBench::TFlat10>(msg.Buffer.Data());
-        uint64_t sum = SumFlat10<NProtoYaFF::NYaFFBench::TFlat10>(root);
+        const auto& root = yaff::ReadRoot<protoyaff::benchmark_access::Flat10>(msg.Buffer.Data());
+        uint64_t sum = SumFlat10<protoyaff::benchmark_access::Flat10>(root);
         benchmark::DoNotOptimize(sum);
     }
 }
 
-struct TFlat10MetaV2 {
-    static constexpr std::array<NYaFF::TFieldOffset, 11> FLAT_OFFSETS = {0, 8, 16, 24, 32, 32, 40, 48, 56, 64, 72};
-    static constexpr std::array<NYaFF::TFieldId, 1> DELETED_IDS = {5};
+struct Flat10MetaV2 {
+    static constexpr std::array<yaff::FieldOffset, 11> FLAT_OFFSETS = {0, 8, 16, 24, 32, 32, 40, 48, 56, 64, 72};
+    static constexpr std::array<yaff::FieldId, 1> DELETED_IDS = {5};
     static constexpr std::array<bool, 10> STATIC_FLAGS = {1, 1, 1, 1, 1, 0, 0, 0, 0, 0};
 };
 
 void BM_Access_Flat10V2_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
-    const auto msg = gen.GenerateYaFFFlat10<NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT>();
+    const auto msg = gen.GenerateYaFFFlat10<yaff::MessageLayout::MESSAGE_LAYOUT_FLAT>();
 
     for (auto _ : state) {
-        const auto& root = NYaFF::ReadRoot<NYaFF::TDynamicMessage<TFlat10MetaV2>>(msg.Buffer.Data());
-        uint64_t sum = SumRawFlat10<NYaFF::TDynamicMessage<TFlat10MetaV2>>(root);
+        const auto& root = yaff::ReadRoot<yaff::DynamicMessage<Flat10MetaV2>>(msg.Buffer.Data());
+        uint64_t sum = SumRawFlat10<yaff::DynamicMessage<Flat10MetaV2>>(root);
         benchmark::DoNotOptimize(sum);
     }
 }
 
-template <NYaFF::EMessageLayout Layout>
+template <yaff::MessageLayout Layout>
 void BM_Access_Flat100_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     const auto msg = gen.GenerateYaFFFlat100<Layout>();
 
     for (auto _ : state) {
-        const auto& root = NYaFF::ReadRoot<NProtoYaFF::NYaFFBench::TFlat100>(msg.Buffer.Data());
-        uint64_t sum = SumFlat100<NProtoYaFF::NYaFFBench::TFlat100>(root);
+        const auto& root = yaff::ReadRoot<protoyaff::benchmark_access::Flat100>(msg.Buffer.Data());
+        uint64_t sum = SumFlat100<protoyaff::benchmark_access::Flat100>(root);
         benchmark::DoNotOptimize(sum);
     }
 }
 
 BENCHMARK(BM_Access_Flat10_Protobuf)->Name("BM_Access_Flat_Protobuf/FieldCount:10");
 BENCHMARK(BM_Access_Flat10_FlatBuffers)->Name("BM_Access_Flat_FlatBuffers/FieldCount:10");
-BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Access_Flat_YaFF/FlatLayout/FieldCount:10");
-BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Access_Flat_YaFF/SparseLayout/FieldCount:10");
 BENCHMARK(BM_Access_Flat10V2_YaFF)->Name("BM_Access_Flat_YaFF/FlatLayout/CompatibilityMode/FieldCount:10");
 
 BENCHMARK(BM_Access_Flat100_Protobuf)->Name("BM_Access_Flat_Protobuf/FieldCount:100");
 BENCHMARK(BM_Access_Flat100_FlatBuffers)->Name("BM_Access_Flat_FlatBuffers/FieldCount:100");
-BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT)
+BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Access_Flat_YaFF/FlatLayout/FieldCount:100");
-BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE)
+BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Access_Flat_YaFF/SparseLayout/FieldCount:100");

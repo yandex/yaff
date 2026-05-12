@@ -1,24 +1,24 @@
 #include "ir_reflect.h"
 
-#include <yaff/builder.h>
+#include <yaff/serializer.h>
 
-namespace NYaFF::NCompile::NIR::NReflect {
+namespace yaff::compilation::ir::reflect {
 
-std::vector<uint8_t> GenerateStringDefault(const NIR::TType& type) {
-    YAFF_REQUIRE(type.Type == EType::TYPE_STRING);
+std::vector<uint8_t> GenerateStringDefault(const ir::TypeDef& type) {
+    YAFF_REQUIRE(type.Type == Type::TYPE_STRING);
 
-    const auto* literal = FindKey(type.Modifiers, NIR::DEFAULT_MODIFIER_NAME);
+    const auto* literal = FindKey(type.Modifiers, ir::DEFAULT_MODIFIER_NAME);
     YAFF_REQUIRE(literal);
 
-    NYaFF::TBuilder yffb;
-    yffb.CreateString(*literal);
-    yffb.Finish();
+    yaff::Serializer ys;
+    ys.SerializeString(*literal);
+    ys.FinishRootless();
 
     std::vector<uint8_t> bytes;
-    bytes.resize(yffb.GetSize());
-    YAFF_MEMCPY(bytes.data(), yffb.GetBufferPointer(), yffb.GetSize());
+    bytes.resize(ys.Size());
+    YAFF_MEMCPY(bytes.data(), ys.Data(), ys.Size());
 
     return bytes;
 }
 
-}  // namespace NYaFF::NCompile::NIR::NReflect
+}  // namespace yaff::compilation::ir::reflect

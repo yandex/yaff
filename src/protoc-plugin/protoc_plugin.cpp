@@ -10,19 +10,19 @@
 #include <string>
 #include <string_view>
 
-namespace NYaFF::NTool {
+namespace yaff::tool {
 
 namespace {
 
-struct TProtobufPluginOptions {
+struct ProtobufPluginOptions {
     std::string Tag;
     std::string RootNamespace;
     std::unordered_set<std::string> FileWhitelist;
     std::unordered_set<std::string> ExpFilter;
 };
 
-TProtobufPluginOptions ParseProtobufPluginOptions(const std::string& parameter) {
-    TProtobufPluginOptions opts;
+ProtobufPluginOptions ParseProtobufPluginOptions(const std::string& parameter) {
+    ProtobufPluginOptions opts;
 
     std::vector<std::pair<std::string, std::string>> options;
     google::protobuf::compiler::ParseGeneratorParameter(parameter, &options);
@@ -45,7 +45,7 @@ std::string_view StripPath(const std::string_view fileName) {
     return fileName.substr(fileName.rfind('/') + 1);
 }
 
-bool NeedToProcessFile(const TProtobufPluginOptions& opts, const google::protobuf::FileDescriptor* file) {
+bool NeedToProcessFile(const ProtobufPluginOptions& opts, const google::protobuf::FileDescriptor* file) {
     if (opts.FileWhitelist.empty()) {
         return true;
     }
@@ -62,34 +62,34 @@ std::string GetYaffFilePath(const google::protobuf::FileDescriptor* file, const 
     return google::protobuf::compiler::cpp::StripProto(file->name()) + GetFileSuffix(tag) + ".yaff." + ext;
 }
 
-static std::unique_ptr<NYaFF::NCompile::IProtobufReflectionTraits> GetReflectionTraits(const std::string& tag) {
+static std::unique_ptr<yaff::compilation::ProtobufReflectionTraits> GetReflectionTraits(const std::string& tag) {
     if (tag.empty()) {
-        return std::make_unique<NYaFF::NCompile::TProtobufReflectionDefaultTraits>();
+        return std::make_unique<yaff::compilation::DefaultProtobufReflectionTraits>();
     }
-    return std::make_unique<NYaFF::NCompile::TProtobufReflectionTaggedTraits>(tag);
+    return std::make_unique<yaff::compilation::TaggedProtobufReflectionTraits>(tag);
 }
 
-std::unique_ptr<NYaFF::NCompile::IFrontEnd> GetFrontEnd(const google::protobuf::FileDescriptor* descriptor,
-                                                        const TProtobufPluginOptions& options) {
-    NYaFF::NCompile::TProtobufReflectionFrontEndOptions protoReflectOpts;
+std::unique_ptr<yaff::compilation::AbstractFrontEnd> GetFrontEnd(const google::protobuf::FileDescriptor* descriptor,
+                                                                 const ProtobufPluginOptions& options) {
+    yaff::compilation::ProtobufReflectionFrontEndOptions protoReflectOpts;
     protoReflectOpts.SkipEmptyMessages = false;
     protoReflectOpts.TargetFiles.emplace(descriptor->name());
     if (!options.RootNamespace.empty()) {
         protoReflectOpts.RootNamespace = options.RootNamespace;
     }
-    return std::make_unique<NYaFF::NCompile::TProtobufReflectionFrontEnd>(descriptor, GetReflectionTraits(options.Tag),
-                                                                          std::move(protoReflectOpts));
+    return std::make_unique<yaff::compilation::ProtobufReflectionFrontEnd>(descriptor, GetReflectionTraits(options.Tag),
+                                                                           std::move(protoReflectOpts));
 }
 
-std::vector<std::unique_ptr<NYaFF::NCompile::IGenerator>> GetGenerators(std::ostream& output,
-                                                                        const TProtobufPluginOptions& options) {
-    std::vector<std::unique_ptr<NYaFF::NCompile::IGenerator>> generators;
+std::vector<std::unique_ptr<yaff::compilation::AbstractGenerator>> GetGenerators(std::ostream& output,
+                                                                                 const ProtobufPluginOptions& options) {
+    std::vector<std::unique_ptr<yaff::compilation::AbstractGenerator>> generators;
 
-    NYaFF::NCompile::TCppGenerationOptions cppGenOpts;
+    yaff::compilation::CppGenerationOptions cppGenOpts;
     cppGenOpts.GenerateProtobufApi = true;
     cppGenOpts.GenerateReflectionApi = true;
     cppGenOpts.IncludesSuffix = GetFileSuffix(options.Tag);
-    generators.emplace_back(std::make_unique<NYaFF::NCompile::TCppGenerator>(output, std::move(cppGenOpts)));
+    generators.emplace_back(std::make_unique<yaff::compilation::CppGenerator>(output, std::move(cppGenOpts)));
 
     return generators;
 }
@@ -101,9 +101,9 @@ void WriteFile(::google::protobuf::io::ZeroCopyOutputStream* stream, std::string
 
 }  // namespace
 
-bool TProtobufGeneratorPlugin::Generate(const ::google::protobuf::FileDescriptor* file, const std::string& parameter,
-                                        ::google::protobuf::compiler::GeneratorContext* generator_context,
-                                        std::string* /*error*/
+bool ProtobufGeneratorPlugin::Generate(const ::google::protobuf::FileDescriptor* file, const std::string& parameter,
+                                       ::google::protobuf::compiler::GeneratorContext* generator_context,
+                                       std::string* /*error*/
 ) const {
     const auto options = ParseProtobufPluginOptions(parameter);
     auto headerPath = GetYaffFilePath(file, options.Tag, "h");
@@ -114,8 +114,8 @@ bool TProtobufGeneratorPlugin::Generate(const ::google::protobuf::FileDescriptor
     if (NeedToProcessFile(options, file)) {
         auto front = GetFrontEnd(file, options);
         auto gen = GetGenerators(headerOutput, options);
-        auto errorHandler = std::make_unique<NYaFF::NCompile::TErrorPrinter>(std::cerr);
-        NYaFF::NCompile::Compile(std::move(front), std::move(gen), nullptr, std::move(errorHandler));
+        auto errorHandler = std::make_unique<yaff::compilation::ErrorPrinter>(std::cerr);
+        yaff::compilation::Compile(std::move(front), std::move(gen), nullptr, std::move(errorHandler));
     }
 
     WriteFile(generator_context->Open(headerPath), headerOutput.view());
@@ -126,8 +126,8 @@ bool TProtobufGeneratorPlugin::Generate(const ::google::protobuf::FileDescriptor
     return true;
 }
 
-uint64_t TProtobufGeneratorPlugin::GetSupportedFeatures() const {
+uint64_t ProtobufGeneratorPlugin::GetSupportedFeatures() const {
     return ::google::protobuf::compiler::CodeGenerator::FEATURE_PROTO3_OPTIONAL;
 }
 
-}  // namespace NYaFF::NTool
+}  // namespace yaff::tool

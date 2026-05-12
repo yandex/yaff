@@ -2,9 +2,9 @@
 
 #include "compiler.h"
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-struct TCppGenerationOptions {
+struct CppGenerationOptions {
     std::string IncludesSuffix;
     std::vector<std::string> ExternalIncludes;
 
@@ -13,16 +13,16 @@ struct TCppGenerationOptions {
     bool GenerateReflectionApi = false;
 };
 
-class TCppGenerator : public IGenerator {
+class CppGenerator : public AbstractGenerator {
 public:
-    TCppGenerator(std::ostream& out, TCppGenerationOptions opts = {});
-    ~TCppGenerator();
+    CppGenerator(std::ostream& out, CppGenerationOptions opts = {});
+    ~CppGenerator();
 
-    void Generate(const NIR::TIR& ir) override;
+    void Generate(const ir::IR& ir) override;
 
 private:
-    class TImpl;
-    std::unique_ptr<TImpl> Impl_;
+    class Impl;
+    std::unique_ptr<Impl> Impl_;
 };
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

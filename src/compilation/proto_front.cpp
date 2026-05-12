@@ -3,7 +3,7 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <yaff/proto/options.pb.h>
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
 template <typename T>
 inline std::string AdaptString(T value) {
@@ -14,18 +14,18 @@ static bool IsMap(const google::protobuf::Descriptor& message) {
     return message.options().map_entry();
 }
 
-static EMessageLayout TranslateMessageLayout(const yaff::proto::Message::Layout layout) {
+static MessageLayout TranslateMessageLayout(const yaff::proto::Message::Layout layout) {
     switch (layout) {
         case yaff::proto::Message::LAYOUT_UNKNOWN:
-            return EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
+            return MessageLayout::MESSAGE_LAYOUT_UNKNOWN;
         case yaff::proto::Message::LAYOUT_FIXED:
-            return EMessageLayout::MESSAGE_LAYOUT_FIXED;
+            return MessageLayout::MESSAGE_LAYOUT_FIXED;
         case yaff::proto::Message::LAYOUT_FLAT:
-            return EMessageLayout::MESSAGE_LAYOUT_FLAT;
+            return MessageLayout::MESSAGE_LAYOUT_FLAT;
         case yaff::proto::Message::LAYOUT_SPARSE:
-            return EMessageLayout::MESSAGE_LAYOUT_SPARSE;
+            return MessageLayout::MESSAGE_LAYOUT_SPARSE;
         case yaff::proto::Message::LAYOUT_DYNAMIC:
-            return EMessageLayout::MESSAGE_LAYOUT_DYNAMIC;
+            return MessageLayout::MESSAGE_LAYOUT_DYNAMIC;
     }
 }
 
@@ -67,23 +67,23 @@ static const yaff::proto::Message* GetMessageMeta(const google::protobuf::Messag
     return (match ? match : fallback);
 }
 
-static EMessageLayout GetMessageLayout(const google::protobuf::Descriptor& message, const std::string& sliceId = "") {
+static MessageLayout GetMessageLayout(const google::protobuf::Descriptor& message, const std::string& sliceId = "") {
     if (IsMap(message)) {
-        return EMessageLayout::MESSAGE_LAYOUT_FIXED;
+        return MessageLayout::MESSAGE_LAYOUT_FIXED;
     }
     if (const auto* messageMeta = GetMessageMeta(message.options(), sliceId)) {
         return TranslateMessageLayout(messageMeta->layout());
     }
-    return EMessageLayout::MESSAGE_LAYOUT_DYNAMIC;
+    return MessageLayout::MESSAGE_LAYOUT_DYNAMIC;
 }
 
-static std::vector<TProtobufDeprecatedField> GetDeprecatedFields(const google::protobuf::Descriptor& message,
-                                                                 const std::string& sliceId = "") {
+static std::vector<ProtobufDeprecatedField> GetDeprecatedFields(const google::protobuf::Descriptor& message,
+                                                                const std::string& sliceId = "") {
     if (const auto* messageMeta = GetMessageMeta(message.options(), sliceId)) {
-        std::vector<TProtobufDeprecatedField> fields;
+        std::vector<ProtobufDeprecatedField> fields;
         fields.reserve(messageMeta->reserved_fields_size());
         for (const auto& deprecated : messageMeta->reserved_fields()) {
-            fields.emplace_back(TProtobufDeprecatedField{
+            fields.emplace_back(ProtobufDeprecatedField{
                 .Id = deprecated.id(),
                 .Type =
                     static_cast<google::protobuf::FieldDescriptor::Type>(deprecated.has_type() ? deprecated.type() : 0),
@@ -110,15 +110,15 @@ static void FillAdditionalModifiers(const google::protobuf::FieldDescriptor& fie
                                     std::map<std::string, std::string>& modifiers,
                                     std::map<std::string, std::string>& elementModifiers) {
     if (field.is_map()) {
-        modifiers.emplace(NIR::ASSOCIATIVE_MODIFIER_NAME, "");
+        modifiers.emplace(ir::ASSOCIATIVE_MODIFIER_NAME, "");
     }
     if (field.is_repeated() && field.message_type() &&
-        GetMessageLayout(*field.message_type(), sliceId) == EMessageLayout::MESSAGE_LAYOUT_FIXED) {
-        elementModifiers.emplace(NIR::INLINE_MODIFIER_NAME, "");
+        GetMessageLayout(*field.message_type(), sliceId) == MessageLayout::MESSAGE_LAYOUT_FIXED) {
+        elementModifiers.emplace(ir::INLINE_MODIFIER_NAME, "");
     }
 }
 
-std::optional<TProtobufField> TProtobufReflectionDefaultTraits::GetYaffFields(
+std::optional<ProtobufField> DefaultProtobufReflectionTraits::GetYaffFields(
     const google::protobuf::FieldDescriptor& field) {
     const auto& options = field.options();
     if (options.deprecated()) {
@@ -126,24 +126,23 @@ std::optional<TProtobufField> TProtobufReflectionDefaultTraits::GetYaffFields(
     }
     const auto* fieldMeta = GetFieldMeta(options);
 
-    TProtobufField protoField;
+    ProtobufField protoField;
     protoField.Id = (fieldMeta && fieldMeta->id() > 0 ? fieldMeta->id() : field.number());
-    FillAdditionalModifiers(field, "", protoField.AdditionalModifiers.Modifiers,
-                            protoField.AdditionalModifiers.ElementModifiers);
+    FillAdditionalModifiers(field, "", protoField.Modifiers.Modifiers, protoField.Modifiers.ElementModifiers);
 
     return protoField;
 }
 
-std::optional<TProtobufMessage> TProtobufReflectionDefaultTraits::GetYaffMessage(
+std::optional<ProtobufMessage> DefaultProtobufReflectionTraits::GetYaffMessage(
     const google::protobuf::Descriptor& message) {
     if (ShouldIgnore(message)) {
         return std::nullopt;
     }
-    std::vector<TProtobufDeprecatedField> deprecated = GetDeprecatedFields(message);
+    std::vector<ProtobufDeprecatedField> deprecated = GetDeprecatedFields(message);
     for (int i = 0; i < message.field_count(); ++i) {
         const auto* field = message.field(i);
         if (field->options().deprecated()) {
-            deprecated.emplace_back(TProtobufDeprecatedField{
+            deprecated.emplace_back(ProtobufDeprecatedField{
                 .Id = static_cast<uint64_t>(field->number()),
                 .Type = field->type(),
                 .Label = (field->is_repeated() ? google::protobuf::FieldDescriptor::LABEL_REPEATED
@@ -163,20 +162,20 @@ std::optional<TProtobufMessage> TProtobufReflectionDefaultTraits::GetYaffMessage
             if (knownIds.contains(id)) {
                 continue;
             }
-            deprecated.emplace_back(TProtobufDeprecatedField{
+            deprecated.emplace_back(ProtobufDeprecatedField{
                 .Id = static_cast<uint64_t>(id),
                 .Type = static_cast<google::protobuf::FieldDescriptor::Type>(0),
                 .Label = static_cast<google::protobuf::FieldDescriptor::Label>(0),
             });
         }
     }
-    return TProtobufMessage{.Layout = GetMessageLayout(message), .DeprecatedFields = std::move(deprecated)};
+    return ProtobufMessage{.Layout = GetMessageLayout(message), .DeprecatedFields = std::move(deprecated)};
 }
 
-TProtobufReflectionTaggedTraits::TProtobufReflectionTaggedTraits(const std::string& sliceId) : SliceId_(sliceId) {
+TaggedProtobufReflectionTraits::TaggedProtobufReflectionTraits(const std::string& sliceId) : SliceId_(sliceId) {
 }
 
-std::optional<TProtobufField> TProtobufReflectionTaggedTraits::GetYaffFields(
+std::optional<ProtobufField> TaggedProtobufReflectionTraits::GetYaffFields(
     const google::protobuf::FieldDescriptor& field) {
     const auto& options = field.options();
     const auto* fieldMeta = GetFieldMeta(options, SliceId_);
@@ -184,15 +183,14 @@ std::optional<TProtobufField> TProtobufReflectionTaggedTraits::GetYaffFields(
         return std::nullopt;
     }
 
-    TProtobufField protoField;
+    ProtobufField protoField;
     protoField.Id = (fieldMeta->id() > 0 ? fieldMeta->id() : field.number());
-    FillAdditionalModifiers(field, SliceId_, protoField.AdditionalModifiers.Modifiers,
-                            protoField.AdditionalModifiers.ElementModifiers);
+    FillAdditionalModifiers(field, SliceId_, protoField.Modifiers.Modifiers, protoField.Modifiers.ElementModifiers);
 
     return {std::move(protoField)};
 }
 
-std::optional<TProtobufMessage> TProtobufReflectionTaggedTraits::GetYaffMessage(
+std::optional<ProtobufMessage> TaggedProtobufReflectionTraits::GetYaffMessage(
     const google::protobuf::Descriptor& message) {
     if (ShouldIgnore(message, SliceId_)) {
         return std::nullopt;
@@ -201,7 +199,7 @@ std::optional<TProtobufMessage> TProtobufReflectionTaggedTraits::GetYaffMessage(
     for (int i = 0; i < options.ExtensionSize(yaff::proto::message); ++i) {
         const auto& messageMeta = options.GetExtension(yaff::proto::message, i);
         if (messageMeta.slice_name() == SliceId_) {
-            return TProtobufMessage{
+            return ProtobufMessage{
                 .Layout = GetMessageLayout(message, SliceId_),
                 .DeprecatedFields = GetDeprecatedFields(message, SliceId_),
             };
@@ -212,7 +210,7 @@ std::optional<TProtobufMessage> TProtobufReflectionTaggedTraits::GetYaffMessage(
 
 class TProtobufBuilder {
 public:
-    TProtobufBuilder(IProtobufReflectionTraits* traits, TProtobufReflectionFrontEndOptions opts)
+    TProtobufBuilder(ProtobufReflectionTraits* traits, ProtobufReflectionFrontEndOptions opts)
         : Traits_(traits), Opts_(std::move(opts)) {
     }
 
@@ -224,7 +222,7 @@ public:
         TraverseFile(file);
     }
 
-    NIR::TIR Finish() && {
+    ir::IR Finish() && {
         return std::move(Ir_);
     }
 
@@ -232,50 +230,50 @@ private:
     inline static const auto PROTO_TYPE_RESERVED = static_cast<google::protobuf::FieldDescriptor::Type>(0);
 
     struct TFieldInfo {
-        TProtobufField TargetField;
+        ProtobufField TargetField;
         const google::protobuf::FieldDescriptor* SourceField = nullptr;
     };
 
-    static std::vector<TFieldInfo> CollectFields(IProtobufReflectionTraits* traits,
+    static std::vector<TFieldInfo> CollectFields(ProtobufReflectionTraits* traits,
                                                  const google::protobuf::Descriptor& message);
-    static std::optional<TProtobufMessage> CollectMessage(IProtobufReflectionTraits* traits,
-                                                          const google::protobuf::Descriptor& message);
+    static std::optional<ProtobufMessage> CollectMessage(ProtobufReflectionTraits* traits,
+                                                         const google::protobuf::Descriptor& message);
 
     static std::string GetNamespaceName(const std::string& prefix, const std::string& pkg);
     static std::string GetTypeDefName(const std::string& pkg, const std::string& fullName);
-    static EType GetBaseType(const google::protobuf::FieldDescriptor::Type type);
+    static Type GetBaseType(const google::protobuf::FieldDescriptor::Type type);
 
     static std::string GetDefaultFieldModifier(const google::protobuf::FieldDescriptor& field);
     static std::map<std::string, std::string> GetFieldModifiers(const google::protobuf::FieldDescriptor& field,
-                                                                const TProtobufField::TAdditionalModifiers& mods);
+                                                                const ProtobufField::AdditionalModifiers& mods);
 
-    const NIR::TMessageDef* TraverseMessage(const google::protobuf::Descriptor& message);
+    const ir::MessageDef* TraverseMessage(const google::protobuf::Descriptor& message);
     void TraverseFile(const google::protobuf::FileDescriptor& message);
 
-    NIR::TSchemaDef* RegisterFile(const google::protobuf::FileDescriptor& file);
-    NIR::TEnumDef* RegisterEnum(const google::protobuf::EnumDescriptor& enm);
-    NIR::TType* RegisterFieldType(const google::protobuf::FieldDescriptor& field,
-                                  const TProtobufField::TAdditionalModifiers& mods,
-                                  const NIR::TMessageDef* messageDef = nullptr, const NIR::TEnumDef* enumDef = nullptr);
-    NIR::TType* RegisterFieldTypeImpl(const google::protobuf::FieldDescriptor& field,
-                                      const TProtobufField::TAdditionalModifiers& mods,
-                                      const NIR::TMessageDef* messageDef = nullptr,
-                                      const NIR::TEnumDef* enumDef = nullptr);
-    NIR::TType* RegisterDeprecatedFieldType(const TProtobufDeprecatedField& field);
-    NIR::TType* RegisterReservedFieldType();
-    void RegisterDependency(const NIR::TSchemaDef* from, NIR::TSchemaDef* to);
+    ir::SchemaDef* RegisterFile(const google::protobuf::FileDescriptor& file);
+    ir::EnumDef* RegisterEnum(const google::protobuf::EnumDescriptor& enm);
+    ir::TypeDef* RegisterFieldType(const google::protobuf::FieldDescriptor& field,
+                                   const ProtobufField::AdditionalModifiers& mods,
+                                   const ir::MessageDef* messageDef = nullptr, const ir::EnumDef* enumDef = nullptr);
+    ir::TypeDef* RegisterFieldTypeImpl(const google::protobuf::FieldDescriptor& field,
+                                       const ProtobufField::AdditionalModifiers& mods,
+                                       const ir::MessageDef* messageDef = nullptr,
+                                       const ir::EnumDef* enumDef = nullptr);
+    ir::TypeDef* RegisterDeprecatedFieldType(const ProtobufDeprecatedField& field);
+    ir::TypeDef* RegisterReservedFieldType();
+    void RegisterDependency(const ir::SchemaDef* from, ir::SchemaDef* to);
 
     std::vector<TFieldInfo> CollectFields(const google::protobuf::Descriptor& message);
-    std::optional<TProtobufMessage> CollectMessage(const google::protobuf::Descriptor& message);
+    std::optional<ProtobufMessage> CollectMessage(const google::protobuf::Descriptor& message);
 
     bool IsTargetFile(const google::protobuf::FileDescriptor& file) const;
 
-    IProtobufReflectionTraits* Traits_;
-    TProtobufReflectionFrontEndOptions Opts_;
-    NIR::TIR Ir_;
+    ProtobufReflectionTraits* Traits_;
+    ProtobufReflectionFrontEndOptions Opts_;
+    ir::IR Ir_;
 };
 
-const NIR::TMessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf::Descriptor& message) {
+const ir::MessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf::Descriptor& message) {
     for (int i = 0; i < message.nested_type_count(); ++i) {
         if (const auto& nested = *message.nested_type(i); !IsMap(nested)) {
             TraverseMessage(nested);
@@ -299,7 +297,7 @@ const NIR::TMessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf
     auto* schemaDef = RegisterFile(*file);
 
     const std::string messageName = GetTypeDefName(AdaptString(file->package()), AdaptString(message.full_name()));
-    auto [messageDef, emplaced] = Ir_.Messages.TryEmplace(NIR::TMessageDef(std::move(messageName), schemaDef));
+    auto [messageDef, emplaced] = Ir_.Messages.TryEmplace(ir::MessageDef(std::move(messageName), schemaDef));
     if (!emplaced) {
         return messageDef;
     }
@@ -315,9 +313,9 @@ const NIR::TMessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf
         const auto* field = fieldInfo.SourceField;
 
         // Register child types;
-        const NIR::TEnumDef* childEnumDef = nullptr;
-        const NIR::TMessageDef* childMessageDef = nullptr;
-        const NIR::TSchemaDef* childSchemaDef = nullptr;
+        const ir::EnumDef* childEnumDef = nullptr;
+        const ir::MessageDef* childMessageDef = nullptr;
+        const ir::SchemaDef* childSchemaDef = nullptr;
         if (field->type() == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
             childMessageDef = TraverseMessage(*field->message_type());
             if (!childMessageDef) {  // Type of field is ignored by frontend, so skip this field;
@@ -333,14 +331,13 @@ const NIR::TMessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf
             RegisterDependency(childSchemaDef, schemaDef);
         }
 
-        const auto* fieldType = RegisterFieldType(*field, target.AdditionalModifiers, childMessageDef, childEnumDef);
-        messageDef->Fields.emplace_back(NIR::TMessageDef::TFieldDef{
+        const auto* fieldType = RegisterFieldType(*field, target.Modifiers, childMessageDef, childEnumDef);
+        messageDef->Fields.emplace_back(ir::MessageDef::FieldDef{
             .Id = target.Id,
             .Name = AdaptString(field->name()),
             .Type = fieldType,
-            .Presence = (field->has_presence() ? EPresence::PRESENCE_EXPLICIT : EPresence::PRESENCE_IMPLICIT),
-            .SharedOffsetVia =
-                (field->real_containing_oneof() ? AdaptString(field->real_containing_oneof()->name()) : ""),
+            .Presence = (field->has_presence() ? Presence::PRESENCE_EXPLICIT : Presence::PRESENCE_IMPLICIT),
+            .OneOf = (field->real_containing_oneof() ? AdaptString(field->real_containing_oneof()->name()) : ""),
         });
 
         knownIds.emplace(target.Id);
@@ -355,7 +352,7 @@ const NIR::TMessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf
         if (field.Type == PROTO_TYPE_RESERVED && knownIds.contains(field.Id)) {
             continue;
         }
-        messageDef->Fields.emplace_back(NIR::TMessageDef::TFieldDef{
+        messageDef->Fields.emplace_back(ir::MessageDef::FieldDef{
             .Id = field.Id,
             .Type = RegisterDeprecatedFieldType(field),
             .Deprecated = true,
@@ -368,7 +365,7 @@ const NIR::TMessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf
         if (knownIds.contains(id)) {
             continue;
         }
-        messageDef->Fields.emplace_back(NIR::TMessageDef::TFieldDef{
+        messageDef->Fields.emplace_back(ir::MessageDef::FieldDef{
             .Id = static_cast<uint64_t>(id),
             .Type = RegisterReservedFieldType(),
             .Deprecated = true,
@@ -389,12 +386,12 @@ void TProtobufBuilder::TraverseFile(const google::protobuf::FileDescriptor& file
     }
 }
 
-NIR::TEnumDef* TProtobufBuilder::RegisterEnum(const google::protobuf::EnumDescriptor& enm) {
+ir::EnumDef* TProtobufBuilder::RegisterEnum(const google::protobuf::EnumDescriptor& enm) {
     const auto* file = enm.file();
     auto* schemaDef = RegisterFile(*file);
 
     const std::string enumName = GetTypeDefName(AdaptString(file->package()), AdaptString(enm.full_name()));
-    auto [enumDef, emplaced] = Ir_.Enums.TryEmplace(NIR::TEnumDef(std::move(enumName), schemaDef));
+    auto [enumDef, emplaced] = Ir_.Enums.TryEmplace(ir::EnumDef(std::move(enumName), schemaDef));
     if (!emplaced) {
         return enumDef;
     }
@@ -405,18 +402,18 @@ NIR::TEnumDef* TProtobufBuilder::RegisterEnum(const google::protobuf::EnumDescri
 
     for (int i = 0; i < enm.value_count(); ++i) {
         const auto* v = enm.value(i);
-        enumDef->Values.emplace_back(NIR::TEnumDef::TEnumVal{.Name = AdaptString(v->name()), .Value = v->number()});
+        enumDef->Values.emplace_back(ir::EnumDef::TEnumVal{.Name = AdaptString(v->name()), .Value = v->number()});
     }
 
     enumDef->Defined = true;
     return enumDef;
 }
 
-NIR::TSchemaDef* TProtobufBuilder::RegisterFile(const google::protobuf::FileDescriptor& file) {
+ir::SchemaDef* TProtobufBuilder::RegisterFile(const google::protobuf::FileDescriptor& file) {
     const std::string name = AdaptString(file.name());
     const std::string fileName = name.substr(0, name.rfind('.'));
 
-    auto [schemaDef, emplaced] = Ir_.Schemas.TryEmplace(NIR::TSchemaDef(fileName));
+    auto [schemaDef, emplaced] = Ir_.Schemas.TryEmplace(ir::SchemaDef(fileName));
     if (!emplaced) {
         return schemaDef;
     }
@@ -426,77 +423,77 @@ NIR::TSchemaDef* TProtobufBuilder::RegisterFile(const google::protobuf::FileDesc
     schemaDef->Namespace = std::move(namespaceName);
 
     const std::string protoFileName = fileName + Opts_.GeneratedProtobufExt;
-    schemaDef->Attributes.emplace(NIR::PROTO_FILE_ATTRIBUTE_NAME, protoFileName);
+    schemaDef->Attributes.emplace(ir::PROTO_FILE_ATTRIBUTE_NAME, protoFileName);
 
     const std::string protoNamespaceName = GetNamespaceName("", package);
-    schemaDef->Attributes.emplace(NIR::PROTO_NAMESPACE_ATTRIBUTE_NAME, protoNamespaceName);
+    schemaDef->Attributes.emplace(ir::PROTO_NAMESPACE_ATTRIBUTE_NAME, protoNamespaceName);
 
     return schemaDef;
 }
 
-NIR::TType* TProtobufBuilder::RegisterFieldType(const google::protobuf::FieldDescriptor& field,
-                                                const TProtobufField::TAdditionalModifiers& mods,
-                                                const NIR::TMessageDef* messageDef, const NIR::TEnumDef* enumDef) {
+ir::TypeDef* TProtobufBuilder::RegisterFieldType(const google::protobuf::FieldDescriptor& field,
+                                                 const ProtobufField::AdditionalModifiers& mods,
+                                                 const ir::MessageDef* messageDef, const ir::EnumDef* enumDef) {
     if (field.is_repeated()) {
-        TProtobufField::TAdditionalModifiers elemMods{.Modifiers = mods.ElementModifiers};
+        ProtobufField::AdditionalModifiers elemMods{.Modifiers = mods.ElementModifiers};
         return Ir_.Types.GetOrEmplace(
-            NIR::TType{.Type = EType::TYPE_VECTOR,
-                       .ElementType = RegisterFieldTypeImpl(field, elemMods, messageDef, enumDef),
-                       .Modifiers = GetFieldModifiers(field, mods)});
+            ir::TypeDef{.Type = Type::TYPE_VECTOR,
+                        .ElementType = RegisterFieldTypeImpl(field, elemMods, messageDef, enumDef),
+                        .Modifiers = GetFieldModifiers(field, mods)});
     }
     return RegisterFieldTypeImpl(field, mods, messageDef, enumDef);
 }
 
-NIR::TType* TProtobufBuilder::RegisterFieldTypeImpl(const google::protobuf::FieldDescriptor& field,
-                                                    const TProtobufField::TAdditionalModifiers& mods,
-                                                    const NIR::TMessageDef* messageDef, const NIR::TEnumDef* enumDef) {
+ir::TypeDef* TProtobufBuilder::RegisterFieldTypeImpl(const google::protobuf::FieldDescriptor& field,
+                                                     const ProtobufField::AdditionalModifiers& mods,
+                                                     const ir::MessageDef* messageDef, const ir::EnumDef* enumDef) {
     const auto fieldType = field.type();
     if (fieldType == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
-        return Ir_.Types.GetOrEmplace(NIR::TType{
-            .Type = EType::TYPE_MESSAGE, .MessageDef = messageDef, .Modifiers = GetFieldModifiers(field, mods)});
+        return Ir_.Types.GetOrEmplace(ir::TypeDef{
+            .Type = Type::TYPE_MESSAGE, .MessageDef = messageDef, .Modifiers = GetFieldModifiers(field, mods)});
     }
 
     if (fieldType == google::protobuf::FieldDescriptor::TYPE_ENUM) {
         return Ir_.Types.GetOrEmplace(
-            NIR::TType{.Type = EType::TYPE_ENUM, .EnumDef = enumDef, .Modifiers = GetFieldModifiers(field, mods)});
+            ir::TypeDef{.Type = Type::TYPE_ENUM, .EnumDef = enumDef, .Modifiers = GetFieldModifiers(field, mods)});
     }
 
     return Ir_.Types.GetOrEmplace(
-        NIR::TType{.Type = GetBaseType(field.type()), .Modifiers = GetFieldModifiers(field, mods)});
+        ir::TypeDef{.Type = GetBaseType(field.type()), .Modifiers = GetFieldModifiers(field, mods)});
 }
 
-NIR::TType* TProtobufBuilder::RegisterDeprecatedFieldType(const TProtobufDeprecatedField& field) {
+ir::TypeDef* TProtobufBuilder::RegisterDeprecatedFieldType(const ProtobufDeprecatedField& field) {
     if (field.Label == google::protobuf::FieldDescriptor::LABEL_REPEATED) {
-        return Ir_.Types.GetOrEmplace(NIR::TType{.Type = EType::TYPE_VECTOR});
+        return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = Type::TYPE_VECTOR});
     }
 
     if (field.Type == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
-        return Ir_.Types.GetOrEmplace(NIR::TType{.Type = EType::TYPE_MESSAGE});
+        return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = Type::TYPE_MESSAGE});
     }
 
     if (field.Type == google::protobuf::FieldDescriptor::TYPE_ENUM) {
-        return Ir_.Types.GetOrEmplace(NIR::TType{.Type = EType::TYPE_INT32});
+        return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = Type::TYPE_INT32});
     }
 
     if (field.Type == PROTO_TYPE_RESERVED) {
-        return Ir_.Types.GetOrEmplace(NIR::TType{.Type = EType::TYPE_NONE});
+        return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = Type::TYPE_NONE});
     }
 
-    return Ir_.Types.GetOrEmplace(NIR::TType{.Type = GetBaseType(field.Type)});
+    return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = GetBaseType(field.Type)});
 }
 
-NIR::TType* TProtobufBuilder::RegisterReservedFieldType() {
-    return Ir_.Types.GetOrEmplace(NIR::TType{.Type = EType::TYPE_NONE});
+ir::TypeDef* TProtobufBuilder::RegisterReservedFieldType() {
+    return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = Type::TYPE_NONE});
 }
 
-void TProtobufBuilder::RegisterDependency(const NIR::TSchemaDef* from, NIR::TSchemaDef* to) {
+void TProtobufBuilder::RegisterDependency(const ir::SchemaDef* from, ir::SchemaDef* to) {
     if (from == to) {  // All schemas are deduplicated in IR.
         return;
     }
     to->Dependencies.emplace(from);
 }
 
-std::vector<TProtobufBuilder::TFieldInfo> TProtobufBuilder::CollectFields(IProtobufReflectionTraits* traits,
+std::vector<TProtobufBuilder::TFieldInfo> TProtobufBuilder::CollectFields(ProtobufReflectionTraits* traits,
                                                                           const google::protobuf::Descriptor& message) {
     std::vector<TFieldInfo> fields;
     fields.reserve(message.field_count());
@@ -510,22 +507,22 @@ std::vector<TProtobufBuilder::TFieldInfo> TProtobufBuilder::CollectFields(IProto
     return fields;
 }
 
-std::optional<TProtobufMessage> TProtobufBuilder::CollectMessage(IProtobufReflectionTraits* traits,
-                                                                 const google::protobuf::Descriptor& message) {
+std::optional<ProtobufMessage> TProtobufBuilder::CollectMessage(ProtobufReflectionTraits* traits,
+                                                                const google::protobuf::Descriptor& message) {
     return traits->GetYaffMessage(message);
 }
 
 std::vector<TProtobufBuilder::TFieldInfo> TProtobufBuilder::CollectFields(const google::protobuf::Descriptor& message) {
     if (IsMap(message)) {
-        TProtobufReflectionDefaultTraits traits;
+        DefaultProtobufReflectionTraits traits;
         return CollectFields(&traits, message);
     }
     return CollectFields(Traits_, message);
 }
 
-std::optional<TProtobufMessage> TProtobufBuilder::CollectMessage(const google::protobuf::Descriptor& message) {
+std::optional<ProtobufMessage> TProtobufBuilder::CollectMessage(const google::protobuf::Descriptor& message) {
     if (IsMap(message)) {
-        TProtobufReflectionDefaultTraits traits;
+        DefaultProtobufReflectionTraits traits;
         return CollectMessage(&traits, message);
     }
     return CollectMessage(Traits_, message);
@@ -554,41 +551,41 @@ std::string TProtobufBuilder::GetTypeDefName(const std::string& pkg, const std::
     return messageName;
 }
 
-EType TProtobufBuilder::GetBaseType(const google::protobuf::FieldDescriptor::Type type) {
+Type TProtobufBuilder::GetBaseType(const google::protobuf::FieldDescriptor::Type type) {
     switch (type) {
         case google::protobuf::FieldDescriptor::TYPE_BOOL:
-            return EType::TYPE_BOOL;
+            return Type::TYPE_BOOL;
         case google::protobuf::FieldDescriptor::TYPE_INT32:
         case google::protobuf::FieldDescriptor::TYPE_SINT32:
         case google::protobuf::FieldDescriptor::TYPE_SFIXED32:
-            return EType::TYPE_INT32;
+            return Type::TYPE_INT32;
         case google::protobuf::FieldDescriptor::TYPE_FIXED32:
         case google::protobuf::FieldDescriptor::TYPE_UINT32:
-            return EType::TYPE_UINT32;
+            return Type::TYPE_UINT32;
         case google::protobuf::FieldDescriptor::TYPE_INT64:
         case google::protobuf::FieldDescriptor::TYPE_SINT64:
         case google::protobuf::FieldDescriptor::TYPE_SFIXED64:
-            return EType::TYPE_INT64;
+            return Type::TYPE_INT64;
         case google::protobuf::FieldDescriptor::TYPE_UINT64:
         case google::protobuf::FieldDescriptor::TYPE_FIXED64:
-            return EType::TYPE_UINT64;
+            return Type::TYPE_UINT64;
         case google::protobuf::FieldDescriptor::TYPE_FLOAT:
-            return EType::TYPE_FLOAT;
+            return Type::TYPE_FLOAT;
         case google::protobuf::FieldDescriptor::TYPE_DOUBLE:
-            return EType::TYPE_DOUBLE;
+            return Type::TYPE_DOUBLE;
         case google::protobuf::FieldDescriptor::TYPE_STRING:
         case google::protobuf::FieldDescriptor::TYPE_BYTES:
-            return EType::TYPE_STRING;
+            return Type::TYPE_STRING;
         default:
             YAFF_THROW("unknown base type");
     }
 }
 
-std::map<std::string, std::string> TProtobufBuilder::GetFieldModifiers(
-    const google::protobuf::FieldDescriptor& field, const TProtobufField::TAdditionalModifiers& mods) {
+std::map<std::string, std::string> TProtobufBuilder::GetFieldModifiers(const google::protobuf::FieldDescriptor& field,
+                                                                       const ProtobufField::AdditionalModifiers& mods) {
     std::map<std::string, std::string> modifiers = mods.Modifiers;
     if (field.has_default_value()) {
-        modifiers.emplace(NIR::DEFAULT_MODIFIER_NAME, GetDefaultFieldModifier(field));
+        modifiers.emplace(ir::DEFAULT_MODIFIER_NAME, GetDefaultFieldModifier(field));
     }
     return modifiers;
 }
@@ -627,19 +624,19 @@ std::string TProtobufBuilder::GetDefaultFieldModifier(const google::protobuf::Fi
     }
 }
 
-TProtobufReflectionFrontEnd::TProtobufReflectionFrontEnd(
+ProtobufReflectionFrontEnd::ProtobufReflectionFrontEnd(
     const std::vector<const google::protobuf::Descriptor*>& descriptors,
-    std::unique_ptr<IProtobufReflectionTraits> traits, TProtobufReflectionFrontEndOptions opts)
+    std::unique_ptr<ProtobufReflectionTraits> traits, ProtobufReflectionFrontEndOptions opts)
     : Descriptors_(descriptors), FileDescriptor_(nullptr), Traits_(std::move(traits)), Opts_(std::move(opts)) {
 }
 
-TProtobufReflectionFrontEnd::TProtobufReflectionFrontEnd(const google::protobuf::FileDescriptor* descriptor,
-                                                         std::unique_ptr<IProtobufReflectionTraits> traits,
-                                                         TProtobufReflectionFrontEndOptions opts)
+ProtobufReflectionFrontEnd::ProtobufReflectionFrontEnd(const google::protobuf::FileDescriptor* descriptor,
+                                                       std::unique_ptr<ProtobufReflectionTraits> traits,
+                                                       ProtobufReflectionFrontEndOptions opts)
     : Descriptors_(), FileDescriptor_(descriptor), Traits_(std::move(traits)), Opts_(std::move(opts)) {
 }
 
-NIR::TIR TProtobufReflectionFrontEnd::Parse() {
+ir::IR ProtobufReflectionFrontEnd::Parse() {
     TProtobufBuilder builder{Traits_.get(), Opts_};
     if (FileDescriptor_) {
         builder.AddDescriptor(*FileDescriptor_);
@@ -652,4 +649,4 @@ NIR::TIR TProtobufReflectionFrontEnd::Parse() {
     return std::move(builder).Finish();
 }
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

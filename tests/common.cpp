@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
-#include <yaff/builder.h>
 #include <yaff/message.h>
+#include <yaff/serializer.h>
 
 #include "protoyaff/proto2.yaff.h"
 
-using namespace NProtoYaFF::NTestYaFF;
+using namespace protoyaff::test;
 
 TEST(DynMessage, EmptyRoot) {
-    const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(nullptr);
+    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(nullptr);
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x6789ULL);
     EXPECT_EQ(nestedMessage.GetNested2().GetSmallField(), 0xAFU);
@@ -15,15 +15,15 @@ TEST(DynMessage, EmptyRoot) {
 }
 
 TEST(DynMessage, NestedMessageFlatRoot) {
-    NYaFF::TBuilder yffb;
-    auto nested1 = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xFFFF, 0x3333);
-    auto nested2 = CreateTSimpleMessage<TSimpleMessageSparseBuilder>(yffb, std::nullopt, 0xFFFF);
-    auto root = CreateTNestedMessage<TNestedMessageFlatBuilder>(yffb, nested1, 0x1234, nested2);
-    yffb.Finish(root);
+    yaff::Serializer ys;
+    auto nested1 = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, 0xFFFF, 0x3333);
+    auto nested2 = SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys, std::nullopt, 0xFFFF);
+    auto root = SerializeNestedMessage<NestedMessageFlatSerializer>(ys, nested1, 0x1234, nested2);
+    ys.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 54ULL);
+    EXPECT_EQ(ys.Size(), 54ULL);
 
-    const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
+    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x1234ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSmallField(), 0xFFFFU);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x3333ULL);
@@ -33,14 +33,14 @@ TEST(DynMessage, NestedMessageFlatRoot) {
 }
 
 TEST(DynMessage, NestedMessageSparseRoot) {
-    NYaFF::TBuilder yffb;
-    auto nested1 = CreateTSimpleMessage<TSimpleMessageFlatBuilder>(yffb, -0x10, 0xFFFF, 0x3333);
-    auto root = CreateTNestedMessage<TNestedMessageSparseBuilder>(yffb, nested1);
-    yffb.Finish(root);
+    yaff::Serializer ys;
+    auto nested1 = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, 0xFFFF, 0x3333);
+    auto root = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested1);
+    ys.Finish(root);
 
-    EXPECT_EQ(yffb.GetSize(), 34ULL);
+    EXPECT_EQ(ys.Size(), 34ULL);
 
-    const auto& nestedMessage = NYaFF::ReadRoot<TNestedMessage>(yffb.GetBufferPointer());
+    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSmallField(), 0xFFFFU);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x3333ULL);
@@ -48,35 +48,35 @@ TEST(DynMessage, NestedMessageSparseRoot) {
 }
 
 TEST(DynMessage, NestedUnused) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTNestedUnused_TMessage(yffb, 123));
+    yaff::Serializer ys;
+    ys.Finish(SerializeNestedUnused_TMessage(ys, 123));
 
-    const auto& nestedMessage = NYaFF::ReadRoot<TNestedUnused_TMessage>(yffb.GetBufferPointer());
+    const auto& nestedMessage = yaff::ReadRoot<NestedUnused_TMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetSomeField(), 123);
 }
 
-TEST(Vector, EmptyVec) {
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(nullptr);
+TEST(Array, EmptyVec) {
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(nullptr);
     EXPECT_EQ(vectorMessage.GetIntegerVec().Size(), 0U);
     EXPECT_EQ(vectorMessage.GetStringVec().Size(), 0U);
     EXPECT_EQ(vectorMessage.GetMessageVec().Size(), 0U);
 }
 
-TEST(Vector, BadVectorOffset) {
-    NYaFF::TBuilder yffb;
+TEST(Array, BadArrayOffset) {
+    yaff::Serializer ys;
     std::vector<uint8_t> largeBytes(2147483646, 0);  // 2GB - 2B (still not enough because of uint32_t length);
-    EXPECT_THROW(yffb.CreateVector(largeBytes), std::runtime_error);
+    EXPECT_THROW(ys.SerializeArray(largeBytes), std::runtime_error);
 }
 
-TEST(Vector, SimpleVec) {
+TEST(Array, SimpleVec) {
     std::vector<uint64_t> vec{1, 2, 3, 4};
 
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, yffb.CreateVector(vec)));
+    yaff::Serializer ys;
+    ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, ys.SerializeArray(vec)));
 
-    EXPECT_EQ(yffb.GetSize(), 47ULL);
+    EXPECT_EQ(ys.Size(), 47ULL);
 
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
     const auto& vectorField = vectorMessage.GetIntegerVec();
     EXPECT_EQ(vectorField.Size(), 4U);
     EXPECT_TRUE(std::equal(vectorField.begin(), vectorField.end(), vec.begin()));
@@ -85,139 +85,138 @@ TEST(Vector, SimpleVec) {
     }
 }
 
-TEST(Vector, StringVec) {
-    NYaFF::TBuilder yffb;
+TEST(Array, StringVec) {
+    yaff::Serializer ys;
 
     std::vector<std::string> expected;
-    std::vector<NYaFF::TInternalOffset<NYaFF::TString>> strings;
+    std::vector<yaff::InternalOffset<yaff::String>> strings;
     for (uint64_t i = 10; i < 20; ++i) {
         std::string str(i, 'a');
         expected.emplace_back(str);
-        strings.emplace_back(yffb.CreateString(str));
+        strings.emplace_back(ys.SerializeString(str));
     }
 
-    yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, yffb.CreateVector(strings)));
+    ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, ys.SerializeArray(strings)));
 
-    EXPECT_EQ(yffb.GetSize(), 254ULL);
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
-    const auto& stringVectorField = vectorMessage.GetStringVec();
-    EXPECT_EQ(stringVectorField.Size(), expected.size());
-    for (uint64_t i = 0; i < stringVectorField.Size(); ++i) {
-        const auto& str = stringVectorField.Get(i);
+    EXPECT_EQ(ys.Size(), 254ULL);
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& stringArrayField = vectorMessage.GetStringVec();
+    EXPECT_EQ(stringArrayField.Size(), expected.size());
+    for (uint64_t i = 0; i < stringArrayField.Size(); ++i) {
+        const auto& str = stringArrayField.Get(i);
         EXPECT_EQ(str, expected[i]);
         EXPECT_EQ(str.Size(), expected[i].size());
         EXPECT_TRUE(memcmp(str.Data(), expected[i].data(), str.Size()) == 0);
     }
 }
 
-TEST(Vector, MessageVec) {
-    NYaFF::TBuilder yffb;
+TEST(Array, MessageVec) {
+    yaff::Serializer ys;
 
-    std::vector<NYaFF::TInternalOffset<TFlatMessage>> messages;
+    std::vector<yaff::InternalOffset<FlatMessage>> messages;
     for (uint64_t i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
-            messages.emplace_back(CreateTFlatMessage<TFlatMessageFlatBuilder>(yffb, std::nullopt, i));
+            messages.emplace_back(SerializeFlatMessage<FlatMessageFlatSerializer>(ys, std::nullopt, i));
         } else {
-            messages.emplace_back(CreateTFlatMessage<TFlatMessageSparseBuilder>(yffb, std::nullopt, i));
+            messages.emplace_back(SerializeFlatMessage<FlatMessageSparseSerializer>(ys, std::nullopt, i));
         }
     }
-    yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, 0, yffb.CreateVector(messages)));
+    ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, 0, ys.SerializeArray(messages)));
 
-    EXPECT_EQ(yffb.GetSize(), 2075ULL);  // Meta should be deduplicated for sparse messages;
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
-    const auto& messageVectorField = vectorMessage.GetMessageVec();
-    EXPECT_EQ(messageVectorField.Size(), 100U);
-    for (uint64_t i = 0; i < messageVectorField.Size(); ++i) {
-        EXPECT_EQ(messageVectorField.Get(i).GetSomeValue2(), i);
-        EXPECT_EQ(messageVectorField.Get(i).GetSomeValue10(), 0x0ULL);
+    EXPECT_EQ(ys.Size(), 2075ULL);  // Meta should be deduplicated for sparse messages;
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& messageArrayField = vectorMessage.GetMessageVec();
+    EXPECT_EQ(messageArrayField.Size(), 100U);
+    for (uint64_t i = 0; i < messageArrayField.Size(); ++i) {
+        EXPECT_EQ(messageArrayField.Get(i).GetSomeValue2(), i);
+        EXPECT_EQ(messageArrayField.Get(i).GetSomeValue10(), 0x0ULL);
     }
 }
 
-TEST(Vector, FixedMessageVec) {
-    NYaFF::TBuilder yffb;
-    const auto vec =
-        yffb.CreateVector<NYaFF::TInlineOffset<NProtoYaFF::NTestYaFF::TStaticFixedMessage>>(10, [&](size_t i) {
-            const auto nested = CreateTSimpleMessage(yffb, i + 1);
-            return [=, &yffb]() { return CreateTStaticFixedMessage(yffb, i * i, nested); };
-        });
-    yffb.Finish(CreateTVectorMessage(yffb, 0, 0, 0, 0, vec));
+TEST(Array, FixedMessageVec) {
+    yaff::Serializer ys;
+    const auto vec = ys.SerializeArray<yaff::InlineOffset<protoyaff::test::StaticFixedMessage>>(10, [&](size_t i) {
+        const auto nested = SerializeSimpleMessage(ys, i + 1);
+        return [=, &ys]() { return SerializeStaticFixedMessage(ys, i * i, nested); };
+    });
+    ys.Finish(SerializeArrayMessage(ys, 0, 0, 0, 0, vec));
 
-    EXPECT_EQ(yffb.GetSize(), 222ULL);
+    EXPECT_EQ(ys.Size(), 222ULL);
 
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
-    const auto& fixedMessageVectorField = vectorMessage.GetFixedMessageVec();
-    EXPECT_EQ(fixedMessageVectorField.Size(), 10U);
-    for (uint64_t i = 0; i < fixedMessageVectorField.Size(); ++i) {
-        EXPECT_EQ(fixedMessageVectorField.Get(i).GetScalar(), i * i);
-        EXPECT_EQ(fixedMessageVectorField.Get(i).GetNested().GetSignedField(), static_cast<int32_t>(i + 1));
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& fixedMessageArrayField = vectorMessage.GetFixedMessageVec();
+    EXPECT_EQ(fixedMessageArrayField.Size(), 10U);
+    for (uint64_t i = 0; i < fixedMessageArrayField.Size(); ++i) {
+        EXPECT_EQ(fixedMessageArrayField.Get(i).GetScalar(), i * i);
+        EXPECT_EQ(fixedMessageArrayField.Get(i).GetNested().GetSignedField(), static_cast<int32_t>(i + 1));
     }
 }
 
-TEST(Vector, BoolVec) {
+TEST(Array, BoolVec) {
     std::vector<bool> flags;
     for (uint64_t i = 0; i < 10; ++i) {
         flags.emplace_back((i % 3) == 0);
     }
 
-    NYaFF::TBuilder yffb;
-    yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, 0, 0, yffb.CreateVector(flags)));
+    yaff::Serializer ys;
+    ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, 0, 0, ys.SerializeArray(flags)));
 
-    EXPECT_EQ(yffb.GetSize(), 37ULL);
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
-    const auto& boolVectorField = vectorMessage.GetBoolVec();
-    EXPECT_EQ(boolVectorField.Size(), 10U);
-    for (uint64_t i = 0; i < boolVectorField.Size(); ++i) {
-        EXPECT_EQ(boolVectorField.Get(i), ((i % 3) == 0));
+    EXPECT_EQ(ys.Size(), 37ULL);
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& boolArrayField = vectorMessage.GetBoolVec();
+    EXPECT_EQ(boolArrayField.Size(), 10U);
+    for (uint64_t i = 0; i < boolArrayField.Size(); ++i) {
+        EXPECT_EQ(boolArrayField.Get(i), ((i % 3) == 0));
     }
 }
 
-TEST(Vector, VectorDedup) {
-    NYaFF::TBuilder yffb;
+TEST(Array, ArrayDedup) {
+    yaff::Serializer ys;
     std::string expected1 = "aaaabbbb12";
     std::string expected2 = "bbbb4";
-    std::vector<NYaFF::TInternalOffset<NYaFF::TString>> strings;
+    std::vector<yaff::InternalOffset<yaff::String>> strings;
     for (uint64_t i = 0; i < 10; ++i) {
         if (i % 2 == 0) {
-            strings.emplace_back(yffb.CreateString(expected1));
+            strings.emplace_back(ys.SerializeString(expected1));
         } else {
-            strings.emplace_back(yffb.CreateString(expected2));
+            strings.emplace_back(ys.SerializeString(expected2));
         }
     }
 }
 
-TEST(Vector, VectorDedupByteSize) {
+TEST(Array, ArrayDedupByteSize) {
     // Based on SPI-136874. When deduplicating a vector, it is necessary to compare memory regions bytewise,
     // without taking into account Size_ of the vector, since it is in elements not in bytes.
 
-    NYaFF::TBuilder yffb;
+    yaff::Serializer ys;
 
     std::string str = "a";
     std::vector<uint64_t> ints = {0xAB0BA61};
 
-    const auto strOffset = yffb.CreateString(str);  // Byte vector of size 1;
-    const auto intsOffset = yffb.CreateVector(
+    const auto strOffset = ys.SerializeString(str);  // Byte vector of size 1;
+    const auto intsOffset = ys.SerializeArray(
         ints);  // Uint64 vector of size 1, where the first byte (little endian) matches the character 'a'.
 
-    std::vector<NYaFF::TInternalOffset<NYaFF::TString>> strings{strOffset};
-    yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, intsOffset, yffb.CreateVector(strings)));
+    std::vector<yaff::InternalOffset<yaff::String>> strings{strOffset};
+    ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, intsOffset, ys.SerializeArray(strings)));
 
-    EXPECT_EQ(yffb.GetSize(), 41ULL);
+    EXPECT_EQ(ys.Size(), 41ULL);
 
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
-    const auto& stringVectorField = vectorMessage.GetStringVec();
-    EXPECT_EQ(stringVectorField.Size(), 1U);
-    EXPECT_EQ(stringVectorField.Get(0).Get(0), 'a');
-    const auto& intVectorField = vectorMessage.GetIntegerVec();
-    EXPECT_EQ(intVectorField.Size(), 1U);
-    EXPECT_EQ(intVectorField.Get(0), 0xAB0BA61ULL);
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& stringArrayField = vectorMessage.GetStringVec();
+    EXPECT_EQ(stringArrayField.Size(), 1U);
+    EXPECT_EQ(stringArrayField.Get(0).Get(0), 'a');
+    const auto& intArrayField = vectorMessage.GetIntegerVec();
+    EXPECT_EQ(intArrayField.Size(), 1U);
+    EXPECT_EQ(intArrayField.Get(0), 0xAB0BA61ULL);
 }
 
-TEST(Vector, SimpleIterator) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(
-        CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, yffb.CreateVector(std::vector<uint64_t>{1, 2, 3, 4})));
+TEST(Array, SimpleIterator) {
+    yaff::Serializer ys;
+    ys.Finish(
+        SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, ys.SerializeArray(std::vector<uint64_t>{1, 2, 3, 4})));
 
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
     const auto& vectorField = vectorMessage.GetIntegerVec();
 
     uint64_t expected = 1;
@@ -230,16 +229,16 @@ TEST(Vector, SimpleIterator) {
     EXPECT_TRUE(std::find(vectorField.begin(), vectorField.end(), 10) == vectorField.end());
 }
 
-TEST(Vector, MessageIterator) {
-    NYaFF::TBuilder yffb;
+TEST(Array, MessageIterator) {
+    yaff::Serializer ys;
 
-    std::vector<NYaFF::TInternalOffset<TFlatMessage>> messages;
+    std::vector<yaff::InternalOffset<FlatMessage>> messages;
     for (uint64_t i = 0; i < 100; ++i) {
-        messages.emplace_back(CreateTFlatMessage<TFlatMessageFlatBuilder>(yffb, 0, i));
+        messages.emplace_back(SerializeFlatMessage<FlatMessageFlatSerializer>(ys, 0, i));
     }
-    yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, 0, yffb.CreateVector(messages)));
+    ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, 0, ys.SerializeArray(messages)));
 
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
     const auto& messagesField = vectorMessage.GetMessageVec();
 
     uint64_t expected = 0;
@@ -253,19 +252,19 @@ TEST(Vector, MessageIterator) {
     EXPECT_EQ(it->GetSomeValue2(), 10ULL);
 }
 
-TEST(Vector, NestedIterator) {
-    NYaFF::TBuilder yffb;
+TEST(Array, NestedIterator) {
+    yaff::Serializer ys;
 
     std::vector<std::string> expected;
-    std::vector<NYaFF::TInternalOffset<NYaFF::TString>> strings;
+    std::vector<yaff::InternalOffset<yaff::String>> strings;
     for (uint64_t i = 10; i < 20; ++i) {
         std::string str(i, 'a');
         expected.emplace_back(str);
-        strings.emplace_back(yffb.CreateString(str));
+        strings.emplace_back(ys.SerializeString(str));
     }
-    yffb.Finish(CreateTVectorMessage<TVectorMessageFlatBuilder>(yffb, 0, yffb.CreateVector(strings)));
+    ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, ys.SerializeArray(strings)));
 
-    const auto& vectorMessage = NYaFF::ReadRoot<TVectorMessage>(yffb.GetBufferPointer());
+    const auto& vectorMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
     const auto& stringsField = vectorMessage.GetStringVec();
     for (size_t strIdx = 0; strIdx < stringsField.size(); ++strIdx) {
         const auto& str = stringsField[strIdx];

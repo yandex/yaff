@@ -3,23 +3,23 @@
 #include "error.h"
 #include "ir.h"
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-class IFrontEnd {
+class AbstractFrontEnd {
 public:
-    virtual ~IFrontEnd() = default;
+    virtual ~AbstractFrontEnd() = default;
 
-    virtual NIR::TIR Parse() = 0;
+    virtual ir::IR Parse() = 0;
 };
 
-class IGenerator {
+class AbstractGenerator {
 public:
-    virtual ~IGenerator() = default;
+    virtual ~AbstractGenerator() = default;
 
-    virtual void Generate(const NIR::TIR& ir) = 0;
+    virtual void Generate(const ir::IR& ir) = 0;
 };
 
-void Compile(std::unique_ptr<IFrontEnd> front, std::vector<std::unique_ptr<IGenerator>> gens,
-             std::unique_ptr<IFrontEnd> compatFront, std::unique_ptr<IErrorHandler> errors);
+void Compile(std::unique_ptr<AbstractFrontEnd> front, std::vector<std::unique_ptr<AbstractGenerator>> gens,
+             std::unique_ptr<AbstractFrontEnd> compatFront, std::unique_ptr<AbstractErrorHandler> errors);
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

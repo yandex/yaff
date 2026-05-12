@@ -3,8 +3,9 @@
 #include "error.h"
 #include "ir.h"
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-bool CheckIRCompatibility(const NIR::TIR& base, const NIR::TIR& patched, std::unique_ptr<IErrorHandler> errorHandler);
+bool CheckIRCompatibility(const ir::IR& base, const ir::IR& patched,
+                          std::unique_ptr<AbstractErrorHandler> errorHandler);
 
 }

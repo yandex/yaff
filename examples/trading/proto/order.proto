@@ -1,29 +1,27 @@
 syntax = "proto2";
 
-package NTrading;
+package trading;
 
-option go_package = "a.yandex-team.ru/library/cpp/yaff/examples/trading/proto;trading";
-
-enum ESide {
+enum Side {
     SIDE_BUY = 0;
     SIDE_SELL = 1;
 }
 
-message TExecution {
+message Execution {
     optional uint64 exec_id = 1;
     optional uint64 fill_price_micros = 2;
     optional uint32 fill_qty = 3;
     optional uint64 exchange_ts_ns = 4;
 }
 
-message TTradeOrder {
+message TradeOrder {
     optional uint64 order_id = 1;
     optional fixed64 client_order_id = 2;
     optional string symbol = 3;
-    optional ESide side = 4;
+    optional Side side = 4;
     optional uint64 limit_price_micros = 5;
     optional uint32 quantity = 6;
     optional uint32 account_id = 7;
     optional uint64 submit_ts_ns = 8;
-    repeated TExecution executions = 9;
+    repeated Execution executions = 9;
 }

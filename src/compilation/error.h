@@ -2,9 +2,9 @@
 
 #include <string>
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-enum class EErrorType : int32_t {
+enum class ErrorType : int32_t {
     COMPILE_ERROR_NONE = 0,
     COMPAT_MESSAGE_REMOVED = 1,
     COMPAT_MESSAGE_NAME_CHANGED = 2,
@@ -15,26 +15,26 @@ enum class EErrorType : int32_t {
     COMPAT_MESSAGE_LAYOUT_CHANGED = 7,
 };
 
-class IErrorHandler {
+class AbstractErrorHandler {
 public:
-    virtual ~IErrorHandler() = default;
+    virtual ~AbstractErrorHandler() = default;
 
-    virtual void Error(const EErrorType error, const std::string& name, const std::string& message) = 0;
-    virtual void Warning(const EErrorType warning, const std::string& name, const std::string& message) = 0;
+    virtual void Error(const ErrorType error, const std::string& name, const std::string& message) = 0;
+    virtual void Warning(const ErrorType warning, const std::string& name, const std::string& message) = 0;
 };
 
-class TErrorPrinter : public IErrorHandler {
+class ErrorPrinter : public AbstractErrorHandler {
 public:
-    TErrorPrinter(std::ostream& out, const std::string& delim = "\n");
+    ErrorPrinter(std::ostream& out, const std::string& delim = "\n");
 
-    void Error(const EErrorType error, const std::string& name, const std::string& message) override;
-    void Warning(const EErrorType warning, const std::string& name, const std::string& message) override;
+    void Error(const ErrorType error, const std::string& name, const std::string& message) override;
+    void Warning(const ErrorType warning, const std::string& name, const std::string& message) override;
 
 private:
     std::string Delim_;
     std::ostream& Out_;
 };
 
-std::string GetErrorMessage(const EErrorType type);
+std::string GetErrorMessage(const ErrorType type);
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

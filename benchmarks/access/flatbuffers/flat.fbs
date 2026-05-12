@@ -1,6 +1,6 @@
 namespace NFlatBuffersBench;
 
-table TFlat10 {
+table Flat10 {
     v0:uint64;
     v1:uint64;
     v2:uint64;
@@ -13,7 +13,7 @@ table TFlat10 {
     v9:uint64;
 }
 
-table TFlat100 {
+table Flat100 {
     v0:uint64;
     v1:uint64;
     v2:uint64;

@@ -5,14 +5,14 @@
 #include "proto/feed.pb.h"
 #include "proto/feed.yaff.h"
 
-NFeed::TFeedResponse BuildFeedResponse() {
-    NFeed::TFeedResponse response;
+feed::FeedResponse BuildFeedResponse() {
+    feed::FeedResponse response;
     response.set_request_id(42);
 
     {
         auto* item = response.add_items();
         item->set_item_id(1001);
-        item->set_content_type(NFeed::CONTENT_TYPE_ARTICLE);
+        item->set_content_type(feed::CONTENT_TYPE_ARTICLE);
         item->set_title("YaFF: Zero-Copy Serialization for High-Performance Services");
         item->set_description("How YaFF enables direct field access without deserialization overhead.");
         item->set_relevance_score(0.95);
@@ -32,7 +32,7 @@ NFeed::TFeedResponse BuildFeedResponse() {
     {
         auto* item = response.add_items();
         item->set_item_id(1002);
-        item->set_content_type(NFeed::CONTENT_TYPE_VIDEO);
+        item->set_content_type(feed::CONTENT_TYPE_VIDEO);
         item->set_title("Migrating from Protobuf to YaFF: A Practical Guide");
         item->set_relevance_score(0.87);
         item->add_tags("yaff");
@@ -47,26 +47,26 @@ NFeed::TFeedResponse BuildFeedResponse() {
     return response;
 }
 
-NYaFF::TDetachedBuffer ProtoToYaff(const NFeed::TFeedResponse& proto) {
-    NYaFF::TBuilder builder;
-    builder.Finish(NProtoYaFF::NFeed::CreateTFeedResponse(builder, proto));
-    return builder.Release();
+yaff::DetachedBuffer ProtoToYaff(const feed::FeedResponse& proto) {
+    yaff::Serializer ys;
+    ys.Finish(protoyaff::feed::SerializeFeedResponse(ys, proto));
+    return ys.Release();
 }
 
-NFeed::TFeedResponse YaffToProto(const NYaFF::TDetachedBuffer& buffer) {
-    const auto& yaff = NYaFF::ReadRoot<NProtoYaFF::NFeed::TFeedResponse>(buffer.Data());
-    NFeed::TFeedResponse restored;
-    yaff.TransformTo(restored);
+feed::FeedResponse YaffToProto(const yaff::DetachedBuffer& buffer) {
+    const auto& yaff = yaff::ReadRoot<protoyaff::feed::FeedResponse>(buffer.Data());
+    feed::FeedResponse restored;
+    yaff.ParseTo(restored);
     return restored;
 }
 
-void PrintHumanReadable(const NYaFF::TDetachedBuffer& buffer) {
-    const auto& yaff = NYaFF::ReadRoot<NProtoYaFF::NFeed::TFeedResponse>(buffer.Data());
-    std::cout << NYaFF::NReflect::DebugString(&yaff, NProtoYaFF::NFeed::TFeedResponse::Descriptor()) << "\n";
+void PrintHumanReadable(const yaff::DetachedBuffer& buffer) {
+    const auto& yaff = yaff::ReadRoot<protoyaff::feed::FeedResponse>(buffer.Data());
+    std::cout << yaff::reflect::DebugString(&yaff, protoyaff::feed::FeedResponse::Descriptor()) << "\n";
 }
 
 template <typename T>
-void Verify(const NFeed::TFeedResponse& original, const T& restored) {
+void Verify(const feed::FeedResponse& original, const T& restored) {
     YAFF_REQUIRE(original.request_id() == restored.request_id());
     YAFF_REQUIRE(original.items_size() == restored.items_size());
 
@@ -101,7 +101,7 @@ int main() {
     const auto buffer = ProtoToYaff(proto);
 
     // 3. Read YaFF fields directly — no deserialization needed.
-    const auto& yaff = NYaFF::ReadRoot<NProtoYaFF::NFeed::TFeedResponse>(buffer.Data());
+    const auto& yaff = yaff::ReadRoot<protoyaff::feed::FeedResponse>(buffer.Data());
     std::cout << "Feed request_id: " << yaff.request_id() << "\n";
     std::cout << "Number of items: " << yaff.items().Size() << "\n";
 

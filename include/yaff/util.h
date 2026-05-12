@@ -2,24 +2,24 @@
 
 #include <iostream>
 
-namespace NYaFF {
+namespace yaff {
 
-class TCodeWriter {
+class CodeWriter {
 public:
-    struct TIdentGuard {
-        explicit TIdentGuard(TCodeWriter& p) : Parent(p) {
+    struct Guard {
+        explicit Guard(CodeWriter& p) : Parent(p) {
             Parent.IncrementIdentLevel();
         }
 
-        ~TIdentGuard() {
+        ~Guard() {
             Parent.DecrementIdentLevel();
         }
 
-        TCodeWriter& Parent;
+        CodeWriter& Parent;
     };
 
 public:
-    TCodeWriter(std::ostream& underlying, const std::string& ident)
+    CodeWriter(std::ostream& underlying, const std::string& ident)
         : Underlying_(underlying), Ident_(ident), IdentLevel_(0), IgnoreIdent_(false), TextWritten_(false) {
     }
 
@@ -61,8 +61,8 @@ public:
         return TextWritten_;
     }
 
-    TIdentGuard IdentGuard() {
-        return TIdentGuard{*this};
+    Guard IdentGuard() {
+        return Guard{*this};
     }
 
 private:
@@ -80,4 +80,4 @@ private:
     bool TextWritten_;
 };
 
-}  // namespace NYaFF
+}  // namespace yaff

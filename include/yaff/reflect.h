@@ -2,18 +2,18 @@
 
 #include "base.h"
 
-namespace NYaFF::NReflect {
+namespace yaff::reflect {
 
-struct TMessageDescriptor;
-struct TEnumDescriptor;
+struct MessageDescriptor;
+struct EnumDescriptor;
 
-struct TTypeDescriptor {
-    const EType Type = EType::TYPE_NONE;
+struct TypeDescriptor {
+    const Type Type = Type::TYPE_NONE;
 
     union {
-        const TTypeDescriptor* Element = nullptr;
-        const TMessageDescriptor* Message;
-        const TEnumDescriptor* Enum;
+        const TypeDescriptor* Element = nullptr;
+        const MessageDescriptor* Message;
+        const EnumDescriptor* Enum;
     } Descriptor;
 
     union {
@@ -31,44 +31,44 @@ struct TTypeDescriptor {
     const bool Inline = false;
 };
 
-struct TFieldDescriptor {
-    const TFieldId Id = 0;
+struct FieldDescriptor {
+    const FieldId Id = 0;
     const char* Name = nullptr;
     const char* ContainingOneof = nullptr;
 
-    const TTypeDescriptor* Type = nullptr;
+    const TypeDescriptor* Type = nullptr;
 
-    const EPresence Presence = EPresence::PRESENCE_NONE;
+    const Presence Presence = Presence::PRESENCE_NONE;
     const bool Deprecated = false;
 
-    const TFieldOffset FlatOffset = 0;
+    const FieldOffset FlatOffset = 0;
 };
 
-struct TMessageDescriptor {
+struct MessageDescriptor {
     const char* Name = nullptr;
-    const EMessageLayout Layout = EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
+    const MessageLayout Layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN;
 
     const uint16_t FieldCount = 0;
-    const TFieldDescriptor* Fields = nullptr;
+    const FieldDescriptor* Fields = nullptr;
 };
 
-struct TEnumValueDescriptor {
+struct EnumValueDescriptor {
     const char* Name = nullptr;
     const int32_t Value = 0;
 };
 
-struct TEnumDescriptor {
+struct EnumDescriptor {
     const char* Name = nullptr;
 
     const uint32_t ValueCount = 0;
-    const TEnumValueDescriptor* Values = nullptr;
+    const EnumValueDescriptor* Values = nullptr;
 };
 
-inline size_t InlineSize(EType type);
-inline size_t InlineSize(const TTypeDescriptor& type);
+inline size_t InlineSize(Type type);
+inline size_t InlineSize(const TypeDescriptor& type);
 
-inline size_t FixedMessageSize(const TMessageDescriptor& msg) {
-    YAFF_REQUIRE(msg.Layout == EMessageLayout::MESSAGE_LAYOUT_FIXED);
+inline size_t FixedMessageSize(const MessageDescriptor& msg) {
+    YAFF_REQUIRE(msg.Layout == MessageLayout::MESSAGE_LAYOUT_FIXED);
     if (msg.FieldCount == 0) {
         return 0;
     }
@@ -76,49 +76,49 @@ inline size_t FixedMessageSize(const TMessageDescriptor& msg) {
     return last.FlatOffset + InlineSize(*last.Type);
 }
 
-inline size_t InlineSize(EType type) {
+inline size_t InlineSize(Type type) {
     switch (type) {
-        case EType::TYPE_NONE:
+        case Type::TYPE_NONE:
             return 0;
-        case EType::TYPE_BOOL:
+        case Type::TYPE_BOOL:
             return sizeof(bool);
-        case EType::TYPE_INT32:
-        case EType::TYPE_ENUM:
+        case Type::TYPE_INT32:
+        case Type::TYPE_ENUM:
             return sizeof(int32_t);
-        case EType::TYPE_UINT32:
+        case Type::TYPE_UINT32:
             return sizeof(uint32_t);
-        case EType::TYPE_INT64:
+        case Type::TYPE_INT64:
             return sizeof(int64_t);
-        case EType::TYPE_UINT64:
+        case Type::TYPE_UINT64:
             return sizeof(uint64_t);
-        case EType::TYPE_FLOAT:
+        case Type::TYPE_FLOAT:
             return sizeof(float);
-        case EType::TYPE_DOUBLE:
+        case Type::TYPE_DOUBLE:
             return sizeof(double);
-        case EType::TYPE_STRING:
-        case EType::TYPE_VECTOR:
-            return sizeof(TOffset);
-        case EType::TYPE_MESSAGE:
+        case Type::TYPE_STRING:
+        case Type::TYPE_VECTOR:
+            return sizeof(Offset);
+        case Type::TYPE_MESSAGE:
             YAFF_THROW("incomplete message type");
     }
 }
 
-inline size_t InlineSize(const TTypeDescriptor& type) {
-    if (type.Type == EType::TYPE_MESSAGE) {
+inline size_t InlineSize(const TypeDescriptor& type) {
+    if (type.Type == Type::TYPE_MESSAGE) {
         if (type.Inline) {
             YAFF_REQUIRE(type.Descriptor.Message);
             return FixedMessageSize(*type.Descriptor.Message);
         }
-        return sizeof(TOffset);
+        return sizeof(Offset);
     }
     return InlineSize(type.Type);
 }
 
-inline TFieldResolverFunc MakeFieldResolverFunc(const TMessageDescriptor* desc) {
-    return [desc](const TFieldId id) {
+inline FieldResolver MakeFieldResolverFunc(const MessageDescriptor* desc) {
+    return [desc](const FieldId id) {
         YAFF_REQUIRE(id > 0);
         return desc->Fields[id - 1].FlatOffset;
     };
 }
 
-}  // namespace NYaFF::NReflect
+}  // namespace yaff::reflect

@@ -1,6 +1,6 @@
-package NYaFFBench;
+package benchmark_space;
 
-message TFlat5 {
+message Flat5 {
     optional uint64 v0 = 1;
     optional uint64 v1 = 2;
     optional uint64 v2 = 3;
@@ -8,7 +8,7 @@ message TFlat5 {
     optional uint64 v4 = 5;
 }
 
-message TFlat50 {
+message Flat50 {
     optional uint64 v0 = 1;
     optional uint64 v1 = 2;
     optional uint64 v2 = 3;

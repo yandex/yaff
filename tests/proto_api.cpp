@@ -10,8 +10,8 @@ using namespace std::string_view_literals;
 
 namespace {
 
-NTestYaFF::TUniversalMessage GenerateUniversalMessage() {
-    NTestYaFF::TUniversalMessage proto;
+test::UniversalMessage GenerateUniversalMessage() {
+    test::UniversalMessage proto;
     proto.set_implicit_string_field("");
     proto.set_explicit_string_field_2("");
     proto.set_implicit_bytes_field("");
@@ -27,8 +27,7 @@ NTestYaFF::TUniversalMessage GenerateUniversalMessage() {
         proto.add_repeated_bytes_field(std::to_string(i));
     }
     for (size_t i = 0; i < 9; ++i) {
-        const auto v =
-            (i % 2 ? NTestYaFF::EEnumeration::ENUMERATION_VALUE : NTestYaFF::EEnumeration::ENUMERATION_OTHER_VALUE);
+        const auto v = (i % 2 ? test::Enumeration::ENUMERATION_VALUE : test::Enumeration::ENUMERATION_OTHER_VALUE);
         proto.add_repeated_enum_field(v);
     }
     for (size_t i = 0; i < 11; ++i) {
@@ -38,15 +37,15 @@ NTestYaFF::TUniversalMessage GenerateUniversalMessage() {
     return proto;
 }
 
-NYaFF::TDetachedBuffer Convert(const NTestYaFF::TUniversalMessage& proto) {
-    NYaFF::TBuilder yffb;
-    yffb.Finish(NProtoYaFF::NTestYaFF::CreateTUniversalMessage(yffb, proto));
-    return yffb.Release();
+yaff::DetachedBuffer Convert(const test::UniversalMessage& proto) {
+    yaff::Serializer ys;
+    ys.Finish(protoyaff::test::SerializeUniversalMessage(ys, proto));
+    return ys.Release();
 }
 
-NTestYaFF::TUniversalMessage Restore(const NProtoYaFF::NTestYaFF::TUniversalMessage& yaff) {
-    NTestYaFF::TUniversalMessage proto;
-    yaff.TransformTo(proto);
+test::UniversalMessage Restore(const protoyaff::test::UniversalMessage& yaff) {
+    test::UniversalMessage proto;
+    yaff.ParseTo(proto);
     return proto;
 }
 
@@ -127,7 +126,7 @@ TEST(ProtoAPI, TemplateTest) {
     const auto& originalProto = GenerateUniversalMessage();
 
     const auto buffer = Convert(originalProto);
-    const auto& yaff = NYaFF::ReadRoot<NProtoYaFF::NTestYaFF::TUniversalMessage>(buffer.Data());
+    const auto& yaff = yaff::ReadRoot<protoyaff::test::UniversalMessage>(buffer.Data());
 
     const auto& restoredProto = Restore(yaff);
 
@@ -177,31 +176,28 @@ TEST(ProtoAPI, TemplateTest) {
 }
 
 TEST(ProtoAPI, Enumerations) {
-    const std::array<std::pair<NProtoYaFF::NTestYaFF::EEnumeration, NTestYaFF::EEnumeration>, 4> testSet = {
-        std::pair{NProtoYaFF::NTestYaFF::EEnumeration::ENUMERATION_UNSPECIFIED,
-                  NTestYaFF::EEnumeration::ENUMERATION_UNSPECIFIED},
-        std::pair{NProtoYaFF::NTestYaFF::EEnumeration::ENUMERATION_VALUE, NTestYaFF::EEnumeration::ENUMERATION_VALUE},
-        std::pair{NProtoYaFF::NTestYaFF::EEnumeration::ENUMERATION_OTHER_VALUE,
-                  NTestYaFF::EEnumeration::ENUMERATION_OTHER_VALUE},
-        std::pair{NProtoYaFF::NTestYaFF::EEnumeration::auto_, NTestYaFF::EEnumeration::auto_}};
+    const std::array<std::pair<protoyaff::test::Enumeration, test::Enumeration>, 4> testSet = {
+        std::pair{protoyaff::test::Enumeration::ENUMERATION_UNSPECIFIED, test::Enumeration::ENUMERATION_UNSPECIFIED},
+        std::pair{protoyaff::test::Enumeration::ENUMERATION_VALUE, test::Enumeration::ENUMERATION_VALUE},
+        std::pair{protoyaff::test::Enumeration::ENUMERATION_OTHER_VALUE, test::Enumeration::ENUMERATION_OTHER_VALUE},
+        std::pair{protoyaff::test::Enumeration::auto_, test::Enumeration::auto_}};
 
     for (auto [v1, v2] : testSet) {
-        auto n1 = NProtoYaFF::NTestYaFF::EEnumeration_Name(v1);
-        auto n2 = NTestYaFF::EEnumeration_Name(v2);
+        auto n1 = protoyaff::test::Enumeration_Name(v1);
+        auto n2 = test::Enumeration_Name(v2);
         EXPECT_EQ(n1, n2);
 
-        NProtoYaFF::NTestYaFF::EEnumeration r1;
-        NTestYaFF::EEnumeration r2;
-        EXPECT_TRUE(NProtoYaFF::NTestYaFF::EEnumeration_Parse(n1, &r1));
-        EXPECT_TRUE(NTestYaFF::EEnumeration_Parse(n2, &r2));
+        protoyaff::test::Enumeration r1;
+        test::Enumeration r2;
+        EXPECT_TRUE(protoyaff::test::Enumeration_Parse(n1, &r1));
+        EXPECT_TRUE(test::Enumeration_Parse(n2, &r2));
         EXPECT_EQ(static_cast<int>(r1), static_cast<int>(r2));
     }
 
-    EXPECT_EQ(static_cast<int>(NProtoYaFF::NTestYaFF::EEnumeration_MIN), static_cast<int>(NTestYaFF::EEnumeration_MIN));
-    EXPECT_EQ(static_cast<int>(NProtoYaFF::NTestYaFF::EEnumeration_MAX), static_cast<int>(NTestYaFF::EEnumeration_MAX));
-    EXPECT_EQ(static_cast<int>(NProtoYaFF::NTestYaFF::EEnumeration_ARRAYSIZE),
-              static_cast<int>(NTestYaFF::EEnumeration_ARRAYSIZE));
+    EXPECT_EQ(static_cast<int>(protoyaff::test::Enumeration_MIN), static_cast<int>(test::Enumeration_MIN));
+    EXPECT_EQ(static_cast<int>(protoyaff::test::Enumeration_MAX), static_cast<int>(test::Enumeration_MAX));
+    EXPECT_EQ(static_cast<int>(protoyaff::test::Enumeration_ARRAYSIZE), static_cast<int>(test::Enumeration_ARRAYSIZE));
 
-    EXPECT_EQ(NProtoYaFF::NTestYaFF::EEnumeration_IsValid(2), NTestYaFF::EEnumeration_IsValid(2));
-    EXPECT_EQ(NProtoYaFF::NTestYaFF::EEnumeration_IsValid(9000), NTestYaFF::EEnumeration_IsValid(9000));
+    EXPECT_EQ(protoyaff::test::Enumeration_IsValid(2), test::Enumeration_IsValid(2));
+    EXPECT_EQ(protoyaff::test::Enumeration_IsValid(9000), test::Enumeration_IsValid(9000));
 }

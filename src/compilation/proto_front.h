@@ -5,86 +5,86 @@
 #include "compiler.h"
 #include "ir.h"
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-struct TProtobufReflectionFrontEndOptions {
+struct ProtobufReflectionFrontEndOptions {
     std::unordered_set<std::string> TargetFiles;
 
-    std::string RootNamespace = "NProtoYaFF";
+    std::string RootNamespace = "protoyaff";
     std::string GeneratedProtobufExt = ".pb.h";
 
     bool SkipEmptyMessages = true;
     bool FillGaps = false;
 };
 
-struct TProtobufDeprecatedField {
+struct ProtobufDeprecatedField {
     uint64_t Id = 0;
     google::protobuf::FieldDescriptor::Type Type = static_cast<google::protobuf::FieldDescriptor::Type>(0);
     google::protobuf::FieldDescriptor::Label Label = static_cast<google::protobuf::FieldDescriptor::Label>(0);
 };
 
-struct TProtobufField {
-    struct TAdditionalModifiers {
+struct ProtobufField {
+    struct AdditionalModifiers {
         std::map<std::string, std::string> Modifiers;
         std::map<std::string, std::string> ElementModifiers;
     };
 
     uint64_t Id = 0;
-    TAdditionalModifiers AdditionalModifiers;
+    AdditionalModifiers Modifiers;
 };
 
-struct TProtobufMessage {
-    NYaFF::EMessageLayout Layout = NYaFF::EMessageLayout::MESSAGE_LAYOUT_UNKNOWN;
-    std::vector<TProtobufDeprecatedField> DeprecatedFields;
+struct ProtobufMessage {
+    yaff::MessageLayout Layout = yaff::MessageLayout::MESSAGE_LAYOUT_UNKNOWN;
+    std::vector<ProtobufDeprecatedField> DeprecatedFields;
 };
 
-class IProtobufReflectionTraits {
+class ProtobufReflectionTraits {
 public:
-    virtual ~IProtobufReflectionTraits() = default;
+    virtual ~ProtobufReflectionTraits() = default;
 
     // Return std::nullopt to skip field;
-    virtual std::optional<TProtobufField> GetYaffFields(const google::protobuf::FieldDescriptor&) = 0;
+    virtual std::optional<ProtobufField> GetYaffFields(const google::protobuf::FieldDescriptor&) = 0;
 
     // Return std::nullopt to skip message;
-    virtual std::optional<TProtobufMessage> GetYaffMessage(const google::protobuf::Descriptor&) = 0;
+    virtual std::optional<ProtobufMessage> GetYaffMessage(const google::protobuf::Descriptor&) = 0;
 };
 
-class TProtobufReflectionDefaultTraits : public IProtobufReflectionTraits {
+class DefaultProtobufReflectionTraits : public ProtobufReflectionTraits {
 public:
-    std::optional<TProtobufField> GetYaffFields(const google::protobuf::FieldDescriptor&) override;
-    std::optional<TProtobufMessage> GetYaffMessage(const google::protobuf::Descriptor&) override;
+    std::optional<ProtobufField> GetYaffFields(const google::protobuf::FieldDescriptor&) override;
+    std::optional<ProtobufMessage> GetYaffMessage(const google::protobuf::Descriptor&) override;
 };
 
-class TProtobufReflectionTaggedTraits : public IProtobufReflectionTraits {
+class TaggedProtobufReflectionTraits : public ProtobufReflectionTraits {
 public:
-    explicit TProtobufReflectionTaggedTraits(const std::string& sliceId);
+    explicit TaggedProtobufReflectionTraits(const std::string& sliceId);
 
-    std::optional<TProtobufField> GetYaffFields(const google::protobuf::FieldDescriptor&) override;
-    std::optional<TProtobufMessage> GetYaffMessage(const google::protobuf::Descriptor&) override;
+    std::optional<ProtobufField> GetYaffFields(const google::protobuf::FieldDescriptor&) override;
+    std::optional<ProtobufMessage> GetYaffMessage(const google::protobuf::Descriptor&) override;
 
 private:
     std::string SliceId_;
 };
 
-class TProtobufReflectionFrontEnd : public IFrontEnd {
+class ProtobufReflectionFrontEnd : public AbstractFrontEnd {
 public:
-    TProtobufReflectionFrontEnd(
+    ProtobufReflectionFrontEnd(
         const google::protobuf::FileDescriptor* fileDescriptor,
-        std::unique_ptr<IProtobufReflectionTraits> traits = std::make_unique<TProtobufReflectionDefaultTraits>(),
-        TProtobufReflectionFrontEndOptions opts = {});
+        std::unique_ptr<ProtobufReflectionTraits> traits = std::make_unique<DefaultProtobufReflectionTraits>(),
+        ProtobufReflectionFrontEndOptions opts = {});
 
-    TProtobufReflectionFrontEnd(
+    ProtobufReflectionFrontEnd(
         const std::vector<const google::protobuf::Descriptor*>& descriptors,
-        std::unique_ptr<IProtobufReflectionTraits> traits = std::make_unique<TProtobufReflectionDefaultTraits>(),
-        TProtobufReflectionFrontEndOptions opts = {});
+        std::unique_ptr<ProtobufReflectionTraits> traits = std::make_unique<DefaultProtobufReflectionTraits>(),
+        ProtobufReflectionFrontEndOptions opts = {});
 
-    NIR::TIR Parse() override;
+    ir::IR Parse() override;
 
 private:
     std::vector<const google::protobuf::Descriptor*> Descriptors_;
     const google::protobuf::FileDescriptor* FileDescriptor_;
-    std::unique_ptr<IProtobufReflectionTraits> Traits_;
-    TProtobufReflectionFrontEndOptions Opts_;
+    std::unique_ptr<ProtobufReflectionTraits> Traits_;
+    ProtobufReflectionFrontEndOptions Opts_;
 };
 
-}  // namespace NYaFF::NCompile
+}  // namespace yaff::compilation

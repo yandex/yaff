@@ -2,8 +2,8 @@
 
 #include "ir.h"
 
-namespace NYaFF::NCompile {
+namespace yaff::compilation {
 
-void ProcessIR(NIR::TIR& ir);
+void ProcessIR(ir::IR& ir);
 
 }

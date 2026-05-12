@@ -2,12 +2,12 @@
 
 #include "base.h"
 
-namespace NYaFF::NReflect {
+namespace yaff::reflect {
 
-YAFF_LAYOUT_BEGIN(TAnyVector) {
+YAFF_LAYOUT_BEGIN(AnyArray) {
 public:
-    TAnyVector(const TAnyVector&) = delete;
-    TAnyVector& operator=(const TAnyVector&) = delete;
+    AnyArray(const AnyArray&) = delete;
+    AnyArray& operator=(const AnyArray&) = delete;
 
     YAFF_PURE uint32_t Size() const noexcept {
         return Size_;
@@ -20,7 +20,7 @@ public:
 
     template <typename T>
     YAFF_PURE const T* GetLayout(uint32_t i) const noexcept {
-        return ResolveOffset<T>(Bytes(), GetAt<TOffset>(i));
+        return ResolveOffset<T>(Bytes(), GetAt<Offset>(i));
     }
 
     template <typename T>
@@ -29,7 +29,7 @@ public:
     }
 
 private:
-    TAnyVector() noexcept = default;
+    AnyArray() noexcept = default;
 
     YAFF_PURE const std::byte* Bytes() const noexcept {
         return reinterpret_cast<const std::byte*>(this + 1);
@@ -44,4 +44,4 @@ private:
 };
 YAFF_LAYOUT_END
 
-}  // namespace NYaFF::NReflect
+}  // namespace yaff::reflect

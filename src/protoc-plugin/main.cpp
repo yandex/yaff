@@ -3,6 +3,6 @@
 #include "protoc_plugin.h"
 
 int main(int argc, char* argv[]) {
-    NYaFF::NTool::TProtobufGeneratorPlugin generator;
+    yaff::tool::ProtobufGeneratorPlugin generator;
     return google::protobuf::compiler::PluginMain(argc, argv, &generator);
 }

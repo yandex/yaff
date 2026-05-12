@@ -1,7 +1,7 @@
 namespace NFlatBuffersBench;
 
-// The size of TLeaf is 72 to ensure that it goes beyond one cache line.
-table TLeaf {
+// The size of Leaf is 72 to ensure that it goes beyond one cache line.
+table Leaf {
     a:uint64;
     b:uint64;
     c:uint64;
@@ -13,10 +13,10 @@ table TLeaf {
     i:int64;
 }
 
-// The offset to TLeaf is placed in another cache line
+// The offset to Leaf is placed in another cache line
 // to achieve better realism with actual data and to make
 // the effects of caching the entire access chain more noticeable.
-table TIntermediate {
+table Intermediate {
     v0:uint64;
     v1:uint64;
     v2:uint64;
@@ -25,11 +25,11 @@ table TIntermediate {
     v5:uint64;
     v6:uint64;
     v7:uint64;
-    leaf:TLeaf;
+    leaf:Leaf;
 }
 
-// The logic of TRoot is the same as that of TIntermediate.
-table TRoot {
+// The logic of Root is the same as that of Intermediate.
+table Root {
     i:uint64;
     ii:uint64;
     iii:uint64;
@@ -38,7 +38,7 @@ table TRoot {
     vi:uint64;
     vii:uint64;
     viii:uint64;
-    intermediate:TIntermediate;
+    intermediate:Intermediate;
 }
 
-root_type TRoot;
+root_type Root;

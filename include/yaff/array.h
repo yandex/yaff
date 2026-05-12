@@ -4,23 +4,23 @@
 
 #include "base.h"
 
-namespace NYaFF {
+namespace yaff {
 
 template <typename T>
-class TVectorIterator;
+class ArrayIterator;
 
 template <typename T>
-class TStructVectorIterator;
+class StructArrayIterator;
 
 template <typename T>
-YAFF_LAYOUT_BEGIN(TBaseVector) {
+YAFF_LAYOUT_BEGIN(BaseArray) {
 public:
     using size_type = uint32_t;
     using difference_type = std::ptrdiff_t;
 
 public:
-    TBaseVector(const TBaseVector&) = delete;
-    TBaseVector& operator=(const TBaseVector&) = delete;
+    BaseArray(const BaseArray&) = delete;
+    BaseArray& operator=(const BaseArray&) = delete;
 
     /*
         This section only works correctly with byte vector specification.
@@ -106,7 +106,7 @@ public:
     }
 
 protected:
-    TBaseVector() noexcept = default;
+    BaseArray() noexcept = default;
 
     YAFF_PURE const std::byte* Bytes() const noexcept {
         return reinterpret_cast<const std::byte*>(this + 1);
@@ -118,105 +118,105 @@ private:
 YAFF_LAYOUT_END
 
 template <typename T>
-YAFF_LAYOUT_BEGIN(TVector) : public TBaseVector<TVector<T>> {
-    using TBase = TBaseVector<TVector<T>>;
+YAFF_LAYOUT_BEGIN(Array) : public BaseArray<Array<T>> {
+    using Base = BaseArray<Array<T>>;
 
 public:
-    using TBase::TBase;
+    using Base::Base;
 
     using value_type = T;
     using stored_type = T;
     using const_reference = T;
     using const_pointer = void;
-    using const_iterator = TVectorIterator<TVector<T>>;
+    using const_iterator = ArrayIterator<Array<T>>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 public:
-    YAFF_PURE const_reference Get(TBase::size_type i) const noexcept {
-        return ReadValue<T>(TBase::Bytes() + i * sizeof(T));
+    YAFF_PURE const_reference Get(Base::size_type i) const noexcept {
+        return ReadValue<T>(Base::Bytes() + i * sizeof(T));
     }
 
-    YAFF_PURE const_reference operator[](TBase::size_type i) const noexcept {
+    YAFF_PURE const_reference operator[](Base::size_type i) const noexcept {
         return Get(i);
     }
 };
 YAFF_LAYOUT_END
 
 template <typename T>
-YAFF_LAYOUT_BEGIN(TVector<TInternalOffset<T>>) : public TBaseVector<TVector<TInternalOffset<T>>> {
-    using TBase = TBaseVector<TVector<TInternalOffset<T>>>;
+YAFF_LAYOUT_BEGIN(Array<InternalOffset<T>>) : public BaseArray<Array<InternalOffset<T>>> {
+    using Base = BaseArray<Array<InternalOffset<T>>>;
 
 public:
-    using TBase::TBase;
+    using Base::Base;
 
     using value_type = T;
-    using stored_type = TInternalOffset<T>;
+    using stored_type = InternalOffset<T>;
     using const_reference = const value_type&;
     using const_pointer = const value_type*;
-    using const_iterator = TStructVectorIterator<TVector<TInternalOffset<T>>>;
+    using const_iterator = StructArrayIterator<Array<InternalOffset<T>>>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 public:
-    YAFF_PURE const_reference Get(TBase::size_type i) const noexcept {
-        const auto offset = ReadValue<TInternalOffset<T>>(TBase::Bytes() + i * sizeof(TInternalOffset<T>));
-        return *ResolveOffset<T>(TBase::Bytes(), offset.O);
+    YAFF_PURE const_reference Get(Base::size_type i) const noexcept {
+        const auto offset = ReadValue<InternalOffset<T>>(Base::Bytes() + i * sizeof(InternalOffset<T>));
+        return *ResolveOffset<T>(Base::Bytes(), offset.O);
     }
 
-    YAFF_PURE const_reference operator[](TBase::size_type i) const noexcept {
+    YAFF_PURE const_reference operator[](Base::size_type i) const noexcept {
         return Get(i);
     }
 };
 YAFF_LAYOUT_END
 
 template <typename T>
-YAFF_LAYOUT_BEGIN(TVector<TInlineOffset<T>>) : public TBaseVector<TVector<TInlineOffset<T>>> {
-    using TBase = TBaseVector<TVector<TInlineOffset<T>>>;
+YAFF_LAYOUT_BEGIN(Array<InlineOffset<T>>) : public BaseArray<Array<InlineOffset<T>>> {
+    using Base = BaseArray<Array<InlineOffset<T>>>;
 
 public:
-    using TBase::TBase;
+    using Base::Base;
 
     using value_type = T;
-    using stored_type = TInlineOffset<T>;
+    using stored_type = InlineOffset<T>;
     using const_reference = const value_type&;
     using const_pointer = const value_type*;
-    using const_iterator = TStructVectorIterator<TVector<TInlineOffset<T>>>;
+    using const_iterator = StructArrayIterator<Array<InlineOffset<T>>>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 public:
-    YAFF_PURE const_reference Get(TBase::size_type i) const noexcept {
-        return *ResolveOffset<T>(TBase::Bytes(), T::TMetaType::LIMIT * i);
+    YAFF_PURE const_reference Get(Base::size_type i) const noexcept {
+        return *ResolveOffset<T>(Base::Bytes(), T::MetaType::LIMIT * i);
     }
 
-    YAFF_PURE const_reference operator[](TBase::size_type i) const noexcept {
+    YAFF_PURE const_reference operator[](Base::size_type i) const noexcept {
         return Get(i);
     }
 };
 YAFF_LAYOUT_END
 
-YAFF_LAYOUT_BEGIN(TString) : public TBaseVector<TString> {
-    using TBase = TBaseVector<TString>;
+YAFF_LAYOUT_BEGIN(String) : public BaseArray<String> {
+    using Base = BaseArray<String>;
 
 public:
-    using TBase::TBase;
+    using Base::Base;
 
     using value_type = char;
     using stored_type = char;
     using const_reference = const value_type&;
     using const_pointer = const value_type*;
-    using const_iterator = TVectorIterator<TString>;
+    using const_iterator = ArrayIterator<String>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 public:
-    YAFF_PURE const_reference Get(TBase::size_type i) const noexcept {
-        return TBase::Data()[i];
+    YAFF_PURE const_reference Get(Base::size_type i) const noexcept {
+        return Base::Data()[i];
     }
 
-    YAFF_PURE const_reference operator[](TBase::size_type i) const noexcept {
+    YAFF_PURE const_reference operator[](Base::size_type i) const noexcept {
         return Get(i);
     }
 
     std::string_view AsStringView() const noexcept {
-        return {TBase::Data(), TBase::Size()};
+        return {Base::Data(), Base::Size()};
     }
 
     operator std::string_view() const noexcept {
@@ -224,23 +224,23 @@ public:
     }
 
     template <std::convertible_to<std::string_view> K>
-    friend std::strong_ordering operator<=>(const TString& lhs, const K& rhs) noexcept {
+    friend std::strong_ordering operator<=>(const String& lhs, const K& rhs) noexcept {
         return lhs.AsStringView() <=> static_cast<std::string_view>(rhs);
     }
 
     template <std::convertible_to<std::string_view> K>
-    friend bool operator==(const TString& lhs, const K& rhs) noexcept {
+    friend bool operator==(const String& lhs, const K& rhs) noexcept {
         return lhs.AsStringView() == static_cast<std::string_view>(rhs);
     }
 
-    friend std::ostream& operator<<(std::ostream& os, const TString& str) {
+    friend std::ostream& operator<<(std::ostream& os, const String& str) {
         return os << static_cast<std::string_view>(str);
     }
 };
 YAFF_LAYOUT_END
 
 template <typename T, typename D>
-class TBaseVectorIterator {
+class BaseArrayIterator {
 public:
     // N.B.: Formally, before C++20, this class can not be a real random_access_iterator,
     // since reference is just T for scalar types. But due to the constancy of the iterator,
@@ -255,14 +255,14 @@ public:
     using reference = typename T::const_reference;
     using pointer = typename T::const_pointer;
 
-    TBaseVectorIterator() noexcept : Vec_(&T::Default()), Cur_(0) {
+    BaseArrayIterator() noexcept : Vec_(&T::Default()), Cur_(0) {
     }
 
-    TBaseVectorIterator(const T& vec, T::size_type cur = 0) noexcept : Vec_(&vec), Cur_(cur) {
+    BaseArrayIterator(const T& vec, T::size_type cur = 0) noexcept : Vec_(&vec), Cur_(cur) {
     }
 
-    TBaseVectorIterator(const TBaseVectorIterator&) noexcept = default;
-    TBaseVectorIterator& operator=(const TBaseVectorIterator&) noexcept = default;
+    BaseArrayIterator(const BaseArrayIterator&) noexcept = default;
+    BaseArrayIterator& operator=(const BaseArrayIterator&) noexcept = default;
 
     friend bool operator==(const D& lhs, const D& rhs) noexcept {
         return lhs.Cur_ == rhs.Cur_;
@@ -343,23 +343,23 @@ private:
 };
 
 template <typename T>
-class TVectorIterator : public TBaseVectorIterator<T, TVectorIterator<T>> {
-    using TBase = TBaseVectorIterator<T, TVectorIterator<T>>;
+class ArrayIterator : public BaseArrayIterator<T, ArrayIterator<T>> {
+    using Base = BaseArrayIterator<T, ArrayIterator<T>>;
 
 public:
-    using TBase::TBase;
+    using Base::Base;
 };
 
 template <typename T>
-class TStructVectorIterator : public TBaseVectorIterator<T, TStructVectorIterator<T>> {
-    using TBase = TBaseVectorIterator<T, TStructVectorIterator<T>>;
+class StructArrayIterator : public BaseArrayIterator<T, StructArrayIterator<T>> {
+    using Base = BaseArrayIterator<T, StructArrayIterator<T>>;
 
 public:
-    using TBase::TBase;
+    using Base::Base;
 
-    YAFF_PURE TBase::pointer operator->() const noexcept {
-        return &TBase::operator*();
+    YAFF_PURE Base::pointer operator->() const noexcept {
+        return &Base::operator*();
     }
 };
 
-}  // namespace NYaFF
+}  // namespace yaff

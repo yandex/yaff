@@ -50,14 +50,14 @@ public:
             const int64_t addend = next - std::accumulate(values.begin(), values.begin() + 8, 0ULL);
 
             flatbuffers::FlatBufferBuilder fbb;
-            const auto leaf = NFlatBuffersBench::CreateTLeaf(fbb, values[0], values[1], values[2], values[3], values[4],
-                                                             values[5], values[6], values[7], addend);
+            const auto leaf = NFlatBuffersBench::CreateLeaf(fbb, values[0], values[1], values[2], values[3], values[4],
+                                                            values[5], values[6], values[7], addend);
             const auto intermediate =
-                NFlatBuffersBench::CreateTIntermediate(fbb, values[8], values[9], values[10], values[11], values[12],
-                                                       values[13], values[14], values[15], leaf);
+                NFlatBuffersBench::CreateIntermediate(fbb, values[8], values[9], values[10], values[11], values[12],
+                                                      values[13], values[14], values[15], leaf);
             const auto root =
-                NFlatBuffersBench::CreateTRoot(fbb, values[16], values[17], values[18], values[19], values[20],
-                                               values[21], values[22], values[23], intermediate);
+                NFlatBuffersBench::CreateRoot(fbb, values[16], values[17], values[18], values[19], values[20],
+                                              values[21], values[22], values[23], intermediate);
             fbb.Finish(root);
 
             YAFF_REQUIRE(fbb.GetSize() == FLATBUFFERS_SIZE);
@@ -67,9 +67,9 @@ public:
         return buffer;
     }
 
-    template <NYaFF::EMessageLayout Layout, size_t Size>
+    template <yaff::MessageLayout Layout, size_t Size>
     std::string GenerateYaFFMessages() {
-        static const uint64_t YAFF_SIZE = (Layout == NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT ? 227 : 239);
+        static const uint64_t YAFF_SIZE = (Layout == yaff::MessageLayout::MESSAGE_LAYOUT_FLAT ? 227 : 239);
         const uint64_t n = (static_cast<double>(Size) / YAFF_SIZE) + 1;
         const auto& perm = GenerateCyclePermutation(n);
 
@@ -78,24 +78,24 @@ public:
         for (uint32_t val : perm) {
             const auto& protoRoot = GenerateProtobuf(val, YAFF_SIZE);
 
-            NYaFF::TBuilder yffb;
-            yffb.EnforceDynamicAlternative(Layout);
-            yffb.Finish(NProtoYaFF::NYaFFBench::CreateTRoot(yffb, protoRoot));
+            yaff::Serializer ys;
+            ys.EnforceDynamicAlternative(Layout);
+            ys.Finish(protoyaff::benchmark_access::SerializeRoot(ys, protoRoot));
 
-            YAFF_REQUIRE(yffb.GetSize() == YAFF_SIZE);
-            buffer.append(reinterpret_cast<const char*>(yffb.GetBufferPointer()), yffb.GetSize());
+            YAFF_REQUIRE(ys.Size() == YAFF_SIZE);
+            buffer.append(reinterpret_cast<const char*>(ys.Data()), ys.Size());
         }
 
         return buffer;
     }
 
 private:
-    NYaFFBench::TRoot GenerateProtobuf(uint32_t val, uint64_t size) {
+    benchmark_access::Root GenerateProtobuf(uint32_t val, uint64_t size) {
         const std::vector<uint64_t> values = GenerateRandomVector64(24);
         const int64_t next = val * size + 1;
         const int64_t addend = next - std::accumulate(values.begin(), values.begin() + 8, 0ULL);
 
-        NYaFFBench::TLeaf leaf;
+        benchmark_access::Leaf leaf;
         leaf.set_a(values[0]);
         leaf.set_b(values[1]);
         leaf.set_c(values[2]);
@@ -106,7 +106,7 @@ private:
         leaf.set_h(values[7]);
         leaf.set_i(addend);
 
-        NYaFFBench::TIntermediate intermediate;
+        benchmark_access::Intermediate intermediate;
         intermediate.set_v0(values[8]);
         intermediate.set_v1(values[9]);
         intermediate.set_v2(values[10]);
@@ -117,7 +117,7 @@ private:
         intermediate.set_v7(values[15]);
         *intermediate.mutable_leaf() = leaf;
 
-        NYaFFBench::TRoot root;
+        benchmark_access::Root root;
         root.set_i(values[16]);
         root.set_ii(values[17]);
         root.set_iii(values[18]);
@@ -168,7 +168,7 @@ private:
     }
 
 template <bool CacheChains, bool InterruptChain>
-uint64_t SumHierarchicalFlatBuffers(const NFlatBuffersBench::TRoot* root) {
+uint64_t SumHierarchicalFlatBuffers(const NFlatBuffersBench::Root* root) {
     uint64_t sum = 0;
     if constexpr (CacheChains) {
         const auto* leaf = root->intermediate()->leaf();
@@ -262,11 +262,11 @@ void BM_Access_Hierarchical_Protobuf(benchmark::State& state) {
 
     volatile uint32_t next = 1;
     for (auto _ : state) {
-        const uint32_t size = NYaFF::ReadValue<uint32_t>(msgs.data() + next);
+        const uint32_t size = yaff::ReadValue<uint32_t>(msgs.data() + next);
 
-        NYaFFBench::TRoot root;
+        benchmark_access::Root root;
         std::ignore = root.ParseFromArray(msgs.data() + next + sizeof(size), size);
-        next = SumHierarchicalProtoYaFF<NYaFFBench::TRoot, CacheChains, InterruptChain>(root);
+        next = SumHierarchicalProtoYaFF<benchmark_access::Root, CacheChains, InterruptChain>(root);
     }
 
     state.counters["object_size"] =
@@ -280,7 +280,7 @@ void BM_Access_Hierarchical_FlatBuffers(benchmark::State& state) {
 
     volatile uint32_t next = 1;
     for (auto _ : state) {
-        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::TRoot>(msgs.data() + next);
+        const auto* root = flatbuffers::GetRoot<NFlatBuffersBench::Root>(msgs.data() + next);
         next = SumHierarchicalFlatBuffers<CacheChains, InterruptChain>(root);
     }
 
@@ -288,15 +288,15 @@ void BM_Access_Hierarchical_FlatBuffers(benchmark::State& state) {
         benchmark::Counter(msgs.size(), benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
 }
 
-template <NYaFF::EMessageLayout Layout, uint64_t Size, bool CacheChains, bool InterruptChain>
+template <yaff::MessageLayout Layout, uint64_t Size, bool CacheChains, bool InterruptChain>
 void BM_Access_Hierarchical_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     const auto msgs = gen.GenerateYaFFMessages<Layout, Size>();
 
     volatile uint32_t next = 1;
     for (auto _ : state) {
-        const auto& root = NYaFF::ReadRoot<NProtoYaFF::NYaFFBench::TRoot>(msgs.data() + next);
-        next = SumHierarchicalProtoYaFF<NProtoYaFF::NYaFFBench::TRoot, CacheChains, InterruptChain>(root);
+        const auto& root = yaff::ReadRoot<protoyaff::benchmark_access::Root>(msgs.data() + next);
+        next = SumHierarchicalProtoYaFF<protoyaff::benchmark_access::Root, CacheChains, InterruptChain>(root);
     }
 
     state.counters["object_size"] =
@@ -321,21 +321,21 @@ BENCHMARK_TEMPLATE(BM_Access_Hierarchical_FlatBuffers, 2048, true, false)
     ->Name("BM_Access_Hierarchical_FlatBuffers/HotAccess/CacheChains:true/Modification:false");
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_FlatBuffers, 2048, true, true)
     ->Name("BM_Access_Hierarchical_FlatBuffers/HotAccess/CacheChains:true/Modification:true");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT, 2048, false, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT, 2048, false, false)
     ->Name("BM_Access_Hierarchical_YaFF/FlatLayout/HotAccess/CacheChains:false/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT, 2048, false, true)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT, 2048, false, true)
     ->Name("BM_Access_Hierarchical_YaFF/FlatLayout/HotAccess/CacheChains:false/Modification:true");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT, 2048, true, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT, 2048, true, false)
     ->Name("BM_Access_Hierarchical_YaFF/FlatLayout/HotAccess/CacheChains:true/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT, 2048, true, true)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT, 2048, true, true)
     ->Name("BM_Access_Hierarchical_YaFF/FlatLayout/HotAccess/CacheChains:true/Modification:true");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, false, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, false, false)
     ->Name("BM_Access_Hierarchical_YaFF/SparseLayout/HotAccess/CacheChains:false/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, false, true)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, false, true)
     ->Name("BM_Access_Hierarchical_YaFF/SparseLayout/HotAccess/CacheChains:false/Modification:true");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, true, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, true, false)
     ->Name("BM_Access_Hierarchical_YaFF/SparseLayout/HotAccess/CacheChains:true/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, true, true)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, true, true)
     ->Name("BM_Access_Hierarchical_YaFF/SparseLayout/HotAccess/CacheChains:true/Modification:true");
 
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Protobuf, 536'870'912, false, false)
@@ -346,11 +346,11 @@ BENCHMARK_TEMPLATE(BM_Access_Hierarchical_FlatBuffers, 536'870'912, false, false
     ->Name("BM_Access_Hierarchical_FlatBuffers/ColdAccess/CacheChains:false/Modification:false");
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_FlatBuffers, 536'870'912, true, false)
     ->Name("BM_Access_Hierarchical_FlatBuffers/ColdAccess/CacheChains:true/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT, 536'870'912, false, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT, 536'870'912, false, false)
     ->Name("BM_Access_Hierarchical_YaFF/FlatLayout/ColdAccess/CacheChains:false/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_FLAT, 536'870'912, true, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT, 536'870'912, true, false)
     ->Name("BM_Access_Hierarchical_YaFF/FlatLayout/ColdAccess/CacheChains:true/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE, 536'870'912, false, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE, 536'870'912, false, false)
     ->Name("BM_Access_Hierarchical_YaFF/SparseLayout/ColdAccess/CacheChains:false/Modification:false");
-BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, NYaFF::EMessageLayout::MESSAGE_LAYOUT_SPARSE, 536'870'912, true, false)
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE, 536'870'912, true, false)
     ->Name("BM_Access_Hierarchical_YaFF/SparseLayout/ColdAccess/CacheChains:true/Modification:false");
