@@ -14,6 +14,7 @@ struct ProtobufReflectionFrontEndOptions {
     std::string GeneratedProtobufExt = ".pb.h";
 
     bool SkipEmptyMessages = true;
+    bool SkipTypeReserved = true;
     bool FillGaps = false;
 };
 

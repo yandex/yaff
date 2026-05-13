@@ -83,10 +83,10 @@ static std::vector<ProtobufDeprecatedField> GetDeprecatedFields(const google::pr
         std::vector<ProtobufDeprecatedField> fields;
         fields.reserve(messageMeta->reserved_fields_size());
         for (const auto& deprecated : messageMeta->reserved_fields()) {
+            const auto type = deprecated.has_type() ? deprecated.type() : 0;
             fields.emplace_back(ProtobufDeprecatedField{
                 .Id = deprecated.id(),
-                .Type =
-                    static_cast<google::protobuf::FieldDescriptor::Type>(deprecated.has_type() ? deprecated.type() : 0),
+                .Type = static_cast<google::protobuf::FieldDescriptor::Type>(type),
                 .Label = static_cast<google::protobuf::FieldDescriptor::Label>(deprecated.label()),
             });
         }
@@ -349,7 +349,8 @@ const ir::MessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf::
         // so the existing field takes precedence over the reserved field.
         // If the reserved field has a specific type,
         // it will result in an invalid IR that will fail further validation.
-        if (field.Type == PROTO_TYPE_RESERVED && knownIds.contains(field.Id)) {
+        const bool skipReserved = (knownIds.contains(field.Id) || Opts_.SkipTypeReserved);
+        if (field.Type == PROTO_TYPE_RESERVED && skipReserved) {
             continue;
         }
         messageDef->Fields.emplace_back(ir::MessageDef::FieldDef{
