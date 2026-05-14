@@ -59,7 +59,7 @@ public:
                 DispatchMessageField(desc->Layout, ptr, field, resolver);
             } else if (type.Type == Type::TYPE_STRING) {
                 DispatchStringField(desc->Layout, ptr, field, resolver);
-            } else if (type.Type == Type::TYPE_VECTOR) {
+            } else if (type.Type == Type::TYPE_ARRAY) {
                 DispatchArrayField(desc->Layout, ptr, field, resolver);
             } else {
                 DispatchScalarField(desc->Layout, ptr, field, resolver);
@@ -84,9 +84,9 @@ private:
 
     template <typename T, typename F>
     void VisitScalarArray(const void* ptr, F&& cb) {
-        const auto& vector = *ReadLayout<AnyArray>(ptr);
-        for (size_t i = 0; i < vector.Size(); ++i) {
-            cb(i, vector.GetValue<T>(i));
+        const auto& array = *ReadLayout<AnyArray>(ptr);
+        for (size_t i = 0; i < array.Size(); ++i) {
+            cb(i, array.GetValue<T>(i));
         }
     }
 
@@ -112,19 +112,19 @@ private:
     }
 
     void DispatchMessageArray(const void* ptr, const TypeDescriptor* element) {
-        const auto& vector = *ReadLayout<AnyArray>(ptr);
+        const auto& array = *ReadLayout<AnyArray>(ptr);
         const size_t inlineSize = (element->Inline ? InlineSize(*element) : 0);
-        for (size_t i = 0; i < vector.Size(); ++i) {
+        for (size_t i = 0; i < array.Size(); ++i) {
             Visitor_->OnElement(i);
-            const void* ith = inlineSize ? vector.GetLayout<char>(i, inlineSize) : vector.GetLayout<char>(i);
+            const void* ith = inlineSize ? array.GetLayout<char>(i, inlineSize) : array.GetLayout<char>(i);
             VisitMessage(ith, element->Descriptor.Message);
         }
     }
 
     void DispatchStringArray(const void* ptr, const TypeDescriptor*) {
-        const auto& vector = *ReadLayout<AnyArray>(ptr);
-        for (size_t i = 0; i < vector.Size(); ++i) {
-            const auto& str = *vector.GetLayout<yaff::String>(i);
+        const auto& array = *ReadLayout<AnyArray>(ptr);
+        for (size_t i = 0; i < array.Size(); ++i) {
+            const auto& str = *array.GetLayout<yaff::String>(i);
             Visitor_->OnElement(i);
             Visitor_->OnString(str);
         }

@@ -88,7 +88,7 @@ TEST(FixedMessage, ArrayOfInlineFixed) {
     struct SimpleMessage {};
     yaff::Serializer ys;
 
-    const auto vectorOffset = ys.SerializeArray<yaff::InlineOffset<SimpleMessage>>([&](size_t i) {
+    const auto arrayOffset = ys.SerializeArray<yaff::InlineOffset<SimpleMessage>>([&](size_t i) {
         ys.StartFixedMessage<TFixedMeta>();
         ys.AddField<uint64_t>(2, i, 0x0);
         ys.AddField<uint64_t>(1, 2 * i, 0x0);
@@ -96,7 +96,7 @@ TEST(FixedMessage, ArrayOfInlineFixed) {
     });
 
     ys.StartFlatMessage<TFlatMeta>();
-    ys.AddField(1, vectorOffset);
+    ys.AddField(1, arrayOffset);
     ys.Finish(yaff::InternalOffset<void>(ys.FinishFlatMessage()));
 
     EXPECT_EQ(ys.Size(), 174ULL);
@@ -104,12 +104,12 @@ TEST(FixedMessage, ArrayOfInlineFixed) {
     const auto* buf = ys.Data();
     const auto& root = yaff::ReadRoot<yaff::DynamicMessage<TFlatMeta>>(buf);
 
-    const auto& vector = *root.ReadLayout<yaff::Array<yaff::InlineOffset<yaff::FixedMessage<TFixedMeta>>>>(
+    const auto& array = *root.ReadLayout<yaff::Array<yaff::InlineOffset<yaff::FixedMessage<TFixedMeta>>>>(
         1, &yaff::Array<yaff::InlineOffset<yaff::FixedMessage<TFixedMeta>>>::Default());
-    const size_t size = vector.Size();
+    const size_t size = array.Size();
     EXPECT_EQ(size, 10U);
     for (size_t i = 0; i < size; ++i) {
-        const auto& simpleMessage = vector.Get(i);
+        const auto& simpleMessage = array.Get(i);
         EXPECT_EQ(simpleMessage.ReadValue<uint64_t>(1, 0x0), 2 * (size - i - 1));
         EXPECT_EQ(simpleMessage.ReadValue<uint64_t>(2, 0x0), size - i - 1);
     }

@@ -82,7 +82,7 @@ enum class Type : int32_t {
     TYPE_DOUBLE = 7,
     TYPE_ENUM = 8,
     TYPE_STRING = 9,
-    TYPE_VECTOR = 10,
+    TYPE_ARRAY = 10,
     TYPE_MESSAGE = 11,
 };
 

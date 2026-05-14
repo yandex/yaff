@@ -93,14 +93,14 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
                "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                    ") is inlined, but inlined fields are not supported yet");
 
-        if (fieldDef.Type->Type == Type::TYPE_VECTOR) {
+        if (fieldDef.Type->Type == Type::TYPE_ARRAY) {
             const auto* elementType = fieldDef.Type->ElementType;
-            Ensure(!elementType || elementType->Type != Type::TYPE_VECTOR,
+            Ensure(!elementType || elementType->Type != Type::TYPE_ARRAY,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
-                       ") is 2d vector, but 2d vectors are not supported");
+                       ") is 2d array, but 2d arrays are not supported");
             Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_IMPLICIT,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
-                       ") is vector, but has explicit presence");
+                       ") is array, but has explicit presence");
         }
 
         if (fieldDef.Type->Type == Type::TYPE_MESSAGE) {
@@ -130,9 +130,9 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
         if (!fieldDef.OneOf.empty()) {
             Ensure(messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED,
                    "message '" + messageDef.Name + "' is fixed and can not have any oneof fields");
-            Ensure(fieldDef.Type->Type != Type::TYPE_VECTOR, "field '" + fieldDef.Name +
-                                                                 "' (id: " + std::to_string(fieldDef.Id) +
-                                                                 ") is vector and can not be oneof field");
+            Ensure(fieldDef.Type->Type != Type::TYPE_ARRAY, "field '" + fieldDef.Name +
+                                                                "' (id: " + std::to_string(fieldDef.Id) +
+                                                                ") is array and can not be oneof field");
             Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT,
                    "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
                        ") is oneof field, but has implicit presence");

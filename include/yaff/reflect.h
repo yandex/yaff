@@ -96,7 +96,7 @@ inline size_t InlineSize(Type type) {
         case Type::TYPE_DOUBLE:
             return sizeof(double);
         case Type::TYPE_STRING:
-        case Type::TYPE_VECTOR:
+        case Type::TYPE_ARRAY:
             return sizeof(Offset);
         case Type::TYPE_MESSAGE:
             YAFF_THROW("incomplete message type");

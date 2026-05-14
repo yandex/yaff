@@ -438,7 +438,7 @@ ir::TypeDef* TProtobufBuilder::RegisterFieldType(const google::protobuf::FieldDe
     if (field.is_repeated()) {
         ProtobufField::AdditionalModifiers elemMods{.Modifiers = mods.ElementModifiers};
         return Ir_.Types.GetOrEmplace(
-            ir::TypeDef{.Type = Type::TYPE_VECTOR,
+            ir::TypeDef{.Type = Type::TYPE_ARRAY,
                         .ElementType = RegisterFieldTypeImpl(field, elemMods, messageDef, enumDef),
                         .Modifiers = GetFieldModifiers(field, mods)});
     }
@@ -465,7 +465,7 @@ ir::TypeDef* TProtobufBuilder::RegisterFieldTypeImpl(const google::protobuf::Fie
 
 ir::TypeDef* TProtobufBuilder::RegisterDeprecatedFieldType(const ProtobufDeprecatedField& field) {
     if (field.Label == google::protobuf::FieldDescriptor::LABEL_REPEATED) {
-        return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = Type::TYPE_VECTOR});
+        return Ir_.Types.GetOrEmplace(ir::TypeDef{.Type = Type::TYPE_ARRAY});
     }
 
     if (field.Type == google::protobuf::FieldDescriptor::TYPE_MESSAGE) {

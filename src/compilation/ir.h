@@ -48,7 +48,7 @@ struct SchemaDef;
 
 struct TypeDef {
     Type Type = Type::TYPE_NONE;
-    const TypeDef* ElementType = nullptr;    // Not nullptr only for TYPE_VECTOR;
+    const TypeDef* ElementType = nullptr;    // Not nullptr only for TYPE_ARRAY;
     const MessageDef* MessageDef = nullptr;  // Not nullptr only for TYPE_MESSAGE;
     const EnumDef* EnumDef = nullptr;        // Not nullptr only for TYPE_ENUM;
 

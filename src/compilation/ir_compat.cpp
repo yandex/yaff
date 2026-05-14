@@ -114,9 +114,9 @@ void IRCompatibilityChecker::CheckTypes(const std::string& fieldName, const ir::
         CheckMessage(*base.MessageDef, *patched.MessageDef);
     }
 
-    if (base.Type == Type::TYPE_VECTOR && base.ElementType && patched.ElementType &&
+    if (base.Type == Type::TYPE_ARRAY && base.ElementType && patched.ElementType &&
         base.ElementType != patched.ElementType) {
-        CheckTypes(ConcatNames(fieldName, "vector_type"), *base.ElementType, *patched.ElementType);
+        CheckTypes(ConcatNames(fieldName, "array_type"), *base.ElementType, *patched.ElementType);
     }
 }
 

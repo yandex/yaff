@@ -8,7 +8,7 @@ static std::string TypeString(const TypeDef& type) {
             const std::string inner = (type.EnumDef ? type.EnumDef->ToString() : "Incomplete");
             return "Enum<" + inner + ">";
         }
-        case Type::TYPE_VECTOR: {
+        case Type::TYPE_ARRAY: {
             const std::string inner = (type.ElementType ? type.ElementType->ToString() : "Incomplete");
             return "Array[" + inner + "]";
         }
@@ -55,7 +55,7 @@ size_t InlineSize(const Type type) {
             return sizeof(float);
         case Type::TYPE_DOUBLE:
             return sizeof(double);
-        case Type::TYPE_VECTOR:
+        case Type::TYPE_ARRAY:
         case Type::TYPE_STRING:
             return sizeof(Offset);
         case Type::TYPE_MESSAGE:
@@ -138,7 +138,7 @@ std::string TypeToString(const Type type) {
             return "Enum";
         case Type::TYPE_STRING:
             return "String";
-        case Type::TYPE_VECTOR:
+        case Type::TYPE_ARRAY:
             return "Array";
         case Type::TYPE_MESSAGE:
             return "Message";
@@ -178,7 +178,7 @@ Type TypeFromString(const std::string& value) {
         return Type::TYPE_STRING;
     }
     if (value == "Array") {
-        return Type::TYPE_VECTOR;
+        return Type::TYPE_ARRAY;
     }
     if (value == "Message") {
         return Type::TYPE_MESSAGE;
@@ -212,7 +212,7 @@ Presence PresenceFromString(const std::string& value) {
 }
 
 const ir::MessageDef* ExtractMessageDef(const ir::TypeDef& type) {
-    if (type.Type == Type::TYPE_VECTOR && type.ElementType) {
+    if (type.Type == Type::TYPE_ARRAY && type.ElementType) {
         return ExtractMessageDef(*type.ElementType);
     }
     if (type.Type == Type::TYPE_MESSAGE) {
@@ -247,7 +247,7 @@ bool IsGapMessage(const MessageDef& msg) {
 }
 
 bool IsScalarArray(const TypeDef& type) {
-    return type.Type == Type::TYPE_VECTOR && type.ElementType && IsScalar(type.ElementType->Type);
+    return type.Type == Type::TYPE_ARRAY && type.ElementType && IsScalar(type.ElementType->Type);
 }
 
 bool IsInline(const TypeDef& type) {

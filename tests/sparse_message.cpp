@@ -66,10 +66,10 @@ TEST(SparseDynamicMessage, BadFillOrder) {
 TEST(SparseDynamicMessage, BadMessageOffset) {
     yaff::Serializer ys;
     std::vector<uint8_t> largeBytes(2147483638, 0);  // 2GB - 10B;
-    const auto vectorOffset = ys.SerializeArray(largeBytes);
+    const auto arrayOffset = ys.SerializeArray(largeBytes);
 
     ys.StartSparseMessage();
-    ys.AddField(1, vectorOffset);
+    ys.AddField(1, arrayOffset);
     EXPECT_THROW(ys.FinishSparseMessage(), std::runtime_error);
 }
 

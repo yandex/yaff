@@ -15,7 +15,7 @@ using namespace std::placeholders;
 namespace yaff::compilation {
 
 static bool IsSizeableField(const ir::MessageDef::FieldDef& field) {
-    return field.Type->Type == Type::TYPE_VECTOR && !ir::IsAssociative(*field.Type) &&
+    return field.Type->Type == Type::TYPE_ARRAY && !ir::IsAssociative(*field.Type) &&
            !ir::IsSequentialMessage(*field.Type);
 }
 
@@ -953,7 +953,7 @@ void CppGenerator::Impl::GenerateMessageFieldDescriptors(const ir::MessageDef& m
     ForFields(msgDef, [&](const auto& fieldDef) {
         const auto* type = fieldDef.Type;
         index.Add(type);
-        if (type->Type == Type::TYPE_VECTOR && type->ElementType) {
+        if (type->Type == Type::TYPE_ARRAY && type->ElementType) {
             index.Add(type->ElementType);
         }
     });
@@ -1084,7 +1084,7 @@ std::string CppGenerator::Impl::GenerateProtobufStructFill(const std::string& mu
             return "if (const auto& _v = from." + fieldName + "(); _v != " + GenerateDefaultValueExternal(fieldDef) +
                    ") { " + mutableCall + "->assign(_v.AsStringView()); } else { " + clearCall + "; }";
         }
-        case Type::TYPE_VECTOR: {
+        case Type::TYPE_ARRAY: {
             std::string fillArray =
                 "if (const auto& _v = from." + GenerateFieldName(fieldDef) + "(); _v.Size() != 0) { ";
             if (fieldDef.Type->ElementType->Type == Type::TYPE_MESSAGE) {
@@ -1172,7 +1172,7 @@ std::string CppGenerator::Impl::GenerateProtobufValue(const ir::MessageDef::Fiel
             (isExpl ? "proto.has_" + fieldName + "()" : getCall + " != " + GenerateDefaultValueExternal(fieldDef));
         return "(" + checkCall + " ? " + serializeCall + " : 0)";
     }
-    if (fieldDef.Type->Type == Type::TYPE_VECTOR) {
+    if (fieldDef.Type->Type == Type::TYPE_ARRAY) {
         return "(!" + getCall + ".empty() ? " + serializeCall + " : 0)";
     }
     if (fieldDef.Type->Type == Type::TYPE_MESSAGE) {
@@ -1196,7 +1196,7 @@ std::string CppGenerator::Impl::GenerateExternalSerialize(const std::string& get
             return GenerateTypeCastExternal(type, getCall);
         case Type::TYPE_STRING:
             return "ys.SerializeString(" + getCall + ")";
-        case Type::TYPE_VECTOR: {
+        case Type::TYPE_ARRAY: {
             const std::string elemType = GenerateTypeExternal(*type.ElementType);
             if (ir::IsAssociative(type)) {
                 const std::string getElemCall = "*" + getCall + ".find(_k)";
@@ -1211,7 +1211,7 @@ std::string CppGenerator::Impl::GenerateExternalSerialize(const std::string& get
                        GenerateWithNamespaceName(ns, col + "<::yaff::exp::Sizeable>") + ">(ys, " + getCall + ")";
             }
             if (!ir::IsScalar(type.ElementType->Type)) {
-                // checkCall is empty because vector element can not be uninitialized;
+                // checkCall is empty because array element can not be uninitialized;
                 const std::string getElemCall = getCall + "[i]";
                 const std::string serialCall = GenerateExternalSerialize(getElemCall, getPrefix, *type.ElementType);
                 return "ys.SerializeArray<" + elemType + ">(" + getCall + ".size(), [&] (size_t i) { return " +
@@ -1370,8 +1370,8 @@ std::string CppGenerator::Impl::GenerateBasicTypeDescriptor(const Type type) {
             return "::yaff::Type::TYPE_ENUM";
         case Type::TYPE_STRING:
             return "::yaff::Type::TYPE_STRING";
-        case Type::TYPE_VECTOR:
-            return "::yaff::Type::TYPE_VECTOR";
+        case Type::TYPE_ARRAY:
+            return "::yaff::Type::TYPE_ARRAY";
         case Type::TYPE_MESSAGE:
             return "::yaff::Type::TYPE_MESSAGE";
         default:
@@ -1388,7 +1388,7 @@ std::string CppGenerator::Impl::GenerateCompositeTypeDescriptor(const ir::TypeDe
             const std::string name = GenerateWithNamespaceName(type.EnumDef->Schema->Namespace, type.EnumDef->Name);
             return "{.Enum = " + GenerateDescriptorFuncName(name) + "()}";
         }
-        case Type::TYPE_VECTOR: {
+        case Type::TYPE_ARRAY: {
             if (!type.ElementType) {
                 return "{.Element = nullptr}";
             }
@@ -1464,7 +1464,7 @@ std::string CppGenerator::Impl::GenerateDefaultValueInternal(const ir::MessageDe
             }
             return GenerateTypeInternal(*fieldDef.Type) + "::Default()";
         }
-        case Type::TYPE_VECTOR:
+        case Type::TYPE_ARRAY:
             return (ir::IsSequentialMessage(*fieldDef.Type)
                         ? GenerateWithNamespaceName(fieldDef.Type->ElementType->MessageDef->Schema->Namespace,
                                                     GenerateDefaultFuncName(GenerateMessageColumnName(
@@ -1505,7 +1505,7 @@ std::string CppGenerator::Impl::GenerateTypeProtobuf(const ir::TypeDef& type) {
             return GenerateEnumProtobufName(*type.EnumDef);
         case Type::TYPE_STRING:
             return "std::string";
-        case Type::TYPE_VECTOR:
+        case Type::TYPE_ARRAY:
             return (ir::IsAssociative(type)
                         ? GenerateMessageProtobufMap(*type.ElementType->MessageDef)
                         : "::google::protobuf::RepeatedPtrField<" + GenerateTypeProtobuf(*type.ElementType) + ">");
@@ -1521,7 +1521,7 @@ std::string CppGenerator::Impl::GenerateTypeExternal(const ir::TypeDef& type) {
         case Type::TYPE_ENUM:
             return GenerateWithNamespaceName(type.EnumDef->Schema->Namespace, type.EnumDef->Name);
         case Type::TYPE_STRING:
-        case Type::TYPE_VECTOR:
+        case Type::TYPE_ARRAY:
         case Type::TYPE_MESSAGE: {
             const std::string offsetType = (ir::IsInline(type) ? "::yaff::InlineOffset" : "::yaff::InternalOffset");
             return offsetType + "<" + GenerateTypeInternal(type) + ">";
@@ -1537,7 +1537,7 @@ std::string CppGenerator::Impl::GenerateTypeInternal(const ir::TypeDef& type) {
             return "int32_t";
         case Type::TYPE_STRING:
             return "::yaff::String";
-        case Type::TYPE_VECTOR: {
+        case Type::TYPE_ARRAY: {
             if (ir::IsSequentialMessage(type)) {
                 const std::string ns = type.ElementType->MessageDef->Schema->Namespace;
                 const std::string col = GenerateMessageColumnName(*type.ElementType->MessageDef);
@@ -1650,8 +1650,8 @@ std::string CppGenerator::Impl::GenerateOneOfFieldName(const std::string& name,
 }
 
 std::string CppGenerator::Impl::GenerateGetterReturnType(const ir::TypeDef& type) {
-    // Return type is not real external type, because vectors and nested structres are returned as reference (not
-    // WrittenOffset);
+    // Return type is not real external type,
+    // because arrays and nested structres are returned as reference (not WrittenOffset);
     return (!ir::IsScalar(type.Type) ? "const " + GenerateTypeInternal(type) + "&" : GenerateTypeExternal(type));
 }
 
