@@ -6,6 +6,56 @@
 #include "protoyaff/flat.pb.h"
 #include "protoyaff/flat.yaff.h"
 
+namespace benchmark_access_raw {
+
+#define YAFF_RAW_FIELD(i)   \
+    uint64_t V##i = 0;      \
+    uint64_t v##i() const { \
+        return V##i;        \
+    }
+
+// N.B.: YAFF_LAYOUT_BEGIN is only needed to legalize aliasing
+// for structures and has no effect on the implementation.
+//
+// When implementing a protocol on raw C++ structures,
+// you will still need to do something similar to mitigate the UB.
+
+// clang-format off
+YAFF_LAYOUT_BEGIN(Flat10) {
+    YAFF_RAW_FIELD(0) YAFF_RAW_FIELD(1) YAFF_RAW_FIELD(2) YAFF_RAW_FIELD(3) YAFF_RAW_FIELD(4)
+    YAFF_RAW_FIELD(5) YAFF_RAW_FIELD(6) YAFF_RAW_FIELD(7) YAFF_RAW_FIELD(8) YAFF_RAW_FIELD(9)
+};
+YAFF_LAYOUT_END
+
+YAFF_LAYOUT_BEGIN(Flat100) {
+    YAFF_RAW_FIELD(0)  YAFF_RAW_FIELD(1)  YAFF_RAW_FIELD(2)  YAFF_RAW_FIELD(3)  YAFF_RAW_FIELD(4)
+    YAFF_RAW_FIELD(5)  YAFF_RAW_FIELD(6)  YAFF_RAW_FIELD(7)  YAFF_RAW_FIELD(8)  YAFF_RAW_FIELD(9)
+    YAFF_RAW_FIELD(10) YAFF_RAW_FIELD(11) YAFF_RAW_FIELD(12) YAFF_RAW_FIELD(13) YAFF_RAW_FIELD(14)
+    YAFF_RAW_FIELD(15) YAFF_RAW_FIELD(16) YAFF_RAW_FIELD(17) YAFF_RAW_FIELD(18) YAFF_RAW_FIELD(19)
+    YAFF_RAW_FIELD(20) YAFF_RAW_FIELD(21) YAFF_RAW_FIELD(22) YAFF_RAW_FIELD(23) YAFF_RAW_FIELD(24)
+    YAFF_RAW_FIELD(25) YAFF_RAW_FIELD(26) YAFF_RAW_FIELD(27) YAFF_RAW_FIELD(28) YAFF_RAW_FIELD(29)
+    YAFF_RAW_FIELD(30) YAFF_RAW_FIELD(31) YAFF_RAW_FIELD(32) YAFF_RAW_FIELD(33) YAFF_RAW_FIELD(34)
+    YAFF_RAW_FIELD(35) YAFF_RAW_FIELD(36) YAFF_RAW_FIELD(37) YAFF_RAW_FIELD(38) YAFF_RAW_FIELD(39)
+    YAFF_RAW_FIELD(40) YAFF_RAW_FIELD(41) YAFF_RAW_FIELD(42) YAFF_RAW_FIELD(43) YAFF_RAW_FIELD(44)
+    YAFF_RAW_FIELD(45) YAFF_RAW_FIELD(46) YAFF_RAW_FIELD(47) YAFF_RAW_FIELD(48) YAFF_RAW_FIELD(49)
+    YAFF_RAW_FIELD(50) YAFF_RAW_FIELD(51) YAFF_RAW_FIELD(52) YAFF_RAW_FIELD(53) YAFF_RAW_FIELD(54)
+    YAFF_RAW_FIELD(55) YAFF_RAW_FIELD(56) YAFF_RAW_FIELD(57) YAFF_RAW_FIELD(58) YAFF_RAW_FIELD(59)
+    YAFF_RAW_FIELD(60) YAFF_RAW_FIELD(61) YAFF_RAW_FIELD(62) YAFF_RAW_FIELD(63) YAFF_RAW_FIELD(64)
+    YAFF_RAW_FIELD(65) YAFF_RAW_FIELD(66) YAFF_RAW_FIELD(67) YAFF_RAW_FIELD(68) YAFF_RAW_FIELD(69)
+    YAFF_RAW_FIELD(70) YAFF_RAW_FIELD(71) YAFF_RAW_FIELD(72) YAFF_RAW_FIELD(73) YAFF_RAW_FIELD(74)
+    YAFF_RAW_FIELD(75) YAFF_RAW_FIELD(76) YAFF_RAW_FIELD(77) YAFF_RAW_FIELD(78) YAFF_RAW_FIELD(79)
+    YAFF_RAW_FIELD(80) YAFF_RAW_FIELD(81) YAFF_RAW_FIELD(82) YAFF_RAW_FIELD(83) YAFF_RAW_FIELD(84)
+    YAFF_RAW_FIELD(85) YAFF_RAW_FIELD(86) YAFF_RAW_FIELD(87) YAFF_RAW_FIELD(88) YAFF_RAW_FIELD(89)
+    YAFF_RAW_FIELD(90) YAFF_RAW_FIELD(91) YAFF_RAW_FIELD(92) YAFF_RAW_FIELD(93) YAFF_RAW_FIELD(94)
+    YAFF_RAW_FIELD(95) YAFF_RAW_FIELD(96) YAFF_RAW_FIELD(97) YAFF_RAW_FIELD(98) YAFF_RAW_FIELD(99)
+};
+YAFF_LAYOUT_END
+// clang-format on
+
+#undef YAFF_RAW_FIELD
+
+}  // namespace benchmark_access_raw
+
 class TDataGenerator {
 public:
     struct ProtobufMessage {
@@ -13,13 +63,18 @@ public:
         std::vector<uint64_t> Values;
     };
 
-    struct TFlatBuffersMessage {
+    struct FlatBuffersMessage {
         flatbuffers::DetachedBuffer Buffer;
         std::vector<uint64_t> Values;
     };
 
-    struct TYaFFMessage {
+    struct YaFFMessage {
         yaff::DetachedBuffer Buffer;
+        std::vector<uint64_t> Values;
+    };
+
+    struct RawMessage {
+        std::string Buffer;
         std::vector<uint64_t> Values;
     };
 
@@ -159,7 +214,7 @@ public:
         };
     }
 
-    TFlatBuffersMessage GenerateFlatBuffersFlat10() {
+    FlatBuffersMessage GenerateFlatBuffersFlat10() {
         std::vector<uint64_t> values = GenerateRandomVector64(10);
 
         flatbuffers::FlatBufferBuilder fbb;
@@ -173,7 +228,7 @@ public:
         };
     }
 
-    TFlatBuffersMessage GenerateFlatBuffersFlat100() {
+    FlatBuffersMessage GenerateFlatBuffersFlat100() {
         std::vector<uint64_t> values = GenerateRandomVector64(100);
 
         flatbuffers::FlatBufferBuilder fbb;
@@ -199,7 +254,7 @@ public:
     }
 
     template <yaff::MessageLayout Layout>
-    TYaFFMessage GenerateYaFFFlat10() {
+    YaFFMessage GenerateYaFFFlat10() {
         ProtobufMessage protoMessage = GenerateProtobufFlat10();
 
         benchmark_access::Flat10 proto;
@@ -217,7 +272,7 @@ public:
     }
 
     template <yaff::MessageLayout Layout>
-    TYaFFMessage GenerateYaFFFlat100() {
+    YaFFMessage GenerateYaFFFlat100() {
         ProtobufMessage protoMessage = GenerateProtobufFlat100();
 
         benchmark_access::Flat100 proto;
@@ -231,6 +286,140 @@ public:
         return {
             .Buffer = ys.Release(),
             .Values = std::move(protoMessage.Values),
+        };
+    }
+
+    RawMessage GenerateRawFlat10() {
+        std::vector<uint64_t> values = GenerateRandomVector64(10);
+
+        benchmark_access_raw::Flat10 raw;
+        raw.V0 = values[0];
+        raw.V1 = values[1];
+        raw.V2 = values[2];
+        raw.V3 = values[3];
+        raw.V4 = values[4];
+        raw.V5 = values[5];
+        raw.V6 = values[6];
+        raw.V7 = values[7];
+        raw.V8 = values[8];
+        raw.V9 = values[9];
+
+        std::string buffer(reinterpret_cast<const char*>(&raw), sizeof(raw));
+        return {
+            .Buffer = std::move(buffer),
+            .Values = std::move(values),
+        };
+    }
+
+    RawMessage GenerateRawFlat100() {
+        std::vector<uint64_t> values = GenerateRandomVector64(100);
+
+        benchmark_access_raw::Flat100 raw;
+        raw.V0 = values[0];
+        raw.V1 = values[1];
+        raw.V2 = values[2];
+        raw.V3 = values[3];
+        raw.V4 = values[4];
+        raw.V5 = values[5];
+        raw.V6 = values[6];
+        raw.V7 = values[7];
+        raw.V8 = values[8];
+        raw.V9 = values[9];
+        raw.V10 = values[10];
+        raw.V11 = values[11];
+        raw.V12 = values[12];
+        raw.V13 = values[13];
+        raw.V14 = values[14];
+        raw.V15 = values[15];
+        raw.V16 = values[16];
+        raw.V17 = values[17];
+        raw.V18 = values[18];
+        raw.V19 = values[19];
+        raw.V20 = values[20];
+        raw.V21 = values[21];
+        raw.V22 = values[22];
+        raw.V23 = values[23];
+        raw.V24 = values[24];
+        raw.V25 = values[25];
+        raw.V26 = values[26];
+        raw.V27 = values[27];
+        raw.V28 = values[28];
+        raw.V29 = values[29];
+        raw.V30 = values[30];
+        raw.V31 = values[31];
+        raw.V32 = values[32];
+        raw.V33 = values[33];
+        raw.V34 = values[34];
+        raw.V35 = values[35];
+        raw.V36 = values[36];
+        raw.V37 = values[37];
+        raw.V38 = values[38];
+        raw.V39 = values[39];
+        raw.V40 = values[40];
+        raw.V41 = values[41];
+        raw.V42 = values[42];
+        raw.V43 = values[43];
+        raw.V44 = values[44];
+        raw.V45 = values[45];
+        raw.V46 = values[46];
+        raw.V47 = values[47];
+        raw.V48 = values[48];
+        raw.V49 = values[49];
+        raw.V50 = values[50];
+        raw.V51 = values[51];
+        raw.V52 = values[52];
+        raw.V53 = values[53];
+        raw.V54 = values[54];
+        raw.V55 = values[55];
+        raw.V56 = values[56];
+        raw.V57 = values[57];
+        raw.V58 = values[58];
+        raw.V59 = values[59];
+        raw.V60 = values[60];
+        raw.V61 = values[61];
+        raw.V62 = values[62];
+        raw.V63 = values[63];
+        raw.V64 = values[64];
+        raw.V65 = values[65];
+        raw.V66 = values[66];
+        raw.V67 = values[67];
+        raw.V68 = values[68];
+        raw.V69 = values[69];
+        raw.V70 = values[70];
+        raw.V71 = values[71];
+        raw.V72 = values[72];
+        raw.V73 = values[73];
+        raw.V74 = values[74];
+        raw.V75 = values[75];
+        raw.V76 = values[76];
+        raw.V77 = values[77];
+        raw.V78 = values[78];
+        raw.V79 = values[79];
+        raw.V80 = values[80];
+        raw.V81 = values[81];
+        raw.V82 = values[82];
+        raw.V83 = values[83];
+        raw.V84 = values[84];
+        raw.V85 = values[85];
+        raw.V86 = values[86];
+        raw.V87 = values[87];
+        raw.V88 = values[88];
+        raw.V89 = values[89];
+        raw.V90 = values[90];
+        raw.V91 = values[91];
+        raw.V92 = values[92];
+        raw.V93 = values[93];
+        raw.V94 = values[94];
+        raw.V95 = values[95];
+        raw.V96 = values[96];
+        raw.V97 = values[97];
+        raw.V98 = values[98];
+        raw.V99 = values[99];
+
+        std::string buffer(reinterpret_cast<const char*>(&raw), sizeof(raw));
+        return {
+            .Buffer = std::move(buffer),
+            .Values = std::move(values),
         };
     }
 
@@ -387,6 +576,27 @@ uint64_t SumFlat100(const T& root) {
     return sum;
 }
 
+void BM_Access_Flat10_Raw(benchmark::State& state) {
+    auto gen = TDataGenerator(std::random_device{}());
+    const auto msg = gen.GenerateRawFlat10();
+
+    for (auto _ : state) {
+        const auto* root = reinterpret_cast<const benchmark_access_raw::Flat10*>(msg.Buffer.data());
+        uint64_t sum = SumFlat10<benchmark_access_raw::Flat10>(*root);
+        benchmark::DoNotOptimize(sum);
+    }
+}
+void BM_Access_Flat100_Raw(benchmark::State& state) {
+    auto gen = TDataGenerator(std::random_device{}());
+    const auto msg = gen.GenerateRawFlat100();
+
+    for (auto _ : state) {
+        const auto* root = reinterpret_cast<const benchmark_access_raw::Flat100*>(msg.Buffer.data());
+        uint64_t sum = SumFlat100<benchmark_access_raw::Flat100>(*root);
+        benchmark::DoNotOptimize(sum);
+    }
+}
+
 void BM_Access_Flat10_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     const auto msg = gen.GenerateProtobufFlat10();
@@ -474,6 +684,7 @@ void BM_Access_Flat100_YaFF(benchmark::State& state) {
     }
 }
 
+BENCHMARK(BM_Access_Flat10_Raw)->Name("BM_Access_Flat_Raw/FieldCount:10");
 BENCHMARK(BM_Access_Flat10_Protobuf)->Name("BM_Access_Flat_Protobuf/FieldCount:10");
 BENCHMARK(BM_Access_Flat10_FlatBuffers)->Name("BM_Access_Flat_FlatBuffers/FieldCount:10");
 BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)
@@ -482,6 +693,7 @@ BENCHMARK_TEMPLATE(BM_Access_Flat10_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SP
     ->Name("BM_Access_Flat_YaFF/SparseLayout/FieldCount:10");
 BENCHMARK(BM_Access_Flat10V2_YaFF)->Name("BM_Access_Flat_YaFF/FlatLayout/CompatibilityMode/FieldCount:10");
 
+BENCHMARK(BM_Access_Flat100_Raw)->Name("BM_Access_Flat_Raw/FieldCount:100");
 BENCHMARK(BM_Access_Flat100_Protobuf)->Name("BM_Access_Flat_Protobuf/FieldCount:100");
 BENCHMARK(BM_Access_Flat100_FlatBuffers)->Name("BM_Access_Flat_FlatBuffers/FieldCount:100");
 BENCHMARK_TEMPLATE(BM_Access_Flat100_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)

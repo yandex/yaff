@@ -6,6 +6,109 @@
 #include "protoyaff/hierarchical.pb.h"
 #include "protoyaff/hierarchical.yaff.h"
 
+namespace benchmark_access_raw {
+
+#define YAFF_RAW_FIELD(N, n) \
+    uint64_t N = 0;          \
+    uint64_t n() const {     \
+        return N;            \
+    }
+
+template <typename T>
+using Inline = T;
+template <typename T>
+using Pointer = const T*;
+
+template <typename T>
+const T& DeRef(const T& x) {
+    return x;
+}
+
+template <typename T>
+const T& DeRef(const T* x) {
+    return *x;
+}
+
+template <typename T>
+T* ChildAddress(T& slot, void*) {
+    return &slot;
+}
+
+template <typename T>
+T* ChildAddress(const T*&, void* fallback) {
+    return reinterpret_cast<T*>(fallback);
+}
+
+template <typename T>
+void LinkChild(T&, T*) {
+}
+
+template <typename T>
+void LinkChild(const T*& slot, T* child) {
+    slot = child;
+}
+
+// N.B.: YAFF_LAYOUT_BEGIN is only needed to legalize aliasing
+// for structures and has no effect on the implementation.
+//
+// When implementing a protocol on raw C++ structures,
+// you will still need to do something similar to mitigate the UB.
+
+// clang-format off
+YAFF_LAYOUT_BEGIN(Leaf) {
+    YAFF_RAW_FIELD(A, a)
+    YAFF_RAW_FIELD(B, b)
+    YAFF_RAW_FIELD(C, c)
+    YAFF_RAW_FIELD(D, d)
+    YAFF_RAW_FIELD(E, e)
+    YAFF_RAW_FIELD(F, f)
+    YAFF_RAW_FIELD(G, g)
+    YAFF_RAW_FIELD(H, h)
+    YAFF_RAW_FIELD(I, i)
+};
+YAFF_LAYOUT_END
+
+template <template <typename> class H>
+YAFF_LAYOUT_BEGIN(Intermediate) {
+    YAFF_RAW_FIELD(V0, v0)
+    YAFF_RAW_FIELD(V1, v1)
+    YAFF_RAW_FIELD(V2, v2)
+    YAFF_RAW_FIELD(V3, v3)
+    YAFF_RAW_FIELD(V4, v4)
+    YAFF_RAW_FIELD(V5, v5)
+    YAFF_RAW_FIELD(V6, v6)
+    YAFF_RAW_FIELD(V7, v7)
+
+    H<Leaf> Leaf_;
+    const Leaf& leaf() const {
+        return DeRef(Leaf_);
+    }
+};
+YAFF_LAYOUT_END
+
+template <template <typename> class H>
+YAFF_LAYOUT_BEGIN(Root) {
+    YAFF_RAW_FIELD(I, i)
+    YAFF_RAW_FIELD(Ii, ii)
+    YAFF_RAW_FIELD(Iii, iii)
+    YAFF_RAW_FIELD(Iv, iv)
+    YAFF_RAW_FIELD(V, v)
+    YAFF_RAW_FIELD(Vi, vi)
+    YAFF_RAW_FIELD(Vii, vii)
+    YAFF_RAW_FIELD(Viii, viii)
+
+    H<Intermediate<H>> Intermediate_;
+    const Intermediate<H>& intermediate() const {
+        return DeRef(Intermediate_);
+    }
+};
+YAFF_LAYOUT_END
+// clang-format on
+
+#undef YAFF_RAW_FIELD
+
+}  // namespace benchmark_access_raw
+
 class TDataGenerator {
 public:
     explicit TDataGenerator(uint64_t seed) : Rng_(seed) {
@@ -84,6 +187,72 @@ public:
 
             YAFF_REQUIRE(ys.Size() == YAFF_SIZE);
             buffer.append(reinterpret_cast<const char*>(ys.Data()), ys.Size());
+        }
+
+        return buffer;
+    }
+
+    template <template <typename> class H, size_t Size>
+    std::string GenerateRawMessages() {
+        using Root = benchmark_access_raw::Root<H>;
+        using Intermediate = benchmark_access_raw::Intermediate<H>;
+        using Leaf = benchmark_access_raw::Leaf;
+
+        static const uint64_t ADD_SIZE = (std::is_same_v<H<Leaf>, Leaf> ? 0 : sizeof(Intermediate) + sizeof(Leaf));
+        static const uint64_t RAW_SIZE = sizeof(Root) + ADD_SIZE;
+        const uint64_t n = (static_cast<double>(Size) / RAW_SIZE) + 1;
+        const auto& perm = GenerateCyclePermutation(n);
+
+        std::string buffer;
+        buffer.resize(n * RAW_SIZE + 1, '\0');
+        for (size_t k = 0; k < perm.size(); ++k) {
+            const uint32_t val = perm[k];
+            const std::vector<uint64_t> values = GenerateRandomVector64(24);
+
+            const int64_t next = val * RAW_SIZE + 1;
+            const int64_t addend = next - std::accumulate(values.begin(), values.begin() + 8, 0ULL);
+
+            char* rootBytes = buffer.data() + k * RAW_SIZE + 1;
+            auto* root = new (rootBytes) Root();
+
+            const auto intermediateOffset = rootBytes + sizeof(Root);
+            auto* intermediate = benchmark_access_raw::ChildAddress(root->Intermediate_, intermediateOffset);
+            new (intermediate) Intermediate();
+
+            const auto leafOffset = intermediateOffset + sizeof(Intermediate);
+            auto* leaf = benchmark_access_raw::ChildAddress(intermediate->Leaf_, leafOffset);
+            new (leaf) Leaf();
+
+            benchmark_access_raw::LinkChild(root->Intermediate_, intermediate);
+            benchmark_access_raw::LinkChild(intermediate->Leaf_, leaf);
+
+            leaf->A = values[0];
+            leaf->B = values[1];
+            leaf->C = values[2];
+            leaf->D = values[3];
+            leaf->E = values[4];
+            leaf->F = values[5];
+            leaf->G = values[6];
+            leaf->H = values[7];
+            leaf->I = addend;
+
+            intermediate->V0 = values[8];
+            intermediate->V1 = values[9];
+            intermediate->V2 = values[10];
+            intermediate->V3 = values[11];
+            intermediate->V4 = values[12];
+            intermediate->V5 = values[13];
+            intermediate->V6 = values[14];
+            intermediate->V7 = values[15];
+
+            root->I = values[16];
+            root->Ii = values[17];
+            root->Iii = values[18];
+            root->Iv = values[19];
+            root->V = values[20];
+            root->Vi = values[21];
+            root->Vii = values[22];
+            root->Viii = values[23];
         }
 
         return buffer;
@@ -255,6 +424,23 @@ uint64_t SumHierarchicalProtoYaFF(const T& root) {
     return sum;
 }
 
+template <template <typename> class H, uint64_t Size, bool CacheChains, bool InterruptChain>
+void BM_Access_Hierarchical_Raw(benchmark::State& state) {
+    using Root = benchmark_access_raw::Root<H>;
+
+    auto gen = TDataGenerator(std::random_device{}());
+    const auto msgs = gen.GenerateRawMessages<H, Size>();
+
+    volatile uint32_t next = 1;
+    for (auto _ : state) {
+        const auto* root = reinterpret_cast<const Root*>(msgs.data() + next);
+        next = SumHierarchicalProtoYaFF<Root, CacheChains, InterruptChain>(*root);
+    }
+
+    state.counters["object_size"] =
+        benchmark::Counter(msgs.size(), benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
+}
+
 template <uint64_t Size, bool CacheChains, bool InterruptChain>
 void BM_Access_Hierarchical_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
@@ -305,6 +491,22 @@ void BM_Access_Hierarchical_YaFF(benchmark::State& state) {
 
 // Using template args (instead of Arg) to set custom understandable names, as well as a user-friendly order in the
 // report.
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Inline, 2048, false, false)
+    ->Name("BM_Access_Hierarchical_Raw_Inline/HotAccess/CacheChains:false/Modification:false");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Inline, 2048, false, true)
+    ->Name("BM_Access_Hierarchical_Raw_Inline/HotAccess/CacheChains:false/Modification:true");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Inline, 2048, true, false)
+    ->Name("BM_Access_Hierarchical_Raw_Inline/HotAccess/CacheChains:true/Modification:false");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Inline, 2048, true, true)
+    ->Name("BM_Access_Hierarchical_Raw_Inline/HotAccess/CacheChains:true/Modification:true");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Pointer, 2048, false, false)
+    ->Name("BM_Access_Hierarchical_Raw_Pointer/HotAccess/CacheChains:false/Modification:false");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Pointer, 2048, false, true)
+    ->Name("BM_Access_Hierarchical_Raw_Pointer/HotAccess/CacheChains:false/Modification:true");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Pointer, 2048, true, false)
+    ->Name("BM_Access_Hierarchical_Raw_Pointer/HotAccess/CacheChains:true/Modification:false");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Pointer, 2048, true, true)
+    ->Name("BM_Access_Hierarchical_Raw_Pointer/HotAccess/CacheChains:true/Modification:true");
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Protobuf, 2048, false, false)
     ->Name("BM_Access_Hierarchical_Protobuf/HotAccess/CacheChains:false/Modification:false");
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Protobuf, 2048, false, true)
@@ -338,6 +540,14 @@ BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAY
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE, 2048, true, true)
     ->Name("BM_Access_Hierarchical_YaFF/SparseLayout/HotAccess/CacheChains:true/Modification:true");
 
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Inline, 536'870'912, false, false)
+    ->Name("BM_Access_Hierarchical_Raw_Inline/ColdAccess/CacheChains:false/Modification:false");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Inline, 536'870'912, true, false)
+    ->Name("BM_Access_Hierarchical_Raw_Inline/ColdAccess/CacheChains:true/Modification:false");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Pointer, 536'870'912, false, false)
+    ->Name("BM_Access_Hierarchical_Raw_Pointer/ColdAccess/CacheChains:false/Modification:false");
+BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Raw, benchmark_access_raw::Pointer, 536'870'912, true, false)
+    ->Name("BM_Access_Hierarchical_Raw_Pointer/ColdAccess/CacheChains:true/Modification:false");
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Protobuf, 536'870'912, false, false)
     ->Name("BM_Access_Hierarchical_Protobuf/ColdAccess/CacheChains:false/Modification:false");
 BENCHMARK_TEMPLATE(BM_Access_Hierarchical_Protobuf, 536'870'912, true, false)
