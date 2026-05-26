@@ -29,3 +29,8 @@ if(MSVC)
 else()
     target_compile_options(yaff_compilation PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+install(TARGETS yaff_compilation
+    EXPORT YaffTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)

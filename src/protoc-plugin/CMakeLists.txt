@@ -19,3 +19,8 @@ if(MSVC)
 else()
     target_compile_options(yaff_protoc_plugin PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+install(TARGETS yaff_protoc_plugin
+    EXPORT YaffTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)

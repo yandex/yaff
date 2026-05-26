@@ -21,3 +21,14 @@ target_include_directories(yaff_proto
         $<BUILD_INTERFACE:${YAFF_PROTO_GENERATED_DIR}>
         $<INSTALL_INTERFACE:include>
 )
+
+install(TARGETS yaff_proto
+    EXPORT YaffTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/options.proto"
+    "${YAFF_PROTO_GENERATED_DIR}/yaff/proto/options.pb.h"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/yaff/proto
+)

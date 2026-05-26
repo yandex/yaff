@@ -7,4 +7,13 @@ target_include_directories(yaff_core
         $<INSTALL_INTERFACE:include>
 )
 
+install(TARGETS yaff_core
+    EXPORT YaffTargets
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+
 add_subdirectory(yaff/proto)

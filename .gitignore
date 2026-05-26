@@ -1,4 +1,3 @@
-.cache
-.DS_Store
-.vscode
+.*
+!/.gitignore
 build
