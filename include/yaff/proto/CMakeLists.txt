@@ -25,7 +25,7 @@ target_include_directories(yaff_proto
 )
 
 install(TARGETS yaff_proto
-    EXPORT YaffTargets
+    EXPORT YaFFTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 

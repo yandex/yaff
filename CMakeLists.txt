@@ -40,28 +40,29 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 install(FILES
-    cmake/yaff-protoc-plugin-target.cmake
-    cmake/yaff-generate.cmake
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Yaff
+    cmake/YaFFProtocPluginTarget.cmake
+    cmake/YaFFGenerate.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
 )
 
-install(EXPORT YaffTargets
+install(EXPORT YaFFTargets
     NAMESPACE yaff::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Yaff
+    FILE YaFFTargets.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
 )
 
 configure_package_config_file(
-    cmake/YaffConfig.cmake.in
-    "${CMAKE_CURRENT_BINARY_DIR}/YaffConfig.cmake"
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Yaff
+    cmake/YaFFConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
 )
 write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/YaffConfigVersion.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/YaffConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/YaffConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Yaff
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
 )

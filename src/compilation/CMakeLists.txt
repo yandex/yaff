@@ -33,6 +33,6 @@ else()
 endif()
 
 install(TARGETS yaff_compilation
-    EXPORT YaffTargets
+    EXPORT YaFFTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

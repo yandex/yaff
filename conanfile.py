@@ -7,8 +7,8 @@ from conan.tools.build import check_min_cppstd
 class YaffConan(ConanFile):
     name = "yaff"
     version = "0.1.0"
-    description = "Yet another Flat Format"
-    license = "" # TODO
+    description = "Yet Another Flat Format"
+    license = "Apache-2.0"
 
     exports_sources = (
         "CMakeLists.txt",
@@ -71,8 +71,8 @@ class YaffConan(ConanFile):
         self.cpp_info.set_property(
             "cmake_build_modules",
             [
-                os.path.join("lib", "cmake", "Yaff", "yaff-protoc-plugin-target.cmake"),
-                os.path.join("lib", "cmake", "Yaff", "yaff-generate.cmake"),
+                os.path.join("lib", "cmake", "YaFF", "YaFFProtocPluginTarget.cmake"),
+                os.path.join("lib", "cmake", "YaFF", "YaFFGenerate.cmake"),
             ]
         )
 

@@ -12,7 +12,7 @@ target_include_directories(yaff_core
 )
 
 install(TARGETS yaff_core
-    EXPORT YaffTargets
+    EXPORT YaFFTargets
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/

@@ -1,4 +1,4 @@
-include(${PROJECT_SOURCE_DIR}/cmake/yaff-generate.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/YaFFGenerate.cmake)
 
 add_subdirectory(feed_api)
 add_subdirectory(trading)

@@ -1,3 +1,8 @@
-.*
-!/.gitignore
+.cache
+.DS_Store
+.vscode
+.venv
+.idea
+.conan*
+
 build

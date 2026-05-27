@@ -22,6 +22,6 @@ else()
 endif()
 
 install(TARGETS yaff_protoc_plugin
-    EXPORT YaffTargets
+    EXPORT YaFFTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
