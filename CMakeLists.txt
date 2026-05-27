@@ -17,6 +17,9 @@ option(YAFF_BUILD_EXAMPLES "Build YaFF examples" OFF)
 
 find_package(Protobuf CONFIG REQUIRED)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 set(YAFF_PROTO_IMPORT_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 
 add_subdirectory(include)
@@ -35,9 +38,6 @@ endif()
 if(YAFF_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
-
-include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
 
 install(FILES
     cmake/YaFFProtocPluginTarget.cmake
