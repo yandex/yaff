@@ -39,7 +39,9 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-install(FILES cmake/yaff-generate.cmake
+install(FILES
+    cmake/yaff-protoc-plugin-target.cmake
+    cmake/yaff-generate.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Yaff
 )
 

@@ -1,6 +1,7 @@
 import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.build import check_min_cppstd
 
 
 class YaffConan(ConanFile):
@@ -41,6 +42,9 @@ class YaffConan(ConanFile):
             self.requires("benchmark/1.8.4")
             self.requires("flatbuffers/24.3.25")
 
+    def validate(self):
+        check_min_cppstd(self, 20)
+
     def layout(self):
         cmake_layout(self)
 
@@ -66,7 +70,10 @@ class YaffConan(ConanFile):
     def package_info(self):
         self.cpp_info.set_property(
             "cmake_build_modules",
-            [os.path.join("lib", "cmake", "Yaff", "yaff-generate.cmake")]
+            [
+                os.path.join("lib", "cmake", "Yaff", "yaff-protoc-plugin-target.cmake"),
+                os.path.join("lib", "cmake", "Yaff", "yaff-generate.cmake"),
+            ]
         )
 
         self.cpp_info.components["core"].set_property("cmake_target_name", "yaff::core")
@@ -87,10 +94,3 @@ class YaffConan(ConanFile):
             "proto",
             "protobuf::libprotobuf",
         ]
-
-        self.cpp_info.components["protoc_plugin"].set_property(
-            "cmake_target_name", "yaff::protoc_plugin"
-        )
-        self.cpp_info.components["protoc_plugin"].libs = []
-        self.cpp_info.components["protoc_plugin"].bindirs = ["bin"]
-        self.cpp_info.components["protoc_plugin"].requires = ["compilation"]

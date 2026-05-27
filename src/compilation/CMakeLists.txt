@@ -13,6 +13,8 @@ set(YAFF_COMPILATION_SOURCES
 add_library(yaff_compilation STATIC ${YAFF_COMPILATION_SOURCES})
 add_library(yaff::compilation ALIAS yaff_compilation)
 
+set_target_properties(yaff_compilation PROPERTIES EXPORT_NAME compilation)
+
 target_link_libraries(yaff_compilation
     PUBLIC
         yaff::core

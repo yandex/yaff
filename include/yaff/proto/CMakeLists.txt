@@ -13,6 +13,8 @@ protobuf_generate(
 add_library(yaff_proto STATIC ${YAFF_PROTO_GENERATED_FILES})
 add_library(yaff::proto ALIAS yaff_proto)
 
+set_target_properties(yaff_proto PROPERTIES EXPORT_NAME proto)
+
 target_link_libraries(yaff_proto PUBLIC protobuf::libprotobuf)
 
 target_include_directories(yaff_proto

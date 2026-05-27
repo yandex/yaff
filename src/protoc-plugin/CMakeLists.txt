@@ -6,6 +6,7 @@ add_executable(yaff::protoc_plugin ALIAS yaff_protoc_plugin)
 
 set_target_properties(yaff_protoc_plugin PROPERTIES
     OUTPUT_NAME protoc-gen-yaff
+    EXPORT_NAME protoc_plugin
 )
 
 target_link_libraries(yaff_protoc_plugin
