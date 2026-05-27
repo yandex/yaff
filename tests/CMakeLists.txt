@@ -1,6 +1,6 @@
 find_package(GTest CONFIG REQUIRED)
 
-include(${PROJECT_SOURCE_DIR}/cmake/yaff-generate.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/YaFFGenerate.cmake)
 
 set(YAFF_TEST_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${YAFF_TEST_GENERATED_DIR})

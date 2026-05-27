@@ -35,3 +35,34 @@ endif()
 if(YAFF_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(FILES
+    cmake/YaFFProtocPluginTarget.cmake
+    cmake/YaFFGenerate.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
+)
+
+install(EXPORT YaFFTargets
+    NAMESPACE yaff::
+    FILE YaFFTargets.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
+)
+
+configure_package_config_file(
+    cmake/YaFFConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
+)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/YaFFConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
+)
