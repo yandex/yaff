@@ -481,7 +481,7 @@ void BM_Access_Hierarchical_YaFF(benchmark::State& state) {
 
     volatile uint32_t next = 1;
     for (auto _ : state) {
-        const auto& root = yaff::ReadRoot<protoyaff::benchmark_access::Root>(msgs.data() + next);
+        const auto& root = yaff::ReadMessage<protoyaff::benchmark_access::Root>(msgs.data() + next);
         next = SumHierarchicalProtoYaFF<protoyaff::benchmark_access::Root, CacheChains, InterruptChain>(root);
     }
 

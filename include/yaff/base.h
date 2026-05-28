@@ -243,7 +243,7 @@ inline auto FindKey(M& map, const K& key) {
 }
 
 template <typename T>
-YAFF_PURE inline const T& ReadRoot(const void* buf) noexcept {
+YAFF_PURE inline const T& ReadMessage(const void* buf) noexcept {
     if (YAFF_UNLIKELY(!buf)) {
         return T::Default();
     }
@@ -251,11 +251,10 @@ YAFF_PURE inline const T& ReadRoot(const void* buf) noexcept {
 }
 
 template <typename T>
-YAFF_PURE inline const T& ReadRootless(const void* buf) noexcept {
-    if (YAFF_UNLIKELY(!buf)) {
-        return T::Default();
-    }
-    return *ReadLayout<T>(buf);
+inline T::ProtobufType ParseMessage(const void* buf) {
+    typename T::ProtobufType proto;
+    ReadMessage<T>(buf).ParseTo(proto);
+    return proto;
 }
 
 }  // namespace yaff

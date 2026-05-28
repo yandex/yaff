@@ -29,7 +29,7 @@ yaff::DetachedBuffer BuildOrderDirect() {
     std::vector<yaff::InternalOffset<protoyaff::trading::Execution>> execs{exec0, exec1};
     auto executions = ys.SerializeArray(execs);
 
-    auto root = protoyaff::trading::SerializeTradeOrder(ys,
+    auto order = protoyaff::trading::SerializeTradeOrder(ys,
         /*order_id=*/           7700ULL,
         /*client_order_id=*/    100500ULL,
         /*symbol=*/             symbol,
@@ -42,12 +42,12 @@ yaff::DetachedBuffer BuildOrderDirect() {
     );
     // clang-format on
 
-    ys.Finish(root);
+    ys.Finish(order);
     return ys.Release();
 }
 
 void DemoOrder(const yaff::DetachedBuffer& buffer) {
-    const auto& order = yaff::ReadRoot<protoyaff::trading::TradeOrder>(buffer.Data());
+    const auto& order = yaff::ReadMessage<protoyaff::trading::TradeOrder>(buffer.Data());
     std::cout << "order_id:           " << order.order_id() << "\n";
     std::cout << "client_order_id:    " << order.client_order_id() << "\n";
     std::cout << "symbol:             " << order.symbol() << "\n";
@@ -67,12 +67,6 @@ void DemoOrder(const yaff::DetachedBuffer& buffer) {
 
     std::cout << "\nHuman Readable:\n";
     std::cout << yaff::reflect::DebugString(&order, protoyaff::trading::TradeOrder::Descriptor()) << "\n";
-}
-
-trading::TradeOrder YaffToProto(const protoyaff::trading::TradeOrder& yaff) {
-    trading::TradeOrder proto;
-    yaff.ParseTo(proto);
-    return proto;
 }
 
 void Verify(const protoyaff::trading::TradeOrder& original, const trading::TradeOrder& restored) {
@@ -99,8 +93,8 @@ int main() {
     DemoOrder(buffer);
 
     // 3. Transform YaFF -> Protobuf.
-    const auto& yaff = yaff::ReadRoot<protoyaff::trading::TradeOrder>(buffer.Data());
-    const auto& proto = YaffToProto(yaff);
+    const auto& yaff = yaff::ReadMessage<protoyaff::trading::TradeOrder>(buffer.Data());
+    const auto& proto = yaff::ParseMessage<protoyaff::trading::TradeOrder>(buffer.Data());
     Verify(yaff, proto);
 
     return 0;

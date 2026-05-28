@@ -6,24 +6,24 @@
 
 using namespace protoyaff::test;
 
-TEST(DynMessage, EmptyRoot) {
-    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(nullptr);
+TEST(DynMessage, EmptyMessage) {
+    const auto& nestedMessage = yaff::ReadMessage<NestedMessage>(nullptr);
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x6789ULL);
     EXPECT_EQ(nestedMessage.GetNested2().GetSmallField(), 0xAFU);
     EXPECT_TRUE(!nestedMessage.HasNested1() && !nestedMessage.HasNested2());
 }
 
-TEST(DynMessage, NestedMessageFlatRoot) {
+TEST(DynMessage, NestedMessageFlat) {
     yaff::Serializer ys;
     auto nested1 = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, 0xFFFF, 0x3333);
     auto nested2 = SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys, std::nullopt, 0xFFFF);
-    auto root = SerializeNestedMessage<NestedMessageFlatSerializer>(ys, nested1, 0x1234, nested2);
-    ys.Finish(root);
+    auto message = SerializeNestedMessage<NestedMessageFlatSerializer>(ys, nested1, 0x1234, nested2);
+    ys.Finish(message);
 
     EXPECT_EQ(ys.Size(), 54ULL);
 
-    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
+    const auto& nestedMessage = yaff::ReadMessage<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x1234ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSmallField(), 0xFFFFU);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x3333ULL);
@@ -32,15 +32,15 @@ TEST(DynMessage, NestedMessageFlatRoot) {
     EXPECT_EQ(nestedMessage.GetNested2().GetLargeField(), 0x6789ULL);
 }
 
-TEST(DynMessage, NestedMessageSparseRoot) {
+TEST(DynMessage, NestedMessageSparse) {
     yaff::Serializer ys;
     auto nested1 = SerializeSimpleMessage<SimpleMessageFlatSerializer>(ys, -0x10, 0xFFFF, 0x3333);
-    auto root = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested1);
-    ys.Finish(root);
+    auto message = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested1);
+    ys.Finish(message);
 
     EXPECT_EQ(ys.Size(), 34ULL);
 
-    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
+    const auto& nestedMessage = yaff::ReadMessage<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSmallField(), 0xFFFFU);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x3333ULL);
@@ -51,12 +51,12 @@ TEST(DynMessage, NestedUnused) {
     yaff::Serializer ys;
     ys.Finish(SerializeNestedUnused_TMessage(ys, 123));
 
-    const auto& nestedMessage = yaff::ReadRoot<NestedUnused_TMessage>(ys.Data());
+    const auto& nestedMessage = yaff::ReadMessage<NestedUnused_TMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetSomeField(), 123);
 }
 
 TEST(Array, EmptyVec) {
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(nullptr);
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(nullptr);
     EXPECT_EQ(arrayMessage.GetIntegerVec().Size(), 0U);
     EXPECT_EQ(arrayMessage.GetStringVec().Size(), 0U);
     EXPECT_EQ(arrayMessage.GetMessageVec().Size(), 0U);
@@ -76,7 +76,7 @@ TEST(Array, SimpleVec) {
 
     EXPECT_EQ(ys.Size(), 47ULL);
 
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& arrayFeild = arrayMessage.GetIntegerVec();
     EXPECT_EQ(arrayFeild.Size(), 4U);
     EXPECT_TRUE(std::equal(arrayFeild.begin(), arrayFeild.end(), vec.begin()));
@@ -99,7 +99,7 @@ TEST(Array, StringVec) {
     ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, ys.SerializeArray(strings)));
 
     EXPECT_EQ(ys.Size(), 254ULL);
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& stringArrayField = arrayMessage.GetStringVec();
     EXPECT_EQ(stringArrayField.Size(), expected.size());
     for (uint64_t i = 0; i < stringArrayField.Size(); ++i) {
@@ -124,7 +124,7 @@ TEST(Array, MessageVec) {
     ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, 0, ys.SerializeArray(messages)));
 
     EXPECT_EQ(ys.Size(), 2075ULL);  // Meta should be deduplicated for sparse messages;
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& messageArrayField = arrayMessage.GetMessageVec();
     EXPECT_EQ(messageArrayField.Size(), 100U);
     for (uint64_t i = 0; i < messageArrayField.Size(); ++i) {
@@ -143,7 +143,7 @@ TEST(Array, FixedMessageVec) {
 
     EXPECT_EQ(ys.Size(), 222ULL);
 
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& fixedMessageArrayField = arrayMessage.GetFixedMessageVec();
     EXPECT_EQ(fixedMessageArrayField.Size(), 10U);
     for (uint64_t i = 0; i < fixedMessageArrayField.Size(); ++i) {
@@ -162,7 +162,7 @@ TEST(Array, BoolVec) {
     ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, 0, 0, ys.SerializeArray(flags)));
 
     EXPECT_EQ(ys.Size(), 37ULL);
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& boolArrayField = arrayMessage.GetBoolVec();
     EXPECT_EQ(boolArrayField.Size(), 10U);
     for (uint64_t i = 0; i < boolArrayField.Size(); ++i) {
@@ -203,7 +203,7 @@ TEST(Array, ArrayDedupByteSize) {
 
     EXPECT_EQ(ys.Size(), 41ULL);
 
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& stringArrayField = arrayMessage.GetStringVec();
     EXPECT_EQ(stringArrayField.Size(), 1U);
     EXPECT_EQ(stringArrayField.Get(0).Get(0), 'a');
@@ -217,7 +217,7 @@ TEST(Array, SimpleIterator) {
     const auto array = ys.SerializeArray(std::vector<uint64_t>{1, 2, 3, 4});
     ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, array));
 
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& arrayField = arrayMessage.GetIntegerVec();
 
     uint64_t expected = 1;
@@ -239,7 +239,7 @@ TEST(Array, MessageIterator) {
     }
     ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, 0, ys.SerializeArray(messages)));
 
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& messagesField = arrayMessage.GetMessageVec();
 
     uint64_t expected = 0;
@@ -265,7 +265,7 @@ TEST(Array, NestedIterator) {
     }
     ys.Finish(SerializeArrayMessage<ArrayMessageFlatSerializer>(ys, 0, ys.SerializeArray(strings)));
 
-    const auto& arrayMessage = yaff::ReadRoot<ArrayMessage>(ys.Data());
+    const auto& arrayMessage = yaff::ReadMessage<ArrayMessage>(ys.Data());
     const auto& stringsField = arrayMessage.GetStringVec();
     for (size_t strIdx = 0; strIdx < stringsField.size(); ++strIdx) {
         const auto& str = stringsField[strIdx];

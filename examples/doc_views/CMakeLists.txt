@@ -21,7 +21,7 @@ protobuf_generate(
 yaff_generate(
     TARGET yaff_example_doc_views
     TAG light_view
-    NAMESPACE NLightView
+    NAMESPACE light_view
     IMPORT_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
     OUT_DIR ${_generated_dir}
 )
@@ -29,7 +29,7 @@ yaff_generate(
 yaff_generate(
     TARGET yaff_example_doc_views
     TAG full_view
-    NAMESPACE NFullView
+    NAMESPACE full_view
     IMPORT_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
     OUT_DIR ${_generated_dir}
 )

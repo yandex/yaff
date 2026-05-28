@@ -126,7 +126,7 @@ TEST(ProtoAPI, TemplateTest) {
     const auto& originalProto = GenerateUniversalMessage();
 
     const auto buffer = Convert(originalProto);
-    const auto& yaff = yaff::ReadRoot<protoyaff::test::UniversalMessage>(buffer.Data());
+    const auto& yaff = yaff::ReadMessage<protoyaff::test::UniversalMessage>(buffer.Data());
 
     const auto& restoredProto = Restore(yaff);
 

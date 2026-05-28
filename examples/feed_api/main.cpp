@@ -47,21 +47,8 @@ feed::FeedResponse BuildFeedResponse() {
     return response;
 }
 
-yaff::DetachedBuffer ProtoToYaff(const feed::FeedResponse& proto) {
-    yaff::Serializer ys;
-    ys.Finish(protoyaff::feed::SerializeFeedResponse(ys, proto));
-    return ys.Release();
-}
-
-feed::FeedResponse YaffToProto(const yaff::DetachedBuffer& buffer) {
-    const auto& yaff = yaff::ReadRoot<protoyaff::feed::FeedResponse>(buffer.Data());
-    feed::FeedResponse restored;
-    yaff.ParseTo(restored);
-    return restored;
-}
-
 void PrintHumanReadable(const yaff::DetachedBuffer& buffer) {
-    const auto& yaff = yaff::ReadRoot<protoyaff::feed::FeedResponse>(buffer.Data());
+    const auto& yaff = yaff::ReadMessage<protoyaff::feed::FeedResponse>(buffer.Data());
     std::cout << yaff::reflect::DebugString(&yaff, protoyaff::feed::FeedResponse::Descriptor()) << "\n";
 }
 
@@ -98,10 +85,10 @@ int main() {
     const auto proto = BuildFeedResponse();
 
     // 2. Convert to YaFF — a compact, zero-copy readable format.
-    const auto buffer = ProtoToYaff(proto);
+    const auto buffer = yaff::Serialize<protoyaff::feed::FeedResponse>(proto);
 
     // 3. Read YaFF fields directly — no deserialization needed.
-    const auto& yaff = yaff::ReadRoot<protoyaff::feed::FeedResponse>(buffer.Data());
+    const auto& yaff = yaff::ReadMessage<protoyaff::feed::FeedResponse>(buffer.Data());
     std::cout << "Feed request_id: " << yaff.request_id() << "\n";
     std::cout << "Number of items: " << yaff.items().Size() << "\n";
 
@@ -118,7 +105,7 @@ int main() {
     PrintHumanReadable(buffer);
 
     // 6. Convert back to protobuf — full round-trip.
-    const auto restored = YaffToProto(buffer);
+    const auto restored = yaff::ParseMessage<protoyaff::feed::FeedResponse>(buffer.Data());
     Verify(proto, restored);
     std::cout << "OK: Round-trip verification passed.\n";
 

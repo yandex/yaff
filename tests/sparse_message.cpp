@@ -15,13 +15,13 @@ TEST(SparseMessage, NestedMessage) {
     EXPECT_EQ(ys.Size(), 49ULL);
 
     const auto* buf = ys.Data();
-    const auto& root = yaff::ReadRoot<StaticSparseMessage>(buf);
+    const auto& msg = yaff::ReadMessage<StaticSparseMessage>(buf);
 
-    const auto& simpleMessage = root.GetNested();
+    const auto& simpleMessage = msg.GetNested();
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xFFFFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
-    EXPECT_EQ(root.GetScalar(), 0xFFULL);
+    EXPECT_EQ(msg.GetScalar(), 0xFFULL);
 }
 
 TEST(SparseMessage, ImplicitMessage) {
@@ -31,11 +31,11 @@ TEST(SparseMessage, ImplicitMessage) {
     EXPECT_EQ(ys.Size(), 20ULL);
 
     const auto* buf = ys.Data();
-    const auto& root = yaff::ReadRoot<ImplicitMessage>(buf);
+    const auto& message = yaff::ReadMessage<ImplicitMessage>(buf);
 
-    EXPECT_EQ(root.GetStringField(), "");
-    EXPECT_EQ(root.GetSignedField(), 1LL);
-    EXPECT_EQ(root.GetUnsignedField(), 0ULL);
+    EXPECT_EQ(message.GetStringField(), "");
+    EXPECT_EQ(message.GetSignedField(), 1LL);
+    EXPECT_EQ(message.GetUnsignedField(), 0ULL);
 }
 
 TEST(SparseDynamicMessage, SimpleMessage) {
@@ -44,7 +44,7 @@ TEST(SparseDynamicMessage, SimpleMessage) {
 
     EXPECT_EQ(ys.Size(), 29ULL);
 
-    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
+    const auto& simpleMessage = yaff::ReadMessage<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xFFFFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
@@ -77,12 +77,11 @@ TEST(SparseDynamicMessage, SkipFields) {
     yaff::Serializer ys;
     SimpleMessageSparseSerializer serializer(ys);
     serializer.add_largefield(0x3333);
-    auto root = std::move(serializer).Finish();
-    ys.Finish(root);
+    ys.Finish(std::move(serializer).Finish());
 
     EXPECT_EQ(ys.Size(), 21ULL);  // Sparse Message does not store skipped fields on wire.
 
-    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
+    const auto& simpleMessage = yaff::ReadMessage<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x0);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
@@ -94,7 +93,7 @@ TEST(SparseDynamicMessage, SkipFieldsTail) {
 
     EXPECT_EQ(ys.Size(), 15ULL);  // Meta tail size optimization;
 
-    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
+    const auto& simpleMessage = yaff::ReadMessage<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x17);
 }
 
@@ -104,7 +103,7 @@ TEST(SparseDynamicMessage, DefaultValues) {
 
     EXPECT_EQ(ys.Size(), 25ULL);  // Message is smaller, because empty value does not stored on wire;
 
-    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
+    const auto& simpleMessage = yaff::ReadMessage<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
@@ -114,12 +113,11 @@ TEST(SparseDynamicMessage, TailDefaultValues) {
     yaff::Serializer ys;
     SimpleMessageSparseSerializer serializer(ys);
     serializer.add_signedfield(-0x10);
-    auto root = std::move(serializer).Finish();
-    ys.Finish(root);
+    ys.Finish(std::move(serializer).Finish());
 
     EXPECT_EQ(ys.Size(), 15ULL);
 
-    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
+    const auto& simpleMessage = yaff::ReadMessage<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x6789ULL);
@@ -129,9 +127,9 @@ TEST(SparseDynamicMessage, AllDefaultValues) {
     yaff::Serializer ys;
     ys.Finish(SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys));
 
-    EXPECT_EQ(ys.Size(), 6ULL);  // root offset (4) + typed limit (2)
+    EXPECT_EQ(ys.Size(), 6ULL);  // start offset (4) + typed limit (2)
 
-    const auto& simpleMessage = yaff::ReadRoot<SimpleMessage>(ys.Data());
+    const auto& simpleMessage = yaff::ReadMessage<SimpleMessage>(ys.Data());
     EXPECT_EQ(simpleMessage.GetSignedField(), 0x0);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xAFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x6789ULL);
@@ -141,12 +139,12 @@ TEST(SparseDynamicMessage, NestedMessages) {
     yaff::Serializer ys;
     auto nested1 = SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys, std::nullopt, 0xFFFF);
     auto nested2 = SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys, 0x17);
-    auto root = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested1, 0x1234, nested2);
-    ys.Finish(root);
+    auto message = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested1, 0x1234, nested2);
+    ys.Finish(message);
 
     EXPECT_EQ(ys.Size(), 52ULL);
 
-    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
+    const auto& nestedMessage = yaff::ReadMessage<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x1234ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSmallField(), 0xFFFFU);
     EXPECT_EQ(nestedMessage.GetNested2().GetSignedField(), 0x17);
@@ -157,12 +155,12 @@ TEST(SparseDynamicMessage, NestedMessages) {
 TEST(SparseDynamicMessage, NestedMessageEmpty) {
     yaff::Serializer ys;
     auto nested = SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys, std::nullopt, std::nullopt, 0x5678);
-    auto root = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested);
-    ys.Finish(root);
+    auto message = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested);
+    ys.Finish(message);
 
     EXPECT_EQ(ys.Size(), 32ULL);
 
-    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
+    const auto& nestedMessage = yaff::ReadMessage<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetLargeField(), 0x5678ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSignedField(), 0x0);
@@ -173,12 +171,12 @@ TEST(SparseDynamicMessage, MetaDeduplication) {
     yaff::Serializer ys;
     auto nested1 = SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys, std::nullopt, 0x20);
     auto nested2 = SerializeSimpleMessage<SimpleMessageSparseSerializer>(ys, std::nullopt, 0x10);
-    auto root = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested1, std::nullopt, nested2);
-    ys.Finish(root);
+    auto message = SerializeNestedMessage<NestedMessageSparseSerializer>(ys, nested1, std::nullopt, nested2);
+    ys.Finish(message);
 
     EXPECT_EQ(ys.Size(), 43ULL);  // because nested2 meta is deduplicated;
 
-    const auto& nestedMessage = yaff::ReadRoot<NestedMessage>(ys.Data());
+    const auto& nestedMessage = yaff::ReadMessage<NestedMessage>(ys.Data());
     EXPECT_EQ(nestedMessage.GetScalarField(), 0x0ULL);
     EXPECT_EQ(nestedMessage.GetNested1().GetSmallField(), 0x20U);
     EXPECT_EQ(nestedMessage.GetNested2().GetSmallField(), 0x10U);
@@ -190,7 +188,7 @@ TEST(SparseDynamicMessage, FloatMessage) {
 
     EXPECT_EQ(ys.Size(), 15ULL);
 
-    const auto& floatMessage = yaff::ReadRoot<FloatMessage>(ys.Data());
+    const auto& floatMessage = yaff::ReadMessage<FloatMessage>(ys.Data());
     EXPECT_EQ(floatMessage.GetFloatField(), 1.1234f);
     EXPECT_EQ(floatMessage.GetDoubleField(), 1e-6);
 }
@@ -201,7 +199,7 @@ TEST(SparseDynamicMessage, UnionMessageEmpty) {
 
     EXPECT_EQ(ys.Size(), 15ULL);
 
-    const auto& unionMessage = yaff::ReadRoot<UnionMessage>(ys.Data());
+    const auto& unionMessage = yaff::ReadMessage<UnionMessage>(ys.Data());
     EXPECT_EQ(unionMessage.GetSomeValue(), 10U);
     EXPECT_EQ(unionMessage.Union_case(), UnionMessage::UnionCase::UNION_NOT_SET);
 
@@ -222,7 +220,7 @@ TEST(SparseDynamicMessage, UnionMessageExplicitPresence) {
 
     EXPECT_EQ(ys.Size(), 23ULL);
 
-    const auto& unionMessage = yaff::ReadRoot<UnionMessage>(ys.Data());
+    const auto& unionMessage = yaff::ReadMessage<UnionMessage>(ys.Data());
     EXPECT_EQ(unionMessage.GetSomeValue(), 10U);
     EXPECT_EQ(unionMessage.Union_case(), UnionMessage::UnionCase::kMediumField);
     EXPECT_EQ(unionMessage.GetMediumField(), -1);
@@ -236,7 +234,7 @@ TEST(SparseDynamicMessage, UnionMessageNested) {
 
     EXPECT_EQ(ys.Size(), 33ULL);
 
-    const auto& unionMessage = yaff::ReadRoot<UnionMessage>(ys.Data());
+    const auto& unionMessage = yaff::ReadMessage<UnionMessage>(ys.Data());
     EXPECT_EQ(unionMessage.GetSomeValue(), 12U);
     EXPECT_EQ(unionMessage.Union_case(), UnionMessage::UnionCase::kNested2);
     EXPECT_EQ(unionMessage.GetNested2().GetSignedField(), 10);
@@ -249,7 +247,7 @@ TEST(SparseDynamicMessage, MixedOneof) {
 
     EXPECT_EQ(ys.Size(), 38ULL);
 
-    const auto& oneofMix = yaff::ReadRoot<OneOfMix>(ys.Data());
+    const auto& oneofMix = yaff::ReadMessage<OneOfMix>(ys.Data());
     EXPECT_EQ(oneofMix.Shared_case(), OneOfMix::SharedCase::kField4);
     EXPECT_EQ(oneofMix.GetField1(), 1ULL);
     EXPECT_EQ(oneofMix.GetField2(), 2ULL);
@@ -265,7 +263,7 @@ TEST(SparseDynamicMessage, GappedMessage) {
 
     EXPECT_EQ(ys.Size(), 31ULL);
 
-    const auto& gappedMessage = yaff::ReadRoot<GappedMessage>(ys.Data());
+    const auto& gappedMessage = yaff::ReadMessage<GappedMessage>(ys.Data());
     EXPECT_EQ(gappedMessage.GetField1(), 1ULL);
     EXPECT_EQ(gappedMessage.GetField3(), 0ULL);
     EXPECT_EQ(gappedMessage.GetField5(), 5ULL);

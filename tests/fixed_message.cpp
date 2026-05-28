@@ -8,10 +8,10 @@ TEST(FixedMessage, SimpleMessage) {
     yaff::Serializer ys;
     ys.Finish(protoyaff::test::SerializeSimpleFixedMessage(ys, 0xE, -0xD, 0xC, 0xB, 0xA));
 
-    EXPECT_EQ(ys.Size(), 36ULL);  // only fields and root offset;
+    EXPECT_EQ(ys.Size(), 36ULL);  // only fields and start offset;
 
     const auto* buf = ys.Data();
-    const auto& simpleMessage = yaff::ReadRoot<protoyaff::test::SimpleFixedMessage>(buf);
+    const auto& simpleMessage = yaff::ReadMessage<protoyaff::test::SimpleFixedMessage>(buf);
 
     EXPECT_EQ(simpleMessage.GetScalar1(), 0xEULL);
     EXPECT_EQ(simpleMessage.GetScalar2(), -0xD);
@@ -27,7 +27,7 @@ TEST(FixedMessage, DefaultValues) {
     EXPECT_EQ(ys.Size(), 36ULL);
 
     const auto* buf = ys.Data();
-    const auto& simpleMessage = yaff::ReadRoot<protoyaff::test::SimpleFixedMessage>(buf);
+    const auto& simpleMessage = yaff::ReadMessage<protoyaff::test::SimpleFixedMessage>(buf);
 
     EXPECT_EQ(simpleMessage.GetScalar5(), 0xAULL);
 }
@@ -41,13 +41,13 @@ TEST(FixedMessage, NestedValues) {
     EXPECT_EQ(ys.Size(), 35ULL);
 
     const auto* buf = ys.Data();
-    const auto& root = yaff::ReadRoot<protoyaff::test::StaticFixedMessage>(buf);
+    const auto& message = yaff::ReadMessage<protoyaff::test::StaticFixedMessage>(buf);
 
-    const auto& simpleMessage = root.GetNested();
+    const auto& simpleMessage = message.GetNested();
     EXPECT_EQ(simpleMessage.GetSignedField(), -0x10);
     EXPECT_EQ(simpleMessage.GetSmallField(), 0xFFFFU);
     EXPECT_EQ(simpleMessage.GetLargeField(), 0x3333ULL);
-    EXPECT_EQ(root.GetScalar(), 0xFFULL);
+    EXPECT_EQ(message.GetScalar(), 0xFFULL);
 }
 
 struct TFixedMeta {
@@ -76,10 +76,10 @@ TEST(FixedMessage, FixedValue) {
     EXPECT_EQ(ys.Size(), 26ULL);
 
     const auto* buf = ys.Data();
-    const auto& root = yaff::ReadRoot<yaff::DynamicMessage<TFlatMeta>>(buf);
+    const auto& msg = yaff::ReadMessage<yaff::DynamicMessage<TFlatMeta>>(buf);
 
     const auto& simpleMessage =
-        *root.ReadLayout<yaff::FixedMessage<TFixedMeta>>(1, &yaff::FixedMessage<TFixedMeta>::Default());
+        *msg.ReadLayout<yaff::FixedMessage<TFixedMeta>>(1, &yaff::FixedMessage<TFixedMeta>::Default());
     EXPECT_EQ(simpleMessage.ReadValue<uint64_t>(1, 0x0), 0xFFULL);
     EXPECT_EQ(simpleMessage.ReadValue<uint64_t>(2, 0x0), 0xAAU);
 }
@@ -102,9 +102,9 @@ TEST(FixedMessage, ArrayOfInlineFixed) {
     EXPECT_EQ(ys.Size(), 174ULL);
 
     const auto* buf = ys.Data();
-    const auto& root = yaff::ReadRoot<yaff::DynamicMessage<TFlatMeta>>(buf);
+    const auto& msg = yaff::ReadMessage<yaff::DynamicMessage<TFlatMeta>>(buf);
 
-    const auto& array = *root.ReadLayout<yaff::Array<yaff::InlineOffset<yaff::FixedMessage<TFixedMeta>>>>(
+    const auto& array = *msg.ReadLayout<yaff::Array<yaff::InlineOffset<yaff::FixedMessage<TFixedMeta>>>>(
         1, &yaff::Array<yaff::InlineOffset<yaff::FixedMessage<TFixedMeta>>>::Default());
     const size_t size = array.Size();
     EXPECT_EQ(size, 10U);

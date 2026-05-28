@@ -268,19 +268,19 @@ public:
     }
 
     template <typename T>
-    void Finish(InternalOffset<T> root) {
+    void Finish(InternalOffset<T> offset) {
         CheckNotFinished();
         CheckNotNested();
-        YAFF_REQUIRE(!root.IsNull());
+        YAFF_REQUIRE(!offset.IsNull());
         Buf_.LeftClear();
-        YAFF_REQUIRE(Buf_.RightSize() + sizeof(Offset) >= root.O);
-        Buf_.RightPushSmall<Offset>(ToCheckedOffset((Buf_.RightSize() + sizeof(Offset)) - root.O));
+        YAFF_REQUIRE(Buf_.RightSize() + sizeof(Offset) >= offset.O);
+        Buf_.RightPushSmall<Offset>(ToCheckedOffset((Buf_.RightSize() + sizeof(Offset)) - offset.O));
         Finished_ = true;
     }
 
     // N.B.: Incorrect use of this version of Finish function may result in UB.
     // Use this version of function only if you know exactly what you're doing.
-    void FinishRootless() {
+    void FinishRaw() {
         CheckNotFinished();
         CheckNotNested();
         Buf_.LeftClear();
@@ -810,5 +810,18 @@ private:
 
     bool Finished_;
 };
+
+template <typename M, typename... As>
+inline DetachedBuffer Serialize(Serializer& ys, As&&... as) {
+    ys.Reset();
+    ys.Finish(M::Serialize(ys, std::forward<As>(as)...));
+    return ys.Release();
+}
+
+template <typename M, typename... As>
+inline DetachedBuffer Serialize(As&&... as) {
+    Serializer ys;
+    return Serialize<M>(ys, std::forward<As>(as)...);
+}
 
 }  // namespace yaff

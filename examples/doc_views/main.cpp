@@ -34,20 +34,8 @@ document::Document LoadDocumentFromStorage() {
     return doc;
 }
 
-yaff::DetachedBuffer BuildLightView(const document::Document& proto) {
-    yaff::Serializer ys;
-    ys.Finish(NLightView::document::SerializeDocument(ys, proto));
-    return ys.Release();
-}
-
-yaff::DetachedBuffer BuildFullView(const document::Document& proto) {
-    yaff::Serializer ys;
-    ys.Finish(NFullView::document::SerializeDocument(ys, proto));
-    return ys.Release();
-}
-
 void DemoLightView(const yaff::DetachedBuffer& buffer) {
-    const auto& view = yaff::ReadRoot<NLightView::document::Document>(buffer.Data());
+    const auto& view = yaff::ReadMessage<light_view::document::Document>(buffer.Data());
 
     std::cout << "=== Light View (early-stage filtering) ===\n";
     std::cout << "Size: " << buffer.Size() << " bytes\n";
@@ -57,11 +45,11 @@ void DemoLightView(const yaff::DetachedBuffer& buffer) {
     std::cout << "region_id: " << view.region_id() << "\n";
     std::cout << "is_active: " << view.is_active() << "\n";
     std::cout << "\nHuman Readable:\n";
-    std::cout << yaff::reflect::DebugString(&view, NLightView::document::Document::Descriptor()) << "\n\n";
+    std::cout << yaff::reflect::DebugString(&view, light_view::document::Document::Descriptor()) << "\n\n";
 }
 
 void DemoFullView(const yaff::DetachedBuffer& buffer) {
-    const auto& view = yaff::ReadRoot<NFullView::document::Document>(buffer.Data());
+    const auto& view = yaff::ReadMessage<full_view::document::Document>(buffer.Data());
 
     std::cout << "=== Full View (late-stage ranking) ===\n";
     std::cout << "Size: " << buffer.Size() << " bytes\n";
@@ -92,14 +80,14 @@ void DemoFullView(const yaff::DetachedBuffer& buffer) {
     std::cout << "]\n";
 
     std::cout << "\nHuman Readable:\n";
-    std::cout << yaff::reflect::DebugString(&view, NFullView::document::Document::Descriptor()) << "\n\n";
+    std::cout << yaff::reflect::DebugString(&view, full_view::document::Document::Descriptor()) << "\n\n";
 }
 
 void VerifyRoundTrip(const document::Document& original, const yaff::DetachedBuffer& lightBuf,
                      const yaff::DetachedBuffer& fullBuf) {
     // Verify light view round-trip.
     {
-        const auto& view = yaff::ReadRoot<NLightView::document::Document>(lightBuf.Data());
+        const auto& view = yaff::ReadMessage<light_view::document::Document>(lightBuf.Data());
         document::Document restored;
         view.ParseTo(restored);
 
@@ -115,7 +103,7 @@ void VerifyRoundTrip(const document::Document& original, const yaff::DetachedBuf
 
     // Verify full view round-trip.
     {
-        const auto& view = yaff::ReadRoot<NFullView::document::Document>(fullBuf.Data());
+        const auto& view = yaff::ReadMessage<full_view::document::Document>(fullBuf.Data());
         document::Document restored;
         view.ParseTo(restored);
 
@@ -137,8 +125,8 @@ int main() {
     const auto proto = LoadDocumentFromStorage();
 
     // 2. Build different YaFF views from the same protobuf.
-    const auto lightBuf = BuildLightView(proto);
-    const auto fullBuf = BuildFullView(proto);
+    const auto lightBuf = yaff::Serialize<light_view::document::Document>(proto);
+    const auto fullBuf = yaff::Serialize<full_view::document::Document>(proto);
 
     // 3. Demonstrate each view.
     DemoLightView(lightBuf);

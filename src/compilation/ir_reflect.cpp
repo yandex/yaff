@@ -12,7 +12,7 @@ std::vector<uint8_t> GenerateStringDefault(const ir::TypeDef& type) {
 
     yaff::Serializer ys;
     ys.SerializeString(*literal);
-    ys.FinishRootless();
+    ys.FinishRaw();
 
     std::vector<uint8_t> bytes;
     bytes.resize(ys.Size());

@@ -262,8 +262,7 @@ public:
 
         yaff::Serializer ys;
         ys.EnforceDynamicAlternative(Layout);
-        const auto root = protoyaff::benchmark_access::SerializeFlat10(ys, proto);
-        ys.Finish(root);
+        ys.Finish(protoyaff::benchmark_access::SerializeFlat10(ys, proto));
 
         return {
             .Buffer = ys.Release(),
@@ -280,8 +279,7 @@ public:
 
         yaff::Serializer ys;
         ys.EnforceDynamicAlternative(Layout);
-        const auto root = protoyaff::benchmark_access::SerializeFlat100(ys, proto);
-        ys.Finish(root);
+        ys.Finish(protoyaff::benchmark_access::SerializeFlat100(ys, proto));
 
         return {
             .Buffer = ys.Release(),
@@ -649,8 +647,8 @@ void BM_Access_Flat10_YaFF(benchmark::State& state) {
     const auto msg = gen.GenerateYaFFFlat10<Layout>();
 
     for (auto _ : state) {
-        const auto& root = yaff::ReadRoot<protoyaff::benchmark_access::Flat10>(msg.Buffer.Data());
-        uint64_t sum = SumFlat10<protoyaff::benchmark_access::Flat10>(root);
+        const auto& message = yaff::ReadMessage<protoyaff::benchmark_access::Flat10>(msg.Buffer.Data());
+        uint64_t sum = SumFlat10<protoyaff::benchmark_access::Flat10>(message);
         benchmark::DoNotOptimize(sum);
     }
 }
@@ -666,8 +664,8 @@ void BM_Access_Flat10V2_YaFF(benchmark::State& state) {
     const auto msg = gen.GenerateYaFFFlat10<yaff::MessageLayout::MESSAGE_LAYOUT_FLAT>();
 
     for (auto _ : state) {
-        const auto& root = yaff::ReadRoot<yaff::DynamicMessage<Flat10MetaV2>>(msg.Buffer.Data());
-        uint64_t sum = SumRawFlat10<yaff::DynamicMessage<Flat10MetaV2>>(root);
+        const auto& message = yaff::ReadMessage<yaff::DynamicMessage<Flat10MetaV2>>(msg.Buffer.Data());
+        uint64_t sum = SumRawFlat10<yaff::DynamicMessage<Flat10MetaV2>>(message);
         benchmark::DoNotOptimize(sum);
     }
 }
@@ -678,8 +676,8 @@ void BM_Access_Flat100_YaFF(benchmark::State& state) {
     const auto msg = gen.GenerateYaFFFlat100<Layout>();
 
     for (auto _ : state) {
-        const auto& root = yaff::ReadRoot<protoyaff::benchmark_access::Flat100>(msg.Buffer.Data());
-        uint64_t sum = SumFlat100<protoyaff::benchmark_access::Flat100>(root);
+        const auto& message = yaff::ReadMessage<protoyaff::benchmark_access::Flat100>(msg.Buffer.Data());
+        uint64_t sum = SumFlat100<protoyaff::benchmark_access::Flat100>(message);
         benchmark::DoNotOptimize(sum);
     }
 }
