@@ -229,7 +229,7 @@ template <typename M>
 inline std::vector<typename M::key_type> SortedKeys(const M& map) {
     std::vector<typename M::key_type> keys;
     keys.reserve(map.size());
-    for (const auto& [k, v] : map) {
+    for (const auto& [k, _] : map) {
         keys.emplace_back(k);
     }
     std::stable_sort(keys.begin(), keys.end());

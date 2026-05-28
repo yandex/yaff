@@ -291,7 +291,7 @@ public:
     }
 
     template <typename T>
-    YAFF_PURE const T* ReadLayout(const FieldId id, const T* defaultPtr) const noexcept {
+    YAFF_PURE const T* ReadLayout(const FieldId id, const T* defaultPtr = nullptr) const noexcept {
         return ToTypedLimit(id) < TypedLimit_ ? ReadLayoutUnsafe<T>(ResolveField(id), defaultPtr) : defaultPtr;
     }
 
