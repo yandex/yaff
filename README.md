@@ -31,7 +31,7 @@ Most applications only need `yaff::core` and `yaff::proto`.
 #### Step 1 — Build and install YaFF
 
 ```bash
-git clone https://github.com/your-org/yaff.git
+git clone https://github.com/yandex/yaff.git
 cd yaff
 
 mkdir build && cd build
@@ -104,7 +104,7 @@ to build it into your local Conan cache once.
 #### Step 1 — Build YaFF into the local Conan cache
 
 ```bash
-git clone https://github.com/your-org/yaff.git
+git clone https://github.com/yandex/yaff.git
 cd yaff
 conan create . --build=missing -s build_type=Release
 ```
