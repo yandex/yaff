@@ -1,7 +1,6 @@
 import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
-from conan.tools.build import check_min_cppstd
 
 
 class YaffConan(ConanFile):
@@ -41,9 +40,6 @@ class YaffConan(ConanFile):
         if self.options.build_benchmarks:
             self.requires("benchmark/1.8.4")
             self.requires("flatbuffers/24.3.25")
-
-    def validate(self):
-        check_min_cppstd(self, 20)
 
     def layout(self):
         cmake_layout(self)
@@ -85,12 +81,3 @@ class YaffConan(ConanFile):
         self.cpp_info.components["proto"].libs = ["yaff_proto"]
         self.cpp_info.components["proto"].requires = ["core", "protobuf::libprotobuf"]
 
-        self.cpp_info.components["compilation"].set_property(
-            "cmake_target_name", "yaff::compilation"
-        )
-        self.cpp_info.components["compilation"].libs = ["yaff_compilation"]
-        self.cpp_info.components["compilation"].requires = [
-            "core",
-            "proto",
-            "protobuf::libprotobuf",
-        ]
