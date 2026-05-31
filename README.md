@@ -1,8 +1,29 @@
-# Yet another Flat Format [YaFF]
+# YaFF [Yet another Flat Format]
 
-YaFF is a C++ serialization library for working with structured data in performance-critical applications with deep [Protobuf](https://protobuf.dev/) integration. Think of it as an alternative [Protobuf](https://protobuf.dev/) wire-format with zero-copy data access support.
+YaFF is a high-performance C++ serialization library that provides a zero-copy wire format for the [Protobuf](https://protobuf.dev/) ecosystem. While the `.proto` schema remains your single source of truth, YaFF changes the physical representation of data to eliminate runtime overhead. This provides performance-critical applications with direct, zero-parsing access through a proto-like interface, while allowing less performance-sensitive components to parse the wire format back into Protobuf messages.
 
----
+YaFF shares the zero-copy foundations of [FlatBuffers](https://flatbuffers.dev/), but concentrates on server-side runtimes and adaptive layout strategies that bring read performance close to native C++ structs, preserving interoperability with Protobuf.
+
+## Key Features
+
+* **Zero-Copy Speed** — Eliminates parsing entirely with mmap-compatible layouts.
+* **Adaptive Layouts** — Allows explicit configuration or runtime adjustment to manage tradeoffs between speed, memory overhead, and schema flexibility.
+* **Protobuf Native** — Uses existing `.proto` files and respects Protobuf semantics.
+* **Incremental Adoption** — Emulates standard proto interfaces and provides two-way message conversion for easy module-by-module integration.
+
+## Quick start
+
+TBD
+
+## Roadmap
+
+YaFF’s core design decouples schema definitions from the underlying physical memory layout. This separation allows the exact same data structures to support multiple runtime representations, enabling optimization for specific access patterns without changing the source schema.
+
+YaFF is under active development. Planned and in-progress work includes:
+
+* **Columnar Layout** — Compact representation for large repeated fields, optimized for analytics and ML pipelines.
+* **Automated Adaptivity** — Layout selection driven automatically by data analysis or via profile-guided modes.
+* **Multi-Language Bindings** — Extending zero-copy data access to languages beyond C++.
 
 ## Integration Guide
 
@@ -24,3 +45,11 @@ Both methods expose the same set of CMake targets and the `yaff_generate()` help
 Most applications only need `yaff::core` and `yaff::proto`.
 
 For step-by-step integration instructions see [docs/integration.md](docs/integration.md).
+
+## Contributing
+
+Contributions are welcome! See the [contributor's guide](CONTRIBUTING.md) for how to report issues and submit pull requests.
+
+## License
+
+This project is licensed under the Apache 2.0 License (Apache-2.0). [Apache License 2.0](LICENSE).
