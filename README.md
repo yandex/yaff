@@ -11,9 +11,20 @@ YaFF shares the zero-copy foundations of [FlatBuffers](https://flatbuffers.dev/)
 * **Protobuf Native** — Uses existing `.proto` files and respects Protobuf semantics.
 * **Incremental Adoption** — Emulates standard proto interfaces and provides two-way message conversion for easy module-by-module integration.
 
-## Quick start
+## Quick Start
 
-TBD
+Working with YaFF feels close to Protobuf: you serialize a message and read fields back through a familiar interface, with no parsing step in between.
+
+```cpp
+// Turn a Protobuf message into a zero-copy YaFF representation...
+const auto buffer = yaff::Serialize<protoyaff::feed::FeedResponse>(proto);
+
+// ...then access fields instantly with zero parsing overhead
+const auto& response = yaff::ReadMessage<protoyaff::feed::FeedResponse>(buffer.Data());
+std::string_view authorName = response.items(0).author().name();
+```
+
+See the full [Quick Start](docs/quick_start.md) guide for the complete walkthrough.
 
 ## Roadmap
 
