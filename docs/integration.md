@@ -1,5 +1,7 @@
 # YaFF — Integration Guide
 
+Working consumer projects for both integration paths are in [integration_example/](../integration_example/).
+
 YaFF can be added to a project in two ways:
 
 - **CMake** — build and install YaFF, then use `find_package`

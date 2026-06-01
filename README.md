@@ -1,5 +1,7 @@
 # YaFF [Yet another Flat Format]
 
+[![CI](https://github.com/yandex/yaff/actions/workflows/ci.yml/badge.svg)](https://github.com/yandex/yaff/actions/workflows/ci.yml)
+
 YaFF is a high-performance C++ serialization library that provides a zero-copy wire format for the [Protobuf](https://protobuf.dev/) ecosystem. While the `.proto` schema remains your single source of truth, YaFF changes the physical representation of data to eliminate runtime overhead. This provides performance-critical applications with direct, zero-parsing access through a proto-like interface, while allowing less performance-sensitive components to parse the wire format back into Protobuf messages.
 
 YaFF shares the zero-copy foundations of [FlatBuffers](https://flatbuffers.dev/), but concentrates on server-side runtimes and adaptive layout strategies that bring read performance close to native C++ structs, preserving interoperability with Protobuf.
@@ -45,6 +47,8 @@ Both methods expose the same set of CMake targets and the `yaff_generate()` help
 Most applications only need `yaff::core` and `yaff::proto`.
 
 For step-by-step integration instructions see [docs/integration.md](docs/integration.md).
+
+Working consumer projects for both paths are in [integration_example/](integration_example/).
 
 ## Contributing
 
