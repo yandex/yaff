@@ -32,14 +32,14 @@ class YaffConan(ConanFile):
     }
 
     def requirements(self):
-        self.requires("protobuf/5.27.0")
+        self.requires("protobuf/[>=5.26]")
 
         if self.options.build_tests:
-            self.requires("gtest/1.14.0")
+            self.requires("gtest/[>=1.13]")
 
         if self.options.build_benchmarks:
-            self.requires("benchmark/1.8.4")
-            self.requires("flatbuffers/24.3.25")
+            self.requires("benchmark/[>=1.8.2]")
+            self.requires("flatbuffers/[>=23.5.9]")
 
     def layout(self):
         cmake_layout(self)
