@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(yaff_smoke_cmake LANGUAGES CXX)
+project(yaff_smoke_conan LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,20 +11,20 @@ set(_generated_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${_generated_dir})
 
 add_executable(yaff_smoke
-    ../src/main.cpp
-    ../proto/smoke.proto
+    src/main.cpp
+    proto/smoke.proto
 )
 
 protobuf_generate(
     TARGET yaff_smoke
     LANGUAGE cpp
-    IMPORT_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/..
+    IMPORT_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
     PROTOC_OUT_DIR ${_generated_dir}
 )
 
 yaff_generate(
     TARGET yaff_smoke
-    IMPORT_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/..
+    IMPORT_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
     OUT_DIR ${_generated_dir}
 )
 

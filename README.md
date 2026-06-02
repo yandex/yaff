@@ -46,8 +46,6 @@ Most applications only need `yaff::core` and `yaff::proto`.
 
 For step-by-step integration instructions see [docs/integration.md](docs/integration.md).
 
-Working consumer projects for both paths are in [integration_example/](integration_example/).
-
 ## Contributing
 
 Contributions are welcome! See the [contributor's guide](CONTRIBUTING.md) for how to report issues and submit pull requests.
