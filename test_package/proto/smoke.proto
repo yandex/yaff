@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package smoke;
+
+message Point {
+    optional int32 x = 1;
+    optional int32 y = 2;
+    optional string label = 3;
+}
