@@ -22,6 +22,6 @@ int main() {
     assert(p.y() == 0);
     assert(p.label() == "origin");
 
-    std::cout << "OK: YaFF smoke test passed.\n";
+    std::cout << "OK: YaFF smoke test passed (version " YAFF_VERSION_STRING ").\n";
     return 0;
 }

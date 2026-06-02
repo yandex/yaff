@@ -6,6 +6,16 @@ project(yaff
     LANGUAGES CXX
 )
 
+math(EXPR YAFF_VERSION_NUMBER
+    "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}"
+)
+
+configure_file(
+    include/yaff/version.h.in
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/yaff/version.h"
+    @ONLY
+)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -47,6 +57,11 @@ install(FILES
     cmake/YaFFProtocPluginTarget.cmake
     cmake/YaFFGenerate.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/yaff/version.h"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/yaff
 )
 
 install(EXPORT YaFFTargets

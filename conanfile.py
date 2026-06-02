@@ -1,11 +1,11 @@
 import os
+import re
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 
 class YaffConan(ConanFile):
     name = "yaff"
-    version = "0.1.0"
     description = "Yet Another Flat Format"
     license = "Apache-2.0"
 
@@ -30,6 +30,10 @@ class YaffConan(ConanFile):
         "build_benchmarks": False,
         "build_examples":   False,
     }
+
+    def set_version(self):
+        content = open(os.path.join(self.recipe_folder, "CMakeLists.txt")).read()
+        self.version = re.search(r"project\([^)]*VERSION\s+([\d.]+)", content).group(1)
 
     def requirements(self):
         self.requires("protobuf/[>=5.26]")

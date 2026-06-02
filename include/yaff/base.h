@@ -10,7 +10,7 @@
 #include <type_traits>
 #include <vector>
 
-#define YAFF_VERSION 000100
+#include <yaff/version.h>
 
 #define YAFF_PRIVATE_STRINGIFY(X) #X
 #define YAFF_STRINGIFY(X) YAFF_PRIVATE_STRINGIFY(X)

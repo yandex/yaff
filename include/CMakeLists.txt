@@ -8,6 +8,7 @@ target_compile_features(yaff_core INTERFACE cxx_std_20)
 target_include_directories(yaff_core
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../generated>
         $<INSTALL_INTERFACE:include>
 )
 
