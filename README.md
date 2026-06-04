@@ -1,3 +1,7 @@
+<img width="64" src="docs/img/logo.png"/><br/>
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ytsaurus/ytsaurus/blob/main/LICENSE)
+
 # YaFF [Yet another Flat Format]
 
 YaFF is a high-performance C++ serialization library that provides a zero-copy wire format for the [Protobuf](https://protobuf.dev/) ecosystem. While the `.proto` schema remains your single source of truth, YaFF changes the physical representation of data to eliminate runtime overhead. This provides performance-critical applications with direct, zero-parsing access through a proto-like interface, while allowing less performance-sensitive components to parse the wire format back into Protobuf messages.
