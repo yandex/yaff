@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  conan-integration:
+    name: "Conan / ${{ matrix.os }} / ${{ matrix.compiler }} ${{ matrix.compiler_version }} / ${{ matrix.build_type }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            compiler: clang
+            compiler_version: "17"
+            cc: clang-17
+            cxx: clang++-17
+            build_type: Release
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clang (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            clang-${{ matrix.compiler_version }} \
+            clang++-${{ matrix.compiler_version }}
+      - name: Set CC/CXX (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          echo "CC=clang-${{ matrix.compiler_version }}"   >> "$GITHUB_ENV"
+          echo "CXX=clang++-${{ matrix.compiler_version }}" >> "$GITHUB_ENV"
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Set CC/CXX (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          echo "CC=${{ matrix.cc }}"  >> "$GITHUB_ENV"
+          echo "CXX=${{ matrix.cxx }}" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Conan
+        run: pip install "conan>=2,<3"
+      - name: Install CMake (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake
+          cmake --version
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-
+      - name: Detect Conan profile
+        run: conan profile detect --force
+      - name: Patch Conan profile (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          PROFILE=$(conan profile path default)
+          sed -i.bak "s|compiler=.*|compiler=${{ matrix.compiler }}|"                         "$PROFILE"
+          sed -i.bak "s|compiler.version=.*|compiler.version=${{ matrix.compiler_version }}|" "$PROFILE"
+          sed -i.bak "s|compiler.libcxx=.*|compiler.libcxx=libstdc++11|"                      "$PROFILE"
+          sed -i.bak "s|build_type=.*|build_type=${{ matrix.build_type }}|"                   "$PROFILE"
+          echo "=== Profile ===" && cat "$PROFILE"
+      - name: conan create
+        run: conan create . --build=missing -s compiler.cppstd=20
+

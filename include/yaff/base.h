@@ -1,16 +1,20 @@
 #pragma once
 
 #include <assert.h>
+#include <yaff/version.h>
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <functional>
+#include <limits>
+#include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
-
-#include <yaff/version.h>
 
 #define YAFF_PRIVATE_STRINGIFY(X) #X
 #define YAFF_STRINGIFY(X) YAFF_PRIVATE_STRINGIFY(X)
