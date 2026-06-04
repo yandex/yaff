@@ -1,19 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" YAFF_VERSION_STRING)
+
 project(yaff
-    VERSION 0.1.0
+    VERSION ${YAFF_VERSION_STRING}
     DESCRIPTION "Yet another Flat Format"
     LANGUAGES CXX
-)
-
-math(EXPR YAFF_VERSION_NUMBER
-    "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}"
-)
-
-configure_file(
-    include/yaff/version.h.in
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/yaff/version.h"
-    @ONLY
 )
 
 set(CMAKE_CXX_STANDARD 20)
@@ -57,11 +49,6 @@ install(FILES
     cmake/YaFFProtocPluginTarget.cmake
     cmake/YaFFGenerate.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/YaFF
-)
-
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/yaff/version.h"
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/yaff
 )
 
 install(EXPORT YaFFTargets

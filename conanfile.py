@@ -1,6 +1,6 @@
 import os
-import re
 from conan import ConanFile
+from conan.tools.files import load
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 
@@ -11,6 +11,7 @@ class YaffConan(ConanFile):
 
     exports_sources = (
         "CMakeLists.txt",
+        "VERSION",
         "cmake/*",
         "include/*",
         "src/*",
@@ -32,8 +33,7 @@ class YaffConan(ConanFile):
     }
 
     def set_version(self):
-        content = open(os.path.join(self.recipe_folder, "CMakeLists.txt")).read()
-        self.version = re.search(r"project\([^)]*VERSION\s+([\d.]+)", content).group(1)
+        self.version = load(self, os.path.join(self.recipe_folder, "VERSION")).strip()
 
     def requirements(self):
         self.requires("protobuf/[>=5.26]")
