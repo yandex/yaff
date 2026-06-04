@@ -1,6 +1,6 @@
 <img width="64" src="docs/img/logo.png"/><br/>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ytsaurus/ytsaurus/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/yandex/yaff/blob/main/LICENSE)
 
 # YaFF [Yet another Flat Format]
 
