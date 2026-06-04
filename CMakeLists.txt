@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" YAFF_VERSION_STRING)
+
 project(yaff
-    VERSION 0.1.0
+    VERSION ${YAFF_VERSION_STRING}
     DESCRIPTION "Yet another Flat Format"
     LANGUAGES CXX
 )
