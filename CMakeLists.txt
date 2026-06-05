@@ -21,6 +21,9 @@ option(YAFF_BUILD_TESTS "Build YaFF tests" OFF)
 option(YAFF_BUILD_BENCHMARKS "Build YaFF benchmarks" OFF)
 option(YAFF_BUILD_EXAMPLES "Build YaFF examples" OFF)
 
+set(YAFF_SANITIZER "none" CACHE STRING "Sanitizer: none | asan | ubsan | asan,ubsan")
+include(cmake/Sanitizers.cmake)
+
 find_package(Protobuf CONFIG REQUIRED)
 
 include(GNUInstallDirs)

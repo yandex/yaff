@@ -7,8 +7,9 @@ on:
 
 jobs:
   conan-integration:
-    name: "Conan / ${{ matrix.os }} / ${{ matrix.compiler }} ${{ matrix.compiler_version }} / ${{ matrix.build_type }}"
+    name: "Conan / ${{ matrix.os }} / ${{ matrix.compiler }} ${{ matrix.compiler_version }} / ${{ matrix.label }}"
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -19,6 +20,30 @@ jobs:
             cc: clang-17
             cxx: clang++-17
             build_type: Release
+            label: Release
+            conan_extra: "-o build_tests=True"
+
+          - os: ubuntu-24.04
+            compiler: clang
+            compiler_version: "17"
+            cc: clang-17
+            cxx: clang++-17
+            build_type: Debug
+            label: Debug / ASAN
+            sanitizer: asan
+            conan_extra: "-o sanitizer=asan -o build_tests=True"
+            allow_failure: true
+
+          - os: ubuntu-24.04
+            compiler: clang
+            compiler_version: "17"
+            cc: clang-17
+            cxx: clang++-17
+            build_type: Debug
+            label: Debug / UBSAN
+            sanitizer: ubsan
+            conan_extra: "-o sanitizer=ubsan -o build_tests=True"
+            allow_failure: true
 
     steps:
       - uses: actions/checkout@v4
@@ -57,8 +82,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          key: conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-${{ matrix.sanitizer || 'none' }}-${{ hashFiles('conanfile.py') }}
           restore-keys: |
+            conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-
             conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-
       - name: Detect Conan profile
         run: conan profile detect --force
@@ -72,5 +98,9 @@ jobs:
           sed -i.bak "s|build_type=.*|build_type=${{ matrix.build_type }}|"                   "$PROFILE"
           echo "=== Profile ===" && cat "$PROFILE"
       - name: conan create
-        run: conan create . --build=missing -s compiler.cppstd=20
+        run: >
+          conan create . --build=missing
+          -s compiler.cppstd=20
+          -s build_type=${{ matrix.build_type }}
+          ${{ matrix.conan_extra }}
 

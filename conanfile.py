@@ -2,6 +2,7 @@ import os
 from conan import ConanFile
 from conan.tools.files import load
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.env import Environment
 
 
 class YaffConan(ConanFile):
@@ -25,11 +26,13 @@ class YaffConan(ConanFile):
         "build_tests":      [True, False],
         "build_benchmarks": [True, False],
         "build_examples":   [True, False],
+        "sanitizer":        ["none", "asan", "ubsan", "asan,ubsan"],
     }
     default_options = {
         "build_tests":      False,
         "build_benchmarks": False,
         "build_examples":   False,
+        "sanitizer":        "none",
     }
 
     def set_version(self):
@@ -42,7 +45,7 @@ class YaffConan(ConanFile):
         self.tool_requires("protobuf/<host_version>")
 
         if self.options.build_tests:
-            self.test_requires("gtest/1.14.0")
+            self.requires("gtest/1.14.0", visible=False)
 
         if self.options.build_benchmarks:
             self.test_requires("benchmark/1.9.5")
@@ -56,6 +59,7 @@ class YaffConan(ConanFile):
         tc.variables["YAFF_BUILD_TESTS"]      = self.options.build_tests
         tc.variables["YAFF_BUILD_BENCHMARKS"] = self.options.build_benchmarks
         tc.variables["YAFF_BUILD_EXAMPLES"]   = self.options.build_examples
+        tc.variables["YAFF_SANITIZER"]        = str(self.options.sanitizer)
         tc.generate()
 
         deps = CMakeDeps(self)
@@ -65,6 +69,12 @@ class YaffConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
+        if self.options.build_tests:
+            env = Environment()
+            env.define("CTEST_OUTPUT_ON_FAILURE", "1")
+            with env.vars(self).apply():
+                cmake.test()
 
     def package(self):
         cmake = CMake(self)
