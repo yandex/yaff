@@ -15,7 +15,7 @@ cmake --build build
 cmake --install build --prefix /usr/local
 ```
 
-This makes YaFF discoverable by `find_package(YaFF)`. For Conan and detailed options, see the [Integration Guide](./integration).
+This makes YaFF discoverable by `find_package(YaFF)`. For Conan and detailed options, see the [Integration Guide](./integration.md).
 
 ## 1. Schema
 
