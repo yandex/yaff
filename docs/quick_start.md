@@ -15,7 +15,7 @@ cmake --build build
 cmake --install build --prefix /usr/local
 ```
 
-This makes YaFF discoverable by `find_package(YaFF)`. For Conan and detailed options, see the [Integration Guide](./integration).
+This makes YaFF discoverable by `find_package(YaFF)`. For Conan and detailed options, see the [Integration Guide](integration.md).
 
 ## 1. Schema
 
@@ -54,7 +54,7 @@ message FeedResponse {
 }
 ```
 
-You can also annotate only part of an existing schema, producing several YaFF *slices* from a single `.proto` file. Beyond slices, schema annotations let you control per-message layouts and other advanced settings. See [Working with Schemas](./schema) for details.
+You can also annotate only part of an existing schema, producing several YaFF *slices* from a single `.proto` file. Beyond slices, schema annotations let you control per-message layouts and other advanced settings. See [Schema Overview](schema/overview.md#advanced-usage) for details.
 
 ## 2. Code Generation
 
@@ -85,7 +85,7 @@ target_link_libraries(my_app PRIVATE yaff::core yaff::proto)
 
 Alongside the `.pb.h` files produced by `protoc`, this generates `.yaff.h` files for the YaFF representation. Generated YaFF types live in the `protoyaff::<package>` namespace (e.g. `protoyaff::feed::FeedResponse`).
 
-The snippet above is a minimal setup to get generation working. For more advanced usage, including consuming YaFF via `find_package` or Conan and the full `yaff_generate()` options, see the [Integration Guide](./integration).
+The snippet above is a minimal setup to get generation working. For more advanced usage, including consuming YaFF via `find_package` or Conan and the full `yaff_generate()` options, see the [Integration Guide](integration.md).
 
 ## 3. Serialize Data
 
@@ -109,7 +109,7 @@ std::ofstream{"out.bin", std::ios::binary}.write(
     reinterpret_cast<const char*>(buffer.Data()), buffer.Size());
 ```
 
-You can also build the buffer directly with YaFF's serialization API, without constructing a Protobuf object at all. This avoids Protobuf's heap allocations, string copies, and the intermediate serialization step. See the [API Reference](./api).
+You can also build the buffer directly with YaFF's serialization API, without constructing a Protobuf object at all. This avoids Protobuf's heap allocations, string copies, and the intermediate serialization step. See the [API Reference](reference/cpp/generated.md#serializing-messages-directly).
 
 ## 4. Read Data
 
@@ -145,7 +145,7 @@ feed::FeedResponse restored;
 response.ParseTo(restored);
 ```
 
-Of course, the schema you read with doesn't have to be the exact version the data was written with: YaFF follows the same evolution rules as Protobuf, so compatible changes (adding fields, reserving removed ones, and so on) keep old and new data interoperable. See [Working with Schemas](./schema) for the details.
+Of course, the schema you read with doesn't have to be the exact version the data was written with: YaFF follows the same evolution rules as Protobuf, so compatible changes (adding fields, reserving removed ones, and so on) keep old and new data interoperable. See [Schema Evolution](schema/evolution.md) for the details.
 
 ## More Examples
 
