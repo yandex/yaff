@@ -1,4 +1,4 @@
-<img width="64" src="docs/_assets/logo.png"/><br/>
+<img width="64" src="docs/_assets/icon.svg"/><br/>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/yandex/yaff/blob/main/LICENSE)
 
