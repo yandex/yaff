@@ -9,7 +9,13 @@ class YaffSmokeConan(ConanFile):
     test_type = "explicit"
 
     def requirements(self):
+        # Emulates a consumer project that pins its own protobuf version.
+        self.requires("protobuf/5.27.0")
+
         self.requires(self.tested_reference_str)
+
+    def build_requirements(self):
+        self.tool_requires("protobuf/<host_version>")
 
     def layout(self):
         cmake_layout(self)
