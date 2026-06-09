@@ -216,7 +216,7 @@ private:
                                                  const ir::TypeDef& type);
     static std::string GenerateDeferredSerializeFuncName(const ir::MessageDef& msgDef);
     static std::string GenerateSerializeFuncName(const ir::MessageDef& msgDef);
-    static std::string GenerateTransformFuncName(const ir::MessageDef& msgDef);
+    static std::string GenerateParseFuncName(const ir::MessageDef& msgDef);
 
     static std::string GenerateDeferredSerializeProtobufFuncDeclaration(const ir::MessageDef& msgDef);
     static std::string GenerateSerializeProtobufFuncDeclaration(const ir::MessageDef& msgDef);
@@ -274,7 +274,7 @@ private:
     void GenerateMessageProtobufSerializer(const ir::MessageDef& msgDef, const bool deferred = false);
     void GenerateMessageAliasSerializeFunc(const ir::MessageDef& msgDef);
     void GenerateMessageAliasDeferredSerializeFunc(const ir::MessageDef& msgDef);
-    void GenerateMessageAliasTransformFunc(const ir::MessageDef& msgDef);
+    void GenerateMessageAliasParseFunc(const ir::MessageDef& msgDef);
     void GenerateMessageBasicSerializeFunc(const ir::MessageDef& msgDef);
     void GenerateMessageDynamicSerializeFunc(const ir::MessageDef& msgDef);
     void GenerateMessageSerializer(MessageType msgType, const ir::MessageDef& msgDef);
@@ -541,7 +541,7 @@ void CppGenerator::Impl::GenerateMessage(const ir::MessageDef& msgDef) {
 
     if (Opts_.GenerateProtobufApi) {
         auto g = Writer_.IdentGuard();
-        GenerateMessageAliasTransformFunc(msgDef);
+        GenerateMessageAliasParseFunc(msgDef);
         GenerateMessageAliasSerializeFunc(msgDef);
         if (ir::IsFixedMessage(msgDef)) {
             GenerateMessageAliasDeferredSerializeFunc(msgDef);
@@ -1023,10 +1023,10 @@ void CppGenerator::Impl::GenerateMessageAliasDeferredSerializeFunc(const ir::Mes
     Writer_ |= "}\n";
 }
 
-void CppGenerator::Impl::GenerateMessageAliasTransformFunc(const ir::MessageDef& msgDef) {
+void CppGenerator::Impl::GenerateMessageAliasParseFunc(const ir::MessageDef& msgDef) {
     Writer_ |= "template <typename T>";
     Writer_ |= "void ParseTo(T& to) const {";
-    Writer_ >= GenerateWithNamespaceName(msgDef.Schema->Namespace, GenerateTransformFuncName(msgDef)) + "(*this, to);";
+    Writer_ >= GenerateWithNamespaceName(msgDef.Schema->Namespace, GenerateParseFuncName(msgDef)) + "(*this, to);";
     Writer_ |= "}\n";
 }
 
@@ -1247,7 +1247,7 @@ std::string CppGenerator::Impl::GenerateParseToProtobufFuncDeclaration(const ir:
     const bool nonEmpty = HasRealFields(msgDef);
     const std::string fromArgName = (nonEmpty ? " from" : "");
     const std::string protoArgName = (nonEmpty ? " proto" : "");
-    return "template <typename F> inline void " + GenerateTransformFuncName(msgDef) + "(const F&" + fromArgName + ", " +
+    return "template <typename F> inline void " + GenerateParseFuncName(msgDef) + "(const F&" + fromArgName + ", " +
            GenerateMessageProtobufType(msgDef) + "&" + protoArgName + ")";
 }
 
@@ -1271,8 +1271,8 @@ std::string CppGenerator::Impl::GenerateSerializeFuncName(const ir::MessageDef& 
     return "Serialize" + msgDef.Name;
 }
 
-std::string CppGenerator::Impl::GenerateTransformFuncName(const ir::MessageDef& msgDef) {
-    return "Transform" + msgDef.Name;
+std::string CppGenerator::Impl::GenerateParseFuncName(const ir::MessageDef& msgDef) {
+    return "Parse" + msgDef.Name;
 }
 
 std::string CppGenerator::Impl::GenerateEnumDescriptorFuncDeclaration(const std::string& name) {
