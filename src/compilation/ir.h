@@ -94,7 +94,6 @@ struct MessageDef : public BaseDef {
         // These fields are filled during post-processing of the IR.
         uint64_t ActiveIndex = 0;
         uint64_t FlatOffset = 0;
-        uint64_t OneOfId = 0;
     };
 
     // This is not real definition. This structure is filled in during post-processing of the IR for optimizations.

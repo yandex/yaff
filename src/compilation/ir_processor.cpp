@@ -140,8 +140,6 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
             auto [it, _] =
                 messageDef.OneOfs.try_emplace(fieldDef.OneOf, ir::MessageDef::OneOfDef{.Name = fieldDef.OneOf});
             it->second.Fields.emplace_back(&fieldDef);
-
-            fieldDef.OneOfId = it->second.Fields.size();
         }
 
         fieldDef.FlatOffset = flatOffset;

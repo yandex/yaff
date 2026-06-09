@@ -504,8 +504,7 @@ void CppGenerator::Impl::GenerateMessage(const ir::MessageDef& msgDef) {
                 if (fieldDef->Deprecated) {
                     return;
                 }
-                Writer_ >=
-                    GenerateOneOfFieldName(oneOf.Name, fieldDef) + " = " + std::to_string(fieldDef->OneOfId) + ",";
+                Writer_ >= GenerateOneOfFieldName(oneOf.Name, fieldDef) + " = " + std::to_string(fieldDef->Id) + ",";
             });
             Writer_ >= GenerateOneOfDefaultCaseEnumName(oneOf.Name) + " = 0,";
             Writer_ |= "};\n";
