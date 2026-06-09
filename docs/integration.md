@@ -105,7 +105,11 @@ class MyAppConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
 
     def requirements(self):
+        self.requires("protobuf/<version>")
         self.requires("yaff/<version>")
+
+    def build_requirements(self):
+        self.tool_requires("protobuf/<host_version>")
 
     def layout(self):
         cmake_layout(self)
@@ -124,7 +128,11 @@ class MyAppConan(ConanFile):
 
 ```ini
 [requires]
+protobuf/<version>
 yaff/<version>
+
+[tool_requires]
+protobuf/<host_version>
 
 [generators]
 CMakeDeps
