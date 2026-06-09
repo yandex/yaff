@@ -1,4 +1,4 @@
-# YaFF — Integration Guide
+# Integration Guide
 
 YaFF can be added to a project in two ways:
 
