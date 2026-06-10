@@ -47,10 +47,10 @@ struct MessageDef;
 struct SchemaDef;
 
 struct TypeDef {
-    Type Type = Type::TYPE_NONE;
-    const TypeDef* ElementType = nullptr;    // Not nullptr only for TYPE_ARRAY;
-    const MessageDef* MessageDef = nullptr;  // Not nullptr only for TYPE_MESSAGE;
-    const EnumDef* EnumDef = nullptr;        // Not nullptr only for TYPE_ENUM;
+    yaff::Type Type = yaff::Type::TYPE_NONE;
+    const ir::TypeDef* ElementType = nullptr;    // Not nullptr only for TYPE_ARRAY;
+    const ir::MessageDef* MessageDef = nullptr;  // Not nullptr only for TYPE_MESSAGE;
+    const ir::EnumDef* EnumDef = nullptr;        // Not nullptr only for TYPE_ENUM;
 
     std::map<std::string, std::string> Modifiers;
 
@@ -86,7 +86,7 @@ struct MessageDef : public BaseDef {
 
         const TypeDef* Type = nullptr;
 
-        Presence Presence = Presence::PRESENCE_NONE;
+        yaff::Presence Presence = yaff::Presence::PRESENCE_NONE;
         bool Deprecated = false;
 
         std::string OneOf;

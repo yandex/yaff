@@ -8,7 +8,7 @@ struct MessageDescriptor;
 struct EnumDescriptor;
 
 struct TypeDescriptor {
-    const Type Type = Type::TYPE_NONE;
+    const yaff::Type Type = yaff::Type::TYPE_NONE;
 
     union {
         const TypeDescriptor* Element = nullptr;
@@ -38,7 +38,7 @@ struct FieldDescriptor {
 
     const TypeDescriptor* Type = nullptr;
 
-    const Presence Presence = Presence::PRESENCE_NONE;
+    const yaff::Presence Presence = yaff::Presence::PRESENCE_NONE;
     const bool Deprecated = false;
 
     const FieldOffset FlatOffset = 0;

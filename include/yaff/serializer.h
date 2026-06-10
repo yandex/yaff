@@ -554,15 +554,15 @@ private:
         }
 
         YAFF_LAYOUT_BEGIN(TField) {
-            Offset Offset;
-            FieldId Id;
+            yaff::Offset Offset;
+            yaff::FieldId Id;
             bool IsScalar;
         };
         YAFF_LAYOUT_END
 
         YAFF_LAYOUT_BEGIN(TMeta) {
-            Offset Offset;
-            FieldId MaxId;
+            yaff::Offset Offset;
+            yaff::FieldId MaxId;
         };
         YAFF_LAYOUT_END
 
