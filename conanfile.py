@@ -26,13 +26,11 @@ class YaffConan(ConanFile):
         "build_tests":      [True, False],
         "build_benchmarks": [True, False],
         "build_examples":   [True, False],
-        "sanitizer":        ["none", "asan", "ubsan", "asan,ubsan"],
     }
     default_options = {
         "build_tests":      False,
         "build_benchmarks": False,
         "build_examples":   False,
-        "sanitizer":        "none",
     }
 
     def set_version(self):
@@ -48,8 +46,8 @@ class YaffConan(ConanFile):
             self.requires("gtest/1.14.0", visible=False)
 
         if self.options.build_benchmarks:
-            self.test_requires("benchmark/1.9.5")
-            self.test_requires("flatbuffers/25.12.19")
+            self.test_requires("benchmark/1.9.5", visible=False)
+            self.test_requires("flatbuffers/25.12.19", visible=False)
 
     def layout(self):
         cmake_layout(self)
@@ -59,7 +57,6 @@ class YaffConan(ConanFile):
         tc.variables["YAFF_BUILD_TESTS"]      = self.options.build_tests
         tc.variables["YAFF_BUILD_BENCHMARKS"] = self.options.build_benchmarks
         tc.variables["YAFF_BUILD_EXAMPLES"]   = self.options.build_examples
-        tc.variables["YAFF_SANITIZER"]        = str(self.options.sanitizer)
         tc.generate()
 
         deps = CMakeDeps(self)

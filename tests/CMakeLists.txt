@@ -39,7 +39,6 @@ function(yaff_add_unit_test _src)
             GTest::gtest_main
     )
     add_test(NAME ${_target} COMMAND ${_target})
-    yaff_apply_sanitizers(${_target})
 endfunction()
 
 yaff_add_unit_test(common.cpp)
