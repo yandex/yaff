@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
             cxx: clang++-17
             build_type: Release
             label: Release
-            conan_extra: "-o build_tests=True"
+            conan_extra: "-o build_tests=True -o build_benchmarks=True -o build_examples=True"
 
           - os: ubuntu-24.04
             compiler: clang
@@ -29,7 +29,7 @@ jobs:
             cxx: clang++-17
             build_type: Debug
             label: Debug
-            conan_extra: "-o build_tests=True"
+            conan_extra: "-o build_tests=True -o build_benchmarks=True -o build_examples=True"
 
           - os: ubuntu-24.04
             compiler: gcc
@@ -38,7 +38,7 @@ jobs:
             cxx: g++-13
             build_type: Release
             label: Release
-            conan_extra: "-o build_tests=True"
+            conan_extra: "-o build_tests=True -o build_benchmarks=True -o build_examples=True"
 
           - os: ubuntu-24.04
             compiler: gcc
@@ -47,7 +47,7 @@ jobs:
             cxx: g++-13
             build_type: Debug
             label: Debug
-            conan_extra: "-o build_tests=True"
+            conan_extra: "-o build_tests=True -o build_benchmarks=True -o build_examples=True"
 
     steps:
       - uses: actions/checkout@v4
@@ -89,17 +89,12 @@ jobs:
             conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-
       - name: Detect Conan profile
         run: conan profile detect --force
-      - name: Patch Conan profile
-        run: |
-          PROFILE=$(conan profile path default)
-          sed -i.bak "s|compiler=.*|compiler=${{ matrix.compiler }}|"                         "$PROFILE"
-          sed -i.bak "s|compiler.version=.*|compiler.version=${{ matrix.compiler_version }}|" "$PROFILE"
-          sed -i.bak "s|compiler.libcxx=.*|compiler.libcxx=libstdc++11|"                      "$PROFILE"
-          sed -i.bak "s|build_type=.*|build_type=${{ matrix.build_type }}|"                   "$PROFILE"
-          echo "=== Profile ===" && cat "$PROFILE"
       - name: conan create
         run: >
           conan create . --build=missing
+          -s compiler=${{ matrix.compiler }}
+          -s compiler.version=${{ matrix.compiler_version }}
+          -s compiler.libcxx=libstdc++11
           -s compiler.cppstd=20
           -s build_type=${{ matrix.build_type }}
           -c tools.cmake:cmake_program=$(which cmake)

@@ -43,11 +43,11 @@ class YaffConan(ConanFile):
         self.tool_requires("protobuf/<host_version>")
 
         if self.options.build_tests:
-            self.test_requires("gtest/1.14.0", visible=False)
+            self.test_requires("gtest/1.14.0")
 
         if self.options.build_benchmarks:
-            self.test_requires("benchmark/1.9.5", visible=False)
-            self.test_requires("flatbuffers/25.12.19", visible=False)
+            self.test_requires("benchmark/1.9.5")
+            self.test_requires("flatbuffers/24.12.23")
 
     def layout(self):
         cmake_layout(self)
