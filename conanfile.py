@@ -2,6 +2,7 @@ import os
 from conan import ConanFile
 from conan.tools.files import load
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.env import Environment
 
 
 class YaffConan(ConanFile):
@@ -46,7 +47,7 @@ class YaffConan(ConanFile):
 
         if self.options.build_benchmarks:
             self.test_requires("benchmark/1.9.5")
-            self.test_requires("flatbuffers/25.12.19")
+            self.test_requires("flatbuffers/24.12.23")
 
     def layout(self):
         cmake_layout(self)
@@ -65,6 +66,12 @@ class YaffConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
+        if self.options.build_tests:
+            env = Environment()
+            env.define("CTEST_OUTPUT_ON_FAILURE", "1")
+            with env.vars(self).apply():
+                cmake.test()
 
     def package(self):
         cmake = CMake(self)
