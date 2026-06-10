@@ -43,7 +43,7 @@ class YaffConan(ConanFile):
         self.tool_requires("protobuf/<host_version>")
 
         if self.options.build_tests:
-            self.requires("gtest/1.14.0", visible=False)
+            self.test_requires("gtest/1.14.0", visible=False)
 
         if self.options.build_benchmarks:
             self.test_requires("benchmark/1.9.5", visible=False)
