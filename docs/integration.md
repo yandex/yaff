@@ -9,6 +9,44 @@ Both methods expose the same set of CMake targets and the `yaff_generate()` help
 
 ---
 
+## System Requirements
+
+### Supported Platforms
+
+- Linux (x86-64, AArch64)
+- macOS (x86-64, Apple Silicon)
+
+### Compilers
+
+C++20 is required. The following compilers are tested or known to work:
+
+| Compiler | Minimum version | Notes                   |
+|----------|-----------------|-------------------------|
+| GCC      | 13              | Requires `libstdc++11`  |
+| Clang    | 17              | `libc++` not tested     |
+
+### Build Tools
+
+| Tool  | Version  |
+|-------|----------|
+| CMake | ≥ 3.20   |
+| Conan | ≥ 2, < 3 |
+
+Conan 1.x is **not** supported.
+
+### Dependencies
+
+Dependencies are resolved automatically by Conan. When integrating via plain CMake, install them manually before configuring.
+
+| Library      | Version   | Required for           |
+|--------------|-----------|------------------------|
+| protobuf     | ≥ 5.26    | Runtime + code generation |
+| gtest        | 1.14.0    | Tests only             |
+| benchmark    | 1.9.5     | Benchmarks only        |
+| flatbuffers  | 24.12.23  | Benchmarks only        |
+
+---
+
 ## 1. Integration via CMake
 
 ### Step 1 — Build and install YaFF
@@ -76,10 +114,19 @@ For complete usage examples of `yaff_generate()` see the [examples/](../examples
 
 ## 2. Integration via Conan
 
+> **Conan 2 required.** Conan 1.x is not supported.
+
 YaFF is not published to ConanCenter. Before using it as a dependency you need
 to build it into your local Conan cache once.
 
-### Step 1 — Build YaFF into the local Conan cache
+### Step 1 — Install Conan 2
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install "conan>=2,<3"
+```
+
+### Step 2 — Build YaFF into the local Conan cache
 
 ```bash
 git clone https://github.com/yandex/yaff.git
