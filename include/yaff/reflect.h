@@ -40,11 +40,19 @@ struct FieldDescriptor {
 
     const yaff::Presence Presence = yaff::Presence::PRESENCE_NONE;
     const bool Deprecated = false;
+};
 
-    const FieldOffset FlatOffset = 0;
+struct MetaDescriptor {
+    const uint16_t FlatOffsetCount = 0;
+    const FieldOffset* FlatOffsets = nullptr;
+
+    const uint16_t DeletedCount = 0;
+    const FieldId* DeletedIds = nullptr;
 };
 
 struct MessageDescriptor {
+    const MetaDescriptor* Meta = nullptr;
+
     const char* Name = nullptr;
     const MessageLayout Layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN;
 
@@ -72,10 +80,8 @@ inline size_t FixedMessageSize(const MessageDescriptor& msg) {
     if (msg.FieldCount == 0) {
         return 0;
     }
-    const auto& last = msg.Fields[msg.FieldCount - 1];
-    return last.FlatOffset + InlineSize(*last.Type);
+    return msg.Meta->FlatOffsets[msg.Meta->FlatOffsetCount - 1];
 }
-
 inline size_t InlineSize(Type type) {
     switch (type) {
         case Type::TYPE_NONE:
@@ -114,10 +120,13 @@ inline size_t InlineSize(const TypeDescriptor& type) {
     return InlineSize(type.Type);
 }
 
-inline FieldResolver MakeFieldResolverFunc(const MessageDescriptor* desc) {
-    return [desc](const FieldId id) {
-        YAFF_REQUIRE(id > 0);
-        return desc->Fields[id - 1].FlatOffset;
+inline FieldResolver MakeFieldResolver(const MessageDescriptor* desc) {
+    return [meta = desc->Meta](const FieldId id, const CorrectionResolver* rslv) -> FieldOffset {
+        FieldOffset offset = meta->FlatOffsets[id - 1];
+        for (uint16_t i = 0; rslv && i < meta->DeletedCount && meta->DeletedIds[i] < id; ++i) {
+            offset += (*rslv)(meta->DeletedIds[i]);
+        }
+        return offset;
     };
 }
 

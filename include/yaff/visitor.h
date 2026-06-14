@@ -47,7 +47,7 @@ public:
         YAFF_REQUIRE(desc);
 
         Visitor_->OnMessageStart();
-        const auto resolver = MakeFieldResolverFunc(desc);
+        const auto resolver = MakeFieldResolver(desc);
         for (uint64_t i = 0; i < desc->FieldCount; ++i) {
             const auto& field = desc->Fields[i];
             if (field.Deprecated) {

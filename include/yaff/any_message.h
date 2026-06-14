@@ -14,7 +14,7 @@ public:
     YAFF_PURE T ReadValue(MessageLayout tl, FieldId id, T dflt, const FieldResolver* rslv = nullptr) const {
         switch (tl) {
             case MessageLayout::MESSAGE_LAYOUT_FIXED:
-                return AsFixedMessage()->ReadValueUnsafe<T>((*rslv)(id), dflt);
+                return AsFixedMessage()->ReadValueUnsafe<T>((*rslv)(id, nullptr), dflt);
             case MessageLayout::MESSAGE_LAYOUT_SPARSE:
                 return AsSparseMessage()->ReadValue<T>(id, dflt);
             case MessageLayout::MESSAGE_LAYOUT_FLAT:
@@ -29,7 +29,7 @@ public:
     YAFF_PURE const T* ReadLayout(MessageLayout tl, FieldId id, const FieldResolver* rslv = nullptr) const {
         switch (tl) {
             case MessageLayout::MESSAGE_LAYOUT_FIXED:
-                return AsFixedMessage()->ReadLayoutUnsafe<T>((*rslv)(id), nullptr);
+                return AsFixedMessage()->ReadLayoutUnsafe<T>((*rslv)(id, nullptr), nullptr);
             case MessageLayout::MESSAGE_LAYOUT_SPARSE:
                 return AsSparseMessage()->ReadLayout<T>(id, nullptr);
             case MessageLayout::MESSAGE_LAYOUT_FLAT:
@@ -44,7 +44,7 @@ public:
     YAFF_PURE bool ReadPresence(MessageLayout tl, const FieldId id, const FieldResolver* rslv = nullptr) const {
         switch (tl) {
             case MessageLayout::MESSAGE_LAYOUT_FIXED:
-                return AsFixedMessage()->ReadPresenceUnsafe<T>((*rslv)(id));
+                return AsFixedMessage()->ReadPresenceUnsafe<T>((*rslv)(id, nullptr));
             case MessageLayout::MESSAGE_LAYOUT_SPARSE:
                 return AsSparseMessage()->ReadPresence<T>(id);
             case MessageLayout::MESSAGE_LAYOUT_FLAT:
@@ -58,31 +58,40 @@ public:
 private:
     AnyMessage() noexcept = default;
 
-    template <typename T>
-    YAFF_PURE T ReadValueDispatch(const FieldId id, const T dflt, const FieldResolver* rslv = nullptr) const {
-        const FieldId typedLimit = yaff::ReadValue<FieldId>(Message());
-        if (FlatMessage<void>::ToTypedLimit(id) < typedLimit) {
-            return AsFlatMessage()->ReadValueUnsafe<T>((*rslv)(id), dflt);
-        }
-        return AsDynamicMessage()->ReadValueDispatch<T>(typedLimit, id, dflt);
+    YAFF_PURE CorrectionResolver MakeCorrectionResolver(const FieldId tl) const {
+        return [tl, m = AsFlatMessage()](const FieldId id) {
+            return (FlatMessage<void>::IsImplicit(tl) ? m->ResolveImplicitSize(id) : m->ResolveExplicitSize(id));
+        };
     }
 
     template <typename T>
-    YAFF_PURE const T* ReadLayoutDispatch(FieldId id, const FieldResolver* rslv = nullptr) const {
-        const FieldId typedLimit = yaff::ReadValue<FieldId>(Message());
-        if (FlatMessage<void>::ToTypedLimit(id) < typedLimit) {
-            return AsFlatMessage()->ReadLayoutUnsafe<T>((*rslv)(id), nullptr);
+    YAFF_PURE T ReadValueDispatch(const FieldId id, const T dflt, const FieldResolver* rslv) const {
+        const FieldId tl = yaff::ReadValue<FieldId>(Message());
+        if (FlatMessage<void>::ToTypedLimit(id) < tl) {
+            const CorrectionResolver corr = MakeCorrectionResolver(tl);
+            return AsFlatMessage()->ReadValueUnsafe<T>((*rslv)(id, &corr), dflt);
         }
-        return AsDynamicMessage()->ReadLayoutDispatch<T>(typedLimit, id, nullptr);
+        return AsDynamicMessage()->ReadValueDispatch<T>(tl, id, dflt);
     }
 
     template <typename T>
-    YAFF_PURE bool ReadPresenceDispatch(const FieldId id, const FieldResolver* rslv = nullptr) const {
-        const FieldId typedLimit = yaff::ReadValue<FieldId>(Message());
-        if (FlatMessage<void>::ToTypedLimit(id) < typedLimit) {
-            return AsFlatMessage()->ReadPresenceUnsafe<T>(typedLimit, id, (*rslv)(id));
+    YAFF_PURE const T* ReadLayoutDispatch(const FieldId id, const FieldResolver* rslv) const {
+        const FieldId tl = yaff::ReadValue<FieldId>(Message());
+        if (FlatMessage<void>::ToTypedLimit(id) < tl) {
+            const CorrectionResolver corr = MakeCorrectionResolver(tl);
+            return AsFlatMessage()->ReadLayoutUnsafe<T>((*rslv)(id, &corr), nullptr);
         }
-        return AsDynamicMessage()->ReadPresenceDispatch<T>(typedLimit, id);
+        return AsDynamicMessage()->ReadLayoutDispatch<T>(tl, id, nullptr);
+    }
+
+    template <typename T>
+    YAFF_PURE bool ReadPresenceDispatch(const FieldId id, const FieldResolver* rslv) const {
+        const FieldId tl = yaff::ReadValue<FieldId>(Message());
+        if (FlatMessage<void>::ToTypedLimit(id) < tl) {
+            const CorrectionResolver corr = MakeCorrectionResolver(tl);
+            return AsFlatMessage()->ReadPresenceUnsafe<T>(tl, id, (*rslv)(id, &corr));
+        }
+        return AsDynamicMessage()->ReadPresenceDispatch<T>(tl, id);
     }
 
     YAFF_PURE const std::byte* Message() const {

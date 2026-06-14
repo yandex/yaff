@@ -192,7 +192,9 @@ YAFF_PURE inline const T* ResolveNullableOffset(const void* obj, const O offset,
 
 using FieldId = uint16_t;
 using FieldOffset = uint16_t;
-using FieldResolver = std::function<FieldOffset(const FieldId)>;
+
+using CorrectionResolver = std::function<FieldOffset(const FieldId id)>;
+using FieldResolver = std::function<FieldOffset(const FieldId id, const CorrectionResolver* rslv)>;
 
 template <typename T, typename U>
 struct WrittenOffset {

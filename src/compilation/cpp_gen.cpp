@@ -258,6 +258,7 @@ private:
     void GenerateMessagePre(const ir::MessageDef& msgDef);
     void GenerateMessagePost(const ir::MessageDef& msgDef);
 
+    void GenerateMessageMetaDescriptor(const ir::MessageDef& msgDef);
     void GenerateMessageFieldDescriptors(const ir::MessageDef& msgDef);
     void GenerateMessageDescriptor(const ir::MessageDef& msgDef);
     void GenerateMessageAliasDescriptor(const ir::MessageDef& msgDef);
@@ -933,11 +934,19 @@ void CppGenerator::Impl::GenerateMessageDescriptor(const ir::MessageDef& msgDef)
         GenerateMessageFieldDescriptors(msgDef);
     }
 
+    const bool hasMeta = ir::IsStaticMetaMessage(msgDef);
+    if (hasMeta) {
+        GenerateMessageMetaDescriptor(msgDef);
+    }
+
     Writer_ |= "static constexpr ::yaff::reflect::MessageDescriptor message = {";
+    if (hasMeta) {
+        Writer_ >= ".Meta = &meta,";
+    }
     Writer_ >= ".Name = \"" + msgDef.Name + "\",";
     Writer_ >= ".Layout = " + GenerateMessageLayoutDescriptor(msgDef.Layout) + ",";
     Writer_ >= ".FieldCount = " + std::to_string(msgDef.Fields.size()) + ",";
-    if (hasFields != 0) {
+    if (hasFields) {
         Writer_ >= ".Fields = fields,";
     }
     Writer_ |= "};";
@@ -945,6 +954,16 @@ void CppGenerator::Impl::GenerateMessageDescriptor(const ir::MessageDef& msgDef)
 
     Writer_.DecrementIdentLevel();
     Writer_ |= "}\n";
+}
+
+void CppGenerator::Impl::GenerateMessageMetaDescriptor(const ir::MessageDef& msgDef) {
+    const std::string metaName = GenerateMessageStaticMetaName(msgDef);
+    Writer_ |= "static constexpr ::yaff::reflect::MetaDescriptor meta = {";
+    Writer_ >= ".FlatOffsetCount = " + metaName + "::FLAT_OFFSETS.size(),";
+    Writer_ >= ".FlatOffsets = " + metaName + "::FLAT_OFFSETS.data(),";
+    Writer_ >= ".DeletedCount = " + metaName + "::DELETED_IDS.size(),";
+    Writer_ >= ".DeletedIds = " + metaName + "::DELETED_IDS.data(),";
+    Writer_ |= "};";
 }
 
 void CppGenerator::Impl::GenerateMessageFieldDescriptors(const ir::MessageDef& msgDef) {
@@ -990,7 +1009,6 @@ void CppGenerator::Impl::GenerateMessageFieldDescriptors(const ir::MessageDef& m
         if (fieldDef.Deprecated) {
             Writer_ >= ".Deprecated = true,";
         }
-        Writer_ >= ".FlatOffset = " + std::to_string(fieldDef.FlatOffset) + ",";
         Writer_ |= "},";
     });
     Writer_ |= "};";

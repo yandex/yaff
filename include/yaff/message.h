@@ -195,26 +195,36 @@ private:
 // TODO: The current correction is calculated by reading from the static CORRECTION_DICTIONARY.
 // It might be worth trying an alternative that uses arithmetic:
 // (meta & 1) + ((meta >> 1) << 2) + 3 * ((meta & 1) & (meta >> 1));
-#define YAFF_RETURN_CORRECTION(expression)                   \
-    do {                                                     \
-        FieldOffset correction = 0;                          \
-        const size_t end = CalculateDeletedIndex(id);        \
-        for (size_t i = 0; i < end; ++i) {                   \
-            const FieldId del = M::DELETED_IDS[i] - 1;       \
-            correction += CORRECTION_DICTIONARY[expression]; \
-        }                                                    \
-        return correction;                                   \
+// clang-format off
+#define YAFF_RETURN_CORRECTION(resolver)                   \
+    do {                                                   \
+        FieldOffset correction = 0;                        \
+        const size_t end = CalculateDeletedIndex(id);      \
+        for (size_t i = 0; i < end; ++i) {                 \
+            correction += resolver(M::DELETED_IDS[i]);     \
+        }                                                  \
+        return correction;                                 \
     } while (0)
 
+    YAFF_PURE FieldOffset ResolveImplicitSize(const FieldId id) const noexcept {
+        return CORRECTION_DICTIONARY[
+            (yaff::ReadValue<uint8_t>(Message() - ((id - 1) >> 2) - 1) >> (((id - 1) & 3) << 1)) & 3];
+    }
+
+    YAFF_PURE FieldOffset ResolveExplicitSize(const FieldId id) const noexcept {
+        return CORRECTION_DICTIONARY[
+            (YAFF_BSWAP16(yaff::ReadValue<uint16_t>(Message() - (((id - 1) * 3) >> 3) - 2)) >> ((((id - 1) * 3) & 7) + 1)) & 3];
+    }
+
     YAFF_PURE FieldOffset ResolveImplicitCorrection(const FieldId id) const noexcept {
-        YAFF_RETURN_CORRECTION((yaff::ReadValue<uint8_t>(Message() - (del >> 2) - 1) >> ((del & 3) << 1)) & 3);
+        YAFF_RETURN_CORRECTION(ResolveImplicitSize);
     }
 
     YAFF_PURE FieldOffset ResolveExplicitCorrection(const FieldId id) const noexcept {
-        YAFF_RETURN_CORRECTION(
-            (YAFF_BSWAP16(yaff::ReadValue<uint16_t>(Message() - ((del * 3) >> 3) - 2)) >> (((del * 3) & 7) + 1)) & 3);
+        YAFF_RETURN_CORRECTION(ResolveExplicitSize);
     }
 
+// clang-format on
 #undef YAFF_RETURN_CORRECTION
 
     YAFF_PURE FieldOffset ResolveCorrection(const FieldId tl, const FieldId id) const noexcept {

@@ -41,6 +41,7 @@ function(yaff_add_unit_test _src)
     add_test(NAME ${_target} COMMAND ${_target})
 endfunction()
 
+yaff_add_unit_test(any_message.cpp)
 yaff_add_unit_test(common.cpp)
 yaff_add_unit_test(proto_api.cpp)
 yaff_add_unit_test(fixed_message.cpp)
