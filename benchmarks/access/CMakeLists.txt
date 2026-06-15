@@ -25,12 +25,6 @@ yaff_generate(
 target_include_directories(yaff_bench_access_protoyaff PUBLIC ${YAFF_BENCH_ACCESS_GENERATED_DIR})
 target_link_libraries(yaff_bench_access_protoyaff PUBLIC yaff::core yaff::proto)
 
-if(MSVC)
-    target_compile_options(yaff_bench_access_protoyaff PRIVATE /O2 /DNDEBUG)
-else()
-    target_compile_options(yaff_bench_access_protoyaff PRIVATE -O3 -DNDEBUG)
-endif()
-
 flatbuffers_generate_headers(
     TARGET yaff_bench_access_flatbuffers
     INCLUDE_PREFIX flatbuffers
@@ -52,11 +46,6 @@ function(yaff_add_access_benchmark _src)
             benchmark::benchmark_main
     )
     add_dependencies(${_target} GENERATE_yaff_bench_access_flatbuffers)
-    if(MSVC)
-        target_compile_options(${_target} PRIVATE /O2 /DNDEBUG)
-    else()
-        target_compile_options(${_target} PRIVATE -O3 -DNDEBUG)
-    endif()
 endfunction()
 
 yaff_add_access_benchmark(flat.cpp)

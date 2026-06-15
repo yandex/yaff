@@ -6,6 +6,8 @@
 #include "protoyaff/flat.pb.h"
 #include "protoyaff/flat.yaff.h"
 
+static constexpr size_t SPACE_SIZE_SAMPLES = 100000;
+
 class TDataGenerator {
 public:
     explicit TDataGenerator(uint64_t seed) : Rng_(seed) {
@@ -301,101 +303,115 @@ private:
 void BM_Space_Flat5_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
-    for (auto _ : state) {
-        const std::string msg = gen.GenerateProtobufFlat5(state.range(0), state.range(1));
-        totalSize += msg.size();
+    for (size_t i = 0; i < SPACE_SIZE_SAMPLES; ++i) {
+        totalSize += gen.GenerateProtobufFlat5(state.range(0), state.range(1)).size();
     }
-    state.counters["Size(bytes)"] =
-        benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
+    for (auto _ : state) {
+    }
+    state.counters["Size(bytes)"] = benchmark::Counter(static_cast<double>(totalSize) / SPACE_SIZE_SAMPLES,
+                                                       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
 }
 
 void BM_Space_Flat50_Protobuf(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
-    for (auto _ : state) {
-        const std::string msg = gen.GenerateProtobufFlat50(state.range(0), state.range(1));
-        totalSize += msg.size();
+    for (size_t i = 0; i < SPACE_SIZE_SAMPLES; ++i) {
+        totalSize += gen.GenerateProtobufFlat50(state.range(0), state.range(1)).size();
     }
-    state.counters["Size(bytes)"] =
-        benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
+    for (auto _ : state) {
+    }
+    state.counters["Size(bytes)"] = benchmark::Counter(static_cast<double>(totalSize) / SPACE_SIZE_SAMPLES,
+                                                       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
 }
 
 void BM_Space_Flat5_FlatBuffers(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
-    for (auto _ : state) {
-        const flatbuffers::DetachedBuffer msg = gen.GenerateFlatBuffersFlat5(state.range(0), state.range(1));
-        totalSize += msg.size();
+    for (size_t i = 0; i < SPACE_SIZE_SAMPLES; ++i) {
+        totalSize += gen.GenerateFlatBuffersFlat5(state.range(0), state.range(1)).size();
     }
-    state.counters["Size(bytes)"] =
-        benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
+    for (auto _ : state) {
+    }
+    state.counters["Size(bytes)"] = benchmark::Counter(static_cast<double>(totalSize) / SPACE_SIZE_SAMPLES,
+                                                       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
 }
 
 void BM_Space_Flat50_FlatBuffers(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
-    for (auto _ : state) {
-        const flatbuffers::DetachedBuffer msg = gen.GenerateFlatBuffersFlat50(state.range(0), state.range(1));
-        totalSize += msg.size();
+    for (size_t i = 0; i < SPACE_SIZE_SAMPLES; ++i) {
+        totalSize += gen.GenerateFlatBuffersFlat50(state.range(0), state.range(1)).size();
     }
-    state.counters["Size(bytes)"] =
-        benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
+    for (auto _ : state) {
+    }
+    state.counters["Size(bytes)"] = benchmark::Counter(static_cast<double>(totalSize) / SPACE_SIZE_SAMPLES,
+                                                       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
 }
 
 template <yaff::MessageLayout Layout>
 void BM_Space_Flat5_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
-    for (auto _ : state) {
-        const yaff::DetachedBuffer msg = gen.GenerateYaFFFlat5<Layout>(state.range(0), state.range(1));
-        totalSize += msg.Size();
+    for (size_t i = 0; i < SPACE_SIZE_SAMPLES; ++i) {
+        totalSize += gen.GenerateYaFFFlat5<Layout>(state.range(0), state.range(1)).Size();
     }
-    state.counters["Size(bytes)"] =
-        benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
+    for (auto _ : state) {
+    }
+    state.counters["Size(bytes)"] = benchmark::Counter(static_cast<double>(totalSize) / SPACE_SIZE_SAMPLES,
+                                                       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
 }
 
 template <yaff::MessageLayout Layout>
 void BM_Space_Flat50_YaFF(benchmark::State& state) {
     auto gen = TDataGenerator(std::random_device{}());
     size_t totalSize = 0;
-    for (auto _ : state) {
-        const yaff::DetachedBuffer msg = gen.GenerateYaFFFlat50<Layout>(state.range(0), state.range(1));
-        totalSize += msg.Size();
+    for (size_t i = 0; i < SPACE_SIZE_SAMPLES; ++i) {
+        totalSize += gen.GenerateYaFFFlat50<Layout>(state.range(0), state.range(1)).Size();
     }
-    state.counters["Size(bytes)"] =
-        benchmark::Counter(totalSize, benchmark::Counter::kAvgIterations, benchmark::Counter::kIs1024);
+    for (auto _ : state) {
+    }
+    state.counters["Size(bytes)"] = benchmark::Counter(static_cast<double>(totalSize) / SPACE_SIZE_SAMPLES,
+                                                       benchmark::Counter::kDefaults, benchmark::Counter::kIs1024);
 }
 
 BENCHMARK(BM_Space_Flat5_Protobuf)
     ->Name("BM_Space_Flat_Protobuf/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max(), 1'000'000}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max(), 1'000'000}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
 BENCHMARK(BM_Space_Flat5_FlatBuffers)
     ->Name("BM_Space_Flat_FlatBuffers/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
 BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Space_Flat_YaFF/FlatLayout/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
 BENCHMARK_TEMPLATE(BM_Space_Flat5_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Space_Flat_YaFF/SparseLayout/FieldCount:5")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
 
 BENCHMARK(BM_Space_Flat50_Protobuf)
     ->Name("BM_Space_Flat_Protobuf/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max(), 1'000'000}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max(), 1'000'000}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
 BENCHMARK(BM_Space_Flat50_FlatBuffers)
     ->Name("BM_Space_Flat_FlatBuffers/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
 BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_FLAT)
     ->Name("BM_Space_Flat_YaFF/FlatLayout/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
 BENCHMARK_TEMPLATE(BM_Space_Flat50_YaFF, yaff::MessageLayout::MESSAGE_LAYOUT_SPARSE)
     ->Name("BM_Space_Flat_YaFF/SparseLayout/FieldCount:50")
     ->ArgNames({"MaxValue", "Density"})
-    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}});
+    ->ArgsProduct({{std::numeric_limits<int64_t>::max()}, {100, 75, 50, 25, 5}})
+    ->Iterations(1);
