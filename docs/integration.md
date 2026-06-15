@@ -20,10 +20,10 @@ Both methods expose the same set of CMake targets and the `yaff_generate()` help
 
 C++20 is required. The following compilers are tested or known to work:
 
-| Compiler | Minimum version | Notes                   |
-|----------|-----------------|-------------------------|
-| GCC      | 13              | Requires `libstdc++11`  |
-| Clang    | 17              | `libc++` not tested     |
+| Compiler | Minimum version |
+|----------|-----------------|
+| GCC      | 13              |
+| Clang    | 17              |
 
 ### Build Tools
 
