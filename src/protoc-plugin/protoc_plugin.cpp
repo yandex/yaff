@@ -94,8 +94,8 @@ std::vector<std::unique_ptr<yaff::compilation::AbstractGenerator>> GetGenerators
     return generators;
 }
 
-void WriteFile(::google::protobuf::io::ZeroCopyOutputStream* stream, std::string_view content) {
-    ::google::protobuf::io::Printer printer(stream);
+void WriteFile(std::unique_ptr<::google::protobuf::io::ZeroCopyOutputStream> stream, std::string_view content) {
+    ::google::protobuf::io::Printer printer(stream.get());
     printer.WriteRaw(content.data(), content.size());
 }
 
@@ -118,10 +118,12 @@ bool ProtobufGeneratorPlugin::Generate(const ::google::protobuf::FileDescriptor*
         yaff::compilation::Compile(std::move(front), std::move(gen), nullptr, std::move(errorHandler));
     }
 
-    WriteFile(generator_context->Open(headerPath), headerOutput.view());
+    WriteFile(std::unique_ptr<::google::protobuf::io::ZeroCopyOutputStream>(generator_context->Open(headerPath)),
+              headerOutput.view());
 
     sourceOutput << "#include \"" << StripPath(headerPath) << "\"";
-    WriteFile(generator_context->Open(sourcePath), sourceOutput.view());
+    WriteFile(std::unique_ptr<::google::protobuf::io::ZeroCopyOutputStream>(generator_context->Open(sourcePath)),
+              sourceOutput.view());
 
     return true;
 }

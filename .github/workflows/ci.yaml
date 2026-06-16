@@ -49,6 +49,20 @@ jobs:
             label: Debug
             conan_extra: "-o build_tests=True -o build_benchmarks=True -o build_examples=True"
 
+          - os: ubuntu-24.04
+            compiler: clang
+            compiler_version: "17"
+            cc: clang-17
+            cxx: clang++-17
+            build_type: Debug
+            label: ASAN+UBSAN
+            conan_extra: "-o build_tests=True -o build_benchmarks=True -o build_examples=True"
+            conan_sanitize: >-
+              -c "tools.build:cflags=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-sanitize-recover=all']"
+              -c "tools.build:cxxflags=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-sanitize-recover=all']"
+              -c "tools.build:exelinkflags=['-fsanitize=address,undefined','-rtlib=compiler-rt']"
+              -c "tools.build:sharedlinkflags=['-fsanitize=address,undefined','-rtlib=compiler-rt']"
+
     steps:
       - uses: actions/checkout@v4
       - name: Install Clang
@@ -57,7 +71,8 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang-${{ matrix.compiler_version }} \
-            clang++-${{ matrix.compiler_version }}
+            clang++-${{ matrix.compiler_version }} \
+            libclang-rt-${{ matrix.compiler_version }}-dev
       - name: Install GCC
         if: matrix.compiler == 'gcc'
         run: |
@@ -83,13 +98,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          key: conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-${{ matrix.label }}-${{ hashFiles('conanfile.py') }}
           restore-keys: |
+            conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-${{ matrix.label }}-
             conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-${{ matrix.build_type }}-
             conan-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.compiler_version }}-
       - name: Detect Conan profile
         run: conan profile detect --force
       - name: conan create
+        env:
+          ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: >
           conan create . --build=missing
           -s compiler=${{ matrix.compiler }}
@@ -99,3 +118,4 @@ jobs:
           -s build_type=${{ matrix.build_type }}
           -c tools.cmake:cmake_program=$(which cmake)
           ${{ matrix.conan_extra }}
+          ${{ matrix.conan_sanitize }}
