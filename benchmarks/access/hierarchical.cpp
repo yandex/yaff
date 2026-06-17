@@ -1,5 +1,7 @@
 #include <benchmark/benchmark.h>
 
+#include <cstddef>
+#include <cstring>
 #include <random>
 
 #include "flatbuffers/hierarchical_generated.h"
@@ -35,17 +37,18 @@ T* ChildAddress(T& slot, void*) {
 }
 
 template <typename T>
-T* ChildAddress(const T*&, void* fallback) {
+T* ChildAddress(const T*, void* fallback) {
     return reinterpret_cast<T*>(fallback);
 }
 
 template <typename T>
-void LinkChild(T&, T*) {
+T& LinkChild(T& slot, T*) {
+    return slot;
 }
 
 template <typename T>
-void LinkChild(const T*& slot, T* child) {
-    slot = child;
+const T* LinkChild(const T*, T* child) {
+    return child;
 }
 
 // N.B.: YAFF_LAYOUT_BEGIN is only needed to legalize aliasing
@@ -223,8 +226,8 @@ public:
             auto* leaf = benchmark_access_raw::ChildAddress(intermediate->Leaf_, leafOffset);
             new (leaf) Leaf();
 
-            benchmark_access_raw::LinkChild(root->Intermediate_, intermediate);
-            benchmark_access_raw::LinkChild(intermediate->Leaf_, leaf);
+            root->Intermediate_ = benchmark_access_raw::LinkChild(root->Intermediate_, intermediate);
+            intermediate->Leaf_ = benchmark_access_raw::LinkChild(intermediate->Leaf_, leaf);
 
             leaf->A = values[0];
             leaf->B = values[1];
