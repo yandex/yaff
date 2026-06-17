@@ -1,7 +1,5 @@
 #include <benchmark/benchmark.h>
 
-#include <cstddef>
-#include <cstring>
 #include <random>
 
 #include "flatbuffers/hierarchical_generated.h"
