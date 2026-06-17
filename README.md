@@ -1,5 +1,6 @@
 <img width="64" src="docs/_assets/icon.svg"/><br/>
 
+[![CI](https://github.com/yandex/yaff/actions/workflows/ci.yaml/badge.svg)](https://github.com/yandex/yaff/actions/workflows/ci.yaml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/yandex/yaff/blob/main/LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-en-2ba2d9.svg)](https://t.me/yaff_en)
 [![Telegram](https://img.shields.io/badge/Telegram-ru-2ba2d9.svg)](https://t.me/yaff_ru)

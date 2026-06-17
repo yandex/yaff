@@ -1216,10 +1216,11 @@ std::string CppGenerator::Impl::GenerateExternalSerialize(const std::string& get
         case Type::TYPE_ARRAY: {
             const std::string elemType = GenerateTypeExternal(*type.ElementType);
             if (ir::IsAssociative(type)) {
+                const std::string keyType = GenerateTypeProtobuf(*type.ElementType->MessageDef->Fields.at(0).Type);
                 const std::string getElemCall = "*" + getCall + ".find(_k)";
                 const std::string serializePairCall = GenerateExternalSerialize(getElemCall, "", *type.ElementType);
-                return "ys.SerializeArray<" + elemType + ">(::yaff::SortedKeys(" + getCall +
-                       "), [&] (const auto& _k) { return " + serializePairCall + "; })";
+                return "ys.SerializeArray<" + elemType + ">(::yaff::SortedKeys(" + getCall + "), [&] (const " +
+                       keyType + "& _k) { return " + serializePairCall + "; })";
             }
             if (ir::IsSequentialMessage(type)) {
                 const std::string ns = type.ElementType->MessageDef->Schema->Namespace;
