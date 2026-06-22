@@ -130,6 +130,13 @@ TEST(ProtoAPI, TemplateTest) {
 
     const auto& restoredProto = Restore(yaff);
 
+    static_assert(std::is_same_v<protoyaff::test::UniversalMessage::EmbeddedEnumeration,
+                                 protoyaff::test::UniversalMessage_EmbeddedEnumeration>,
+                  "Nested alias for enumeration is not generated");
+    static_assert(std::is_same_v<protoyaff::test::UniversalMessage::EmbeddedMessage,
+                                 protoyaff::test::UniversalMessage_EmbeddedMessage>,
+                  "Nested alias for message is not generated");
+
     CheckExplicitStringFields(originalProto);
     CheckExplicitStringFields(yaff);
     CheckExplicitStringFields(restoredProto);

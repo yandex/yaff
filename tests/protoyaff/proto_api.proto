@@ -10,6 +10,10 @@ enum Enumeration {
 }
 
 message UniversalMessage {
+    enum EmbeddedEnumeration {
+        EMBEDDED_ENUMERATION_UNSPECIFIED = 0;
+        EMBEDDED_ENUMERATION_SPECIFIED = 1;
+    }
     message EmbeddedMessage { }
 
     int32 implicit_numeric_field = 1;

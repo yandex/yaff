@@ -93,8 +93,9 @@ std::string EnumDef::ToString() const {
     return Schema->Namespace + "::" + Name;
 }
 
-MessageDef::MessageDef(std::string name, const SchemaDef* schema, MessageLayout layout)
-    : BaseDef(std::move(name)), Schema(schema), Layout(layout) {
+MessageDef::MessageDef(std::string name, const SchemaDef* schema, std::vector<const BaseDef*> nestedTypes,
+                       const MessageLayout layout)
+    : BaseDef(std::move(name)), Schema(schema), NestedTypes(std::move(nestedTypes)), Layout(layout) {
 }
 
 std::string MessageDef::ToString() const {

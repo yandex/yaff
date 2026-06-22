@@ -104,6 +104,8 @@ struct MessageDef : public BaseDef {
 
     const SchemaDef* Schema = nullptr;
 
+    std::vector<const BaseDef*> NestedTypes;
+
     MessageLayout Layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN;
     std::vector<FieldDef> Fields;
 
@@ -112,7 +114,8 @@ struct MessageDef : public BaseDef {
     bool AssociativePair = false;
     std::map<std::string, OneOfDef> OneOfs;
 
-    MessageDef(std::string name, const SchemaDef* schema, MessageLayout layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN);
+    MessageDef(std::string name, const SchemaDef* schema, std::vector<const BaseDef*> nestedTypes = {},
+               MessageLayout layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN);
     std::string ToString() const;
 };
 
