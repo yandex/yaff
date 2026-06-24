@@ -484,6 +484,15 @@ void CppGenerator::Impl::GenerateMessage(const ir::MessageDef& msgDef) {
     if (Opts_.GenerateProtobufApi) {
         Writer_ >= "using ProtobufType = " + GenerateMessageProtobufType(msgDef) + ";";
     }
+
+    // Generate type aliases for nested types
+    for (auto&& child : msgDef.NestedTypes) {
+        const auto& fullName = child->Name;
+        if (const auto pos = fullName.find('_'); pos != std::string::npos) {
+            Writer_ >= "using " + fullName.substr(pos + 1, fullName.size()) + " = " + fullName + ";";
+        }
+    }
+
     if (Writer_.TextWritten()) {
         Writer_ |= "";
     }
