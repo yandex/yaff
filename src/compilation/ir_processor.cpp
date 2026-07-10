@@ -1,5 +1,6 @@
 #include "ir_processor.h"
 
+#include <sstream>
 #include <unordered_set>
 
 namespace yaff::compilation {
@@ -9,7 +10,8 @@ public:
     void Process(ir::IR& ir) &&;
 
 private:
-    static void Ensure(const bool cond, const std::string& message);
+    template <typename... MessagePartT>
+    static void Ensure(const bool cond, const MessagePartT&... message);
 
     void ProcessSchema(ir::IR& ir, ir::SchemaDef& schemaDef);
     void ProcessEnum(ir::IR& ir, ir::EnumDef& enumDef);
@@ -43,9 +45,9 @@ void IRProcessor::ProcessSchema(ir::IR&, ir::SchemaDef& schemaDef) {
 }
 
 void IRProcessor::ProcessEnum(ir::IR&, ir::EnumDef& enumDef) {
-    Ensure(enumDef.Schema, "enum can not be not connected to schema '" + enumDef.Name + "'");
-    Ensure(enumDef.Defined == enumDef.Schema->Defined, "incomplete definition of enum '" + enumDef.Name +
-                                                           "' in defined schema '" + enumDef.Schema->Namespace + "'");
+    Ensure(enumDef.Schema, "enum can not be not connected to schema '", enumDef.Name, "'");
+    Ensure(enumDef.Defined == enumDef.Schema->Defined, "incomplete definition of enum '", enumDef.Name,
+                                                           "' in defined schema '", enumDef.Schema->Namespace, "'");
     if (!enumDef.Defined) {
         return;
     }
@@ -59,11 +61,11 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
         return;
     }
     const auto [_, emplaced] = ProcessedMessages_.emplace(&messageDef);
-    Ensure(emplaced, "duplicated process call for message '" + messageDef.Name + "'");
+    Ensure(emplaced, "duplicated process call for message '", messageDef.Name, "'");
 
-    Ensure(messageDef.Schema, "message can not be not connected to schema '" + messageDef.Name + "'");
+    Ensure(messageDef.Schema, "message can not be not connected to schema '", messageDef.Name, "'");
     Ensure(messageDef.Defined == messageDef.Schema->Defined,
-           "incomplete definition of message '" + messageDef.Name + "'");
+           "incomplete definition of message '", messageDef.Name, "'");
     if (!messageDef.Defined) {
         return;
     }
@@ -74,43 +76,42 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
     const bool gapped = ir::IsGapMessage(messageDef);
     Ensure(!gapped || (messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FLAT &&
                        messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED),
-           "message '" + messageDef.Name + "' can not contain any gaps because it has field size based layout");
+           "message '", messageDef.Name, "' can not contain any gaps because it has field size based layout");
 
     bool comparable = false;
     uint64_t activeIndex = 1;
     FieldOffset flatOffset = 0;
     for (auto& fieldDef : messageDef.Fields) {
         Ensure(!fieldDef.Name.empty() || fieldDef.Deprecated,
-               "field with id '" + std::to_string(fieldDef.Id) + "' has empty name");
+               "field with id '", fieldDef.Id, "' has empty name");
 
         if (fieldDef.Type->Modifiers.contains(ir::DEFAULT_MODIFIER_NAME)) {
             Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING,
-                   "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) + ") " +
-                       "not allowed to have default value");
+                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id, ") not allowed to have default value");
         }
 
         Ensure(!fieldDef.Type->Modifiers.contains(ir::INLINE_MODIFIER_NAME),
-               "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
+               "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
                    ") is inlined, but inlined fields are not supported yet");
 
         if (fieldDef.Type->Type == Type::TYPE_ARRAY) {
             const auto* elementType = fieldDef.Type->ElementType;
             Ensure(!elementType || elementType->Type != Type::TYPE_ARRAY,
-                   "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
+                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
                        ") is 2d array, but 2d arrays are not supported");
             Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_IMPLICIT,
-                   "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
+                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
                        ") is array, but has explicit presence");
         }
 
         if (fieldDef.Type->Type == Type::TYPE_MESSAGE) {
             Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT,
-                   "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
+                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
                        ") is message, but has implicit presence");
         }
 
         Ensure(fieldDef.ActiveIndex == 0,
-               "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) + ") has non-zero active index");
+               "field '", fieldDef.Name, "' (id: ", fieldDef.Id, ") has non-zero active index");
 
         if (!fieldDef.Deprecated) {
             fieldDef.ActiveIndex = activeIndex++;
@@ -118,23 +119,23 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
 
         if (fieldDef.Type->Modifiers.contains(ir::KEY_MODIFIER_NAME)) {
             Ensure(!fieldDef.Deprecated,
-                   "field (id: " + std::to_string(fieldDef.Id) + ") is deprecated and can not be key");
+                   "field (id: ", fieldDef.Id, ") is deprecated and can not be key");
             Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING,
-                   "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
+                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
                        ") is not scalar or string and can not be key");
 
-            Ensure(!comparable, "message '" + messageDef.Name + "' contains multiple key fields");
+            Ensure(!comparable, "message '", messageDef.Name, "' contains multiple key fields");
             comparable = true;
         }
 
         if (!fieldDef.OneOf.empty()) {
             Ensure(messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED,
-                   "message '" + messageDef.Name + "' is fixed and can not have any oneof fields");
-            Ensure(fieldDef.Type->Type != Type::TYPE_ARRAY, "field '" + fieldDef.Name +
-                                                                "' (id: " + std::to_string(fieldDef.Id) +
+                   "message '", messageDef.Name, "' is fixed and can not have any oneof fields");
+            Ensure(fieldDef.Type->Type != Type::TYPE_ARRAY, "field '", fieldDef.Name,
+                                                                "' (id: ", fieldDef.Id,
                                                                 ") is array and can not be oneof field");
             Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT,
-                   "field '" + fieldDef.Name + "' (id: " + std::to_string(fieldDef.Id) +
+                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
                        ") is oneof field, but has implicit presence");
 
             auto [it, _] =
@@ -160,22 +161,25 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
         if (ir::IsAssociative(*fieldDef.Type)) {
             message->AssociativePair = true;
             Ensure(message->Layout == MessageLayout::MESSAGE_LAYOUT_FIXED,
-                   "message '" + message->Name + "' marked as associative pair, but is not fixed");
+                   "message '", message->Name, "' marked as associative pair, but is not fixed");
             Ensure(message->Fields.size() == 2,
-                   "message '" + message->Name + "' marked as associative pair, but contains not 2 fields");
+                   "message '", message->Name, "' marked as associative pair, but contains not 2 fields");
 
             const auto& key = message->Fields[0];
-            Ensure(!key.Deprecated, "field (id: " + std::to_string(key.Id) + ") is deprecated and can not be map key");
+            Ensure(!key.Deprecated, "field (id: ", key.Id, ") is deprecated and can not be map key");
             Ensure(ir::IsScalar(key.Type->Type) || key.Type->Type == Type::TYPE_STRING,
-                   "field '" + key.Name + "' (id: " + std::to_string(key.Id) +
+                   "field '", key.Name, "' (id: ", key.Id,
                        ") is not scalar or string and can not be map key");
         }
     }
 }
 
-void IRProcessor::Ensure(const bool cond, const std::string& message) {
+template <typename... MessageArgT>
+void IRProcessor::Ensure(const bool cond, const MessageArgT&... message) {
     if (YAFF_UNLIKELY(!cond)) {
-        throw std::runtime_error(message.c_str());
+        std::ostringstream oss;
+        ((oss << message), ...);
+        throw std::runtime_error(oss.str());
     }
 }
 
