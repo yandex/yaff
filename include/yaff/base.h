@@ -34,6 +34,17 @@
 #define YAFF_UNLIKELY(Cond) (Cond)
 #endif
 
+#if defined(__clang__) || defined(__GNUC__)
+#define YAFF_ALWAYS_INLINE [[gnu::always_inline]] inline
+#define YAFF_NOINLINE [[gnu::noinline]]
+#elif defined(_MSC_VER)
+#define YAFF_ALWAYS_INLINE __forceinline
+#define YAFF_NOINLINE __declspec(noinline)
+#else
+#define YAFF_ALWAYS_INLINE inline
+#define YAFF_NOINLINE
+#endif
+
 // TODO: support different strategies for unaligned memory access, e.g. packed structs;
 #if defined(__clang__) || defined(__GNUC__)
 #define YAFF_MEMCPY __builtin_memcpy

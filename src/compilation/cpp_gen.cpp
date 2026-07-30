@@ -745,7 +745,8 @@ void CppGenerator::Impl::GenerateMessageFieldAdd(const std::string& msgName, con
     const std::string valueArgType = GenerateTypeExternal(*fieldDef.Type);
     const std::string valueArgName = GenerateFieldName(fieldDef);
 
-    Writer_ |= "void add_" + GenerateFieldName(fieldDef) + "(" + valueArgType + " " + valueArgName + ") {";
+    Writer_ |=
+        "YAFF_ALWAYS_INLINE void add_" + GenerateFieldName(fieldDef) + "(" + valueArgType + " " + valueArgName + ") {";
 
     const std::string type = GenerateTypeInternal(*fieldDef.Type);
     const std::string id = msgName + "::" + GenerateIdName(fieldDef);
