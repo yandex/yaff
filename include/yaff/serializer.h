@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <unordered_set>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -75,12 +76,12 @@ public:
     }
 
     template <typename T>
-    void AddField(FieldId fieldId, T value, T def) {
+    YAFF_ALWAYS_INLINE void AddField(FieldId fieldId, T value, T def) {
         AddFieldDispatch<T>(fieldId, value, def);
     }
 
     template <typename T>
-    void AddField(FieldId fieldId, InternalOffset<T> offset) {
+    YAFF_ALWAYS_INLINE void AddField(FieldId fieldId, InternalOffset<T> offset) {
         AddFieldDispatch<T>(fieldId, offset);
     }
 
@@ -88,8 +89,7 @@ public:
     void StartFixedMessage() {
         // Nesting is possible for this call, but not another message, since no FieldOffset is set.
         YAFF_REQUIRE(std::holds_alternative<DummyMessageSerializer>(MessageSerializer_));
-        Buf_.RightFill(M::LIMIT);
-        StartMessageDispatch<FixedMessageSerializer>(Buf_, Buf_.RightSize(), M::FLAT_OFFSETS);
+        StartMessageDispatch<FixedMessageSerializer>(Buf_, std::in_place_type<M>);
     }
 
     Offset FinishFixedMessage() {
@@ -100,11 +100,24 @@ public:
         requires(M::DELETED_IDS.empty())
     void StartFlatMessage(bool implicit = false, bool sized = false) {
         CheckNotNested();
-        StartMessageDispatch<FlatMessageSerializer>(Buf_, sized, implicit, M::FLAT_OFFSETS);
+        if (implicit) {
+            if (sized) {
+                StartMessageDispatch<FlatMessageSerializer<false, true>>(Buf_, std::in_place_type<M>);
+            } else {
+                StartMessageDispatch<FlatMessageSerializer<false, false>>(Buf_, std::in_place_type<M>);
+            }
+        } else {
+            if (sized) {
+                StartMessageDispatch<FlatMessageSerializer<true, true>>(Buf_, std::in_place_type<M>);
+            } else {
+                StartMessageDispatch<FlatMessageSerializer<true, false>>(Buf_, std::in_place_type<M>);
+            }
+        }
     }
 
     Offset FinishFlatMessage() {
-        return FinishMessageDispatch<FlatMessageSerializer>();
+        return FinishMessageDispatch<FlatMessageSerializer<true, true>, FlatMessageSerializer<true, false>,
+                                     FlatMessageSerializer<false, true>, FlatMessageSerializer<false, false>>();
     }
 
     void StartSparseMessage(bool implicit = false) {
@@ -345,16 +358,18 @@ private:
     struct DummyMessageSerializer {
         template <typename T, typename... Ps>
         void AddField(FieldId, Ps&&...) {
-            YAFF_THROW("impossible control flow");
+            YAFF_THROW("no message is being serialized");
         }
         Offset Finish() && {
-            YAFF_THROW("impossible control flow");
+            YAFF_THROW("no message is being serialized");
         }
     };
 
     struct FixedMessageSerializer {
-        FixedMessageSerializer(DualBuffer& buffer, size_t loc, OffsetsView offsets)
-            : Buf(buffer), Loc(loc), Offsets(offsets) {
+        template <typename M>
+        FixedMessageSerializer(DualBuffer& buffer, std::in_place_type_t<M>) : Buf(buffer), Offsets(M::FLAT_OFFSETS) {
+            Buf.RightFill(M::LIMIT);
+            Loc = Buf.RightSize();
         }
 
         FixedMessageSerializer(const FixedMessageSerializer&) = delete;
@@ -393,7 +408,13 @@ private:
         OffsetsView Offsets;
     };
 
+    template <bool E, bool S>
     struct FlatMessageSerializer {
+        struct SizeMasks {
+            const std::byte* Expl = nullptr;
+            const std::byte* Impl = nullptr;
+        };
+
         inline static constexpr size_t TYPED_LIMIT_SIZE = sizeof(FieldId);
 
         static constexpr size_t CalculateFieldMetaSize(const bool expl, const bool sized) {
@@ -408,33 +429,51 @@ private:
             return (size > 0) + (size > 1) + (size > 4);
         }
 
-        static void SetPresence(std::byte* maskStart, const FieldId id, const bool sized) {
-            const size_t index = (id - 1) * CalculateFieldMetaSize(true, sized);
+        template <typename M>
+        static consteval auto BuildSizeMask() {
+            constexpr size_t count = M::FLAT_OFFSETS.size();
+            std::array<std::byte, CalculateMetaSize(count - 1, E, true)> mask{};
+            for (size_t i = 0; i + 1 < count; ++i) {
+                const size_t corr = CalculateCorrection(M::FLAT_OFFSETS[i + 1] - M::FLAT_OFFSETS[i]);
+                const size_t index = i * CalculateFieldMetaSize(E, true) + E;
+                mask[index >> 3] |= static_cast<std::byte>(corr) << (index & 7);
+                if ((index & 7) == 7) {
+                    mask[(index >> 3) + 1] |= static_cast<std::byte>(corr) >> 1;
+                }
+            }
+            return mask;
+        }
+
+        template <typename M>
+        inline static constexpr auto SIZE_MASK = BuildSizeMask<M>();
+
+        static void ApplySizeMask(std::byte* maskStart, const std::byte* mask, const FieldId maxId, const bool expl) {
+            const size_t bits = (maxId - 1) * CalculateFieldMetaSize(expl, true);
+            const size_t metaSize = (bits + 7) >> 3;
+            for (size_t j = 0; j + 1 < metaSize; ++j) {
+                *(maskStart - j - 1) |= mask[j];
+            }
+            const size_t tailBits = bits - ((metaSize - 1) << 3);
+            *(maskStart - metaSize) |= mask[metaSize - 1] & static_cast<std::byte>((1u << tailBits) - 1);
+        }
+
+        static void SetPresence(std::byte* maskStart, const FieldId id) {
+            const size_t index = (id - 1) * CalculateFieldMetaSize(true, S);
             *(maskStart - (index >> 3) - 1) |= (static_cast<std::byte>(1) << (index & 7));
         }
 
-        static void SetSize(std::byte* maskStart, const FieldId id, const size_t size, const bool expl) {
-            const size_t corr = CalculateCorrection(size);
-            if (corr == 0) {
-                return;
-            }
-            const size_t index = (id - 1) * CalculateFieldMetaSize(expl, true) + expl;
-            *(maskStart - (index >> 3) - 1) |= (static_cast<std::byte>(corr) << (index & 7));
-            if ((index & 7) == 7) {
-                *(maskStart - (index >> 3) - 2) |= (static_cast<std::byte>(corr) >> 1);
-            }
-        }
-
-        FlatMessageSerializer(DualBuffer& buffer, bool sized, bool implicit, OffsetsView offsets)
+        template <typename M>
+        FlatMessageSerializer(DualBuffer& buffer, std::in_place_type_t<M>)
             : Buf(buffer),
               Start(Buf.RightSize()),
               End(0),
               MaxId(0),
               PrevOffset(0),
-              EnableSizes(sized),
-              EnableExplicit(!implicit),
               NeedExplicit(false),
-              Offsets(offsets) {
+              Base(nullptr),
+              Offsets(M::FLAT_OFFSETS),
+              Sizes{FlatMessageSerializer<true, true>::SIZE_MASK<M>.data(),
+                    FlatMessageSerializer<false, true>::SIZE_MASK<M>.data()} {
         }
 
         FlatMessageSerializer(const FlatMessageSerializer&) = delete;
@@ -444,9 +483,11 @@ private:
         FlatMessageSerializer& operator=(FlatMessageSerializer&& other) = delete;
 
         template <typename T>
-        void AddField(const FieldId id, const T value, const T def) {
-            if (!EnableExplicit && IsEqual(value, def)) {
-                return;
+        YAFF_ALWAYS_INLINE void AddField(const FieldId id, const T value, const T def) {
+            if constexpr (!E) {
+                if (IsEqual<T>(value, def)) {
+                    return;
+                }
             }
             const FieldOffset offset = Offsets.Data[id - 1];
             TrackField<T>(id, offset, value, def);
@@ -454,7 +495,7 @@ private:
         }
 
         template <typename T>
-        void AddField(const FieldId id, const InternalOffset<T> value) {
+        YAFF_ALWAYS_INLINE void AddField(const FieldId id, const InternalOffset<T> value) {
             if (value.IsNull()) {
                 return;
             }
@@ -466,7 +507,7 @@ private:
 
         Offset Finish() && {
             YAFF_REQUIRE(MaxId < 0x2000);
-            const bool trulyExplicit = (EnableExplicit && NeedExplicit);
+            const bool trulyExplicit = (E && NeedExplicit);
 
             if (IsEmpty()) {
                 YAFF_REQUIRE(Buf.RightSize() == Start);
@@ -474,40 +515,29 @@ private:
                 return ToCheckedOffset(Buf.RightSize());
             }
 
-            if (EnableExplicit && !trulyExplicit) {
+            if (E && !trulyExplicit) {
                 YAFF_REQUIRE(Buf.RightSize() >= End);
                 Buf.RightPop(Buf.RightSize() - End);
             }
 
-            if (EnableSizes) {
+            if constexpr (S) {
                 // N.B.: This line ensures that the buffer is allocated
                 // when we have not allocated or discarded the meta information.
                 Buf.RightFill(!trulyExplicit * CalculateMetaSize(MaxId - 1, false, true));
-                for (size_t i = 0; i < MaxId - 1; ++i) {
-                    const size_t size = Offsets.Data[i + 1] - Offsets.Data[i];
-                    SetSize(Buf.RightDataAt(End), i + 1, size, trulyExplicit);
-                }
+                ApplySizeMask(Buf.RightDataAt(End), trulyExplicit ? Sizes.Expl : Sizes.Impl, MaxId, trulyExplicit);
             }
 
-            const FieldId typedLimit = ((MaxId << 2) | (0x8000 | (EnableSizes << 1) | trulyExplicit));
+            const FieldId typedLimit = ((MaxId << 2) | (0x8000 | (S << 1) | trulyExplicit));
             WriteValue<FieldId>(Buf.RightDataAt(End), typedLimit);
 
             return ToCheckedOffset(End);
         }
 
         template <typename T>
-        void TrackField(const FieldId id, const FieldOffset offset, const T val, const T def) {
+        YAFF_ALWAYS_INLINE void TrackField(const FieldId id, const FieldOffset offset, const T val, const T def) {
             YAFF_REQUIRE(id > 0);
-
-            if (IsEmpty()) {
-                YAFF_REQUIRE(Buf.RightSize() == Start);
-
-                const size_t dataSize = TYPED_LIMIT_SIZE + offset + sizeof(T);
-                const size_t metaSize = EnableExplicit * CalculateMetaSize(id, EnableExplicit, EnableSizes);
-                Buf.RightFill(dataSize + metaSize);
-
-                End = Start + dataSize;
-                MaxId = id + 1;
+            if (YAFF_UNLIKELY(IsEmpty())) {
+                Initialize(id, offset, sizeof(T));
             } else {
                 // Expects fields to be written only once and only in the reverse order of the declaration in the
                 // schema.
@@ -515,16 +545,31 @@ private:
             }
             PrevOffset = offset;
 
-            NeedExplicit = (NeedExplicit || IsEqual<T>(val, def));
-            if (EnableExplicit) {
-                SetPresence(Buf.RightDataAt(End), id, EnableSizes);
+            if constexpr (E) {
+                if (YAFF_UNLIKELY(IsEqual<T>(val, def))) {
+                    NeedExplicit = true;
+                }
+                SetPresence(Base, id);
             }
+        }
+
+        YAFF_NOINLINE void Initialize(const FieldId id, const FieldOffset offset, const size_t valueSize) {
+            YAFF_REQUIRE(Buf.RightSize() == Start);
+
+            const size_t dataSize = TYPED_LIMIT_SIZE + offset + valueSize;
+            const size_t metaSize = E * CalculateMetaSize(id, E, S);
+            Buf.RightFill(dataSize + metaSize);
+
+            End = Start + dataSize;
+            MaxId = id + 1;
+            // Base is valid only until the buffer reallocates; the whole frame
+            // is allocated upfront, so no growth happens within the message.
+            Base = Buf.RightDataAt(End);
         }
 
         template <typename T>
         void WriteField(const FieldOffset offset, T value) {
-            YAFF_REQUIRE(End >= offset + TYPED_LIMIT_SIZE);
-            WriteValue<T>(Buf.RightDataAt(End - offset - TYPED_LIMIT_SIZE), value);
+            WriteValue<T>(Base + offset + TYPED_LIMIT_SIZE, value);
         }
 
         bool IsEmpty() const {
@@ -537,12 +582,12 @@ private:
 
         FieldId MaxId;
         FieldOffset PrevOffset;
-
-        bool EnableSizes;
-        bool EnableExplicit;
         bool NeedExplicit;
 
-        OffsetsView Offsets;
+        std::byte* Base;
+
+        const OffsetsView Offsets;
+        const SizeMasks Sizes;
     };
 
     struct SparseMessageSerializer {
@@ -702,7 +747,9 @@ private:
     };
 
     using MessageSerializer =
-        std::variant<DummyMessageSerializer, FixedMessageSerializer, FlatMessageSerializer, SparseMessageSerializer>;
+        std::variant<DummyMessageSerializer, FixedMessageSerializer, FlatMessageSerializer<true, true>,
+                     FlatMessageSerializer<true, false>, FlatMessageSerializer<false, true>,
+                     FlatMessageSerializer<false, false>, SparseMessageSerializer>;
 
     explicit Serializer(SerializerType type, size_t initialSize = 0, bool = false)
         : Type_(type),
@@ -744,10 +791,20 @@ private:
     }
 
     template <typename T, typename... Ps>
-    void AddFieldDispatch(FieldId fieldId, Ps&&... params) {
-        CheckNotFinished();
-        CheckNested();
-        std::visit([&](auto& b) { b.template AddField<T>(fieldId, std::forward<Ps>(params)...); }, MessageSerializer_);
+    YAFF_NOINLINE void AddFieldDispatchSlow(FieldId fieldId, Ps... params) {
+        std::visit([&](auto& b) { b.template AddField<T>(fieldId, params...); }, MessageSerializer_);
+    }
+
+    template <typename T, typename... Ps>
+    YAFF_ALWAYS_INLINE void AddFieldDispatch(FieldId fieldId, Ps... params) {
+        // FlatMessageSerializer<true, true> is the most frequent alternative,
+        // being effectively the default one: the dynamic layout requires sized
+        // messages, and a message usually has some explicit fields.
+        if (auto* flat = std::get_if<FlatMessageSerializer<true, true>>(&MessageSerializer_)) {
+            flat->template AddField<T>(fieldId, params...);
+            return;
+        }
+        AddFieldDispatchSlow<T>(fieldId, params...);
     }
 
     template <typename T, typename... Ps>
@@ -757,14 +814,16 @@ private:
         MessageSerializer_.emplace<T>(std::forward<Ps>(params)...);
     }
 
-    template <typename T>
+    template <typename... Ts>
     Offset FinishMessageDispatch() {
         CheckNotFinished();
         CheckNested();
-        DecrementDepth();
-        YAFF_REQUIRE(std::holds_alternative<T>(MessageSerializer_));
-        const auto offset = std::visit([](auto&& b) { return std::move(b).Finish(); }, std::move(MessageSerializer_));
+        const auto offset = ([serializer = std::get_if<Ts>(&MessageSerializer_)] {
+            return serializer ? std::move(*serializer).Finish() : Offset{};
+        }() | ...);
+        YAFF_REQUIRE(offset != 0);
         MessageSerializer_.emplace<DummyMessageSerializer>();
+        DecrementDepth();
         return offset;
     }
 

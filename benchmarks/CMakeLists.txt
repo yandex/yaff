@@ -4,4 +4,5 @@ find_package(flatbuffers CONFIG REQUIRED)
 include(${PROJECT_SOURCE_DIR}/cmake/YaFFGenerate.cmake)
 
 add_subdirectory(access)
+add_subdirectory(serialize)
 add_subdirectory(space)
