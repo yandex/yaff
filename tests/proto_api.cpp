@@ -208,3 +208,53 @@ TEST(ProtoAPI, Enumerations) {
     EXPECT_EQ(protoyaff::test::Enumeration_IsValid(2), test::Enumeration_IsValid(2));
     EXPECT_EQ(protoyaff::test::Enumeration_IsValid(9000), test::Enumeration_IsValid(9000));
 }
+
+TEST(ProtoAPI, NestedTypeAliasDepth) {
+    // Depth >= 2: the alias inside Level2 must be named "Level3", not "Level2_Level3".
+    static_assert(std::is_same_v<protoyaff::test::DeepNesting::Level2, protoyaff::test::DeepNesting_Level2>,
+                  "Nested alias for depth-1 message is not generated");
+    static_assert(
+        std::is_same_v<protoyaff::test::DeepNesting::Level2::Level3, protoyaff::test::DeepNesting_Level2_Level3>,
+        "Nested alias for depth-2 message is not generated, or was generated with the wrong local name");
+
+    // Enclosing message's own flattened name contains an underscore: the alias inside it must still be
+    // named "Inner", not "Message_Inner".
+    static_assert(
+        std::is_same_v<protoyaff::test::My_UnderscoredMessage::Inner, protoyaff::test::My_UnderscoredMessage_Inner>,
+        "Nested alias is wrong when the enclosing message name contains an underscore");
+}
+
+TEST(ProtoAPI, NestedEnumFullParity) {
+    using Alias = protoyaff::test::UniversalMessage::EmbeddedEnumeration;
+    using Flat = protoyaff::test::UniversalMessage_EmbeddedEnumeration;
+
+    static_assert(std::is_same_v<Alias, Flat>, "Nested alias for enumeration is not generated");
+    static_assert(protoyaff::test::UniversalMessage::EMBEDDED_ENUMERATION_UNSPECIFIED ==
+                  Flat::EMBEDDED_ENUMERATION_UNSPECIFIED);
+    static_assert(protoyaff::test::UniversalMessage::EMBEDDED_ENUMERATION_SPECIFIED ==
+                  Flat::EMBEDDED_ENUMERATION_SPECIFIED);
+    static_assert(protoyaff::test::UniversalMessage::EmbeddedEnumeration_MIN ==
+                  protoyaff::test::UniversalMessage_EmbeddedEnumeration_MIN);
+    static_assert(protoyaff::test::UniversalMessage::EmbeddedEnumeration_MAX ==
+                  protoyaff::test::UniversalMessage_EmbeddedEnumeration_MAX);
+    static_assert(protoyaff::test::UniversalMessage::EmbeddedEnumeration_ARRAYSIZE ==
+                  protoyaff::test::UniversalMessage_EmbeddedEnumeration_ARRAYSIZE);
+
+    for (const int value : {-1, 0, 1, 2}) {
+        EXPECT_EQ(protoyaff::test::UniversalMessage::EmbeddedEnumeration_IsValid(value),
+                  protoyaff::test::UniversalMessage_EmbeddedEnumeration_IsValid(value));
+    }
+
+    EXPECT_EQ(protoyaff::test::UniversalMessage::EmbeddedEnumeration_Name(
+                  protoyaff::test::UniversalMessage::EMBEDDED_ENUMERATION_SPECIFIED),
+              protoyaff::test::UniversalMessage_EmbeddedEnumeration_Name(Flat::EMBEDDED_ENUMERATION_SPECIFIED));
+
+    Alias parsedViaAlias{};
+    Flat parsedViaFlat{};
+    const bool aliasParsed =
+        protoyaff::test::UniversalMessage::EmbeddedEnumeration_Parse("EMBEDDED_ENUMERATION_SPECIFIED", &parsedViaAlias);
+    const bool flatParsed = protoyaff::test::UniversalMessage_EmbeddedEnumeration_Parse(
+        "EMBEDDED_ENUMERATION_SPECIFIED", &parsedViaFlat);
+    EXPECT_EQ(aliasParsed, flatParsed);
+    EXPECT_EQ(parsedViaAlias, parsedViaFlat);
+}

@@ -274,18 +274,19 @@ private:
 };
 
 const ir::MessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf::Descriptor& message) {
-    std::vector<const ir::BaseDef*> nestedTypes;
+    std::vector<const ir::MessageDef*> nestedMessages;
+    std::vector<const ir::EnumDef*> nestedEnums;
 
     for (int i = 0; i < message.nested_type_count(); ++i) {
         if (const auto& nested = *message.nested_type(i); !IsMap(nested)) {
             if (const auto* next = TraverseMessage(nested); next) {
-                nestedTypes.push_back(next);
+                nestedMessages.push_back(next);
             }
         }
     }
     for (int i = 0; i < message.enum_type_count(); ++i) {
         if (const auto* next = RegisterEnum(*message.enum_type(i)); next) {
-            nestedTypes.push_back(next);
+            nestedEnums.push_back(next);
         }
     }
 
@@ -303,11 +304,12 @@ const ir::MessageDef* TProtobufBuilder::TraverseMessage(const google::protobuf::
     auto* schemaDef = RegisterFile(*file);
 
     const std::string messageName = GetTypeDefName(AdaptString(file->package()), AdaptString(message.full_name()));
-    auto [messageDef, emplaced] =
-        Ir_.Messages.TryEmplace(ir::MessageDef(messageName, schemaDef, std::move(nestedTypes)));
+    auto [messageDef, emplaced] = Ir_.Messages.TryEmplace(ir::MessageDef(messageName, schemaDef));
     if (!emplaced) {
         return messageDef;
     }
+    messageDef->NestedEnums = std::move(nestedEnums);
+    messageDef->NestedMessages = std::move(nestedMessages);
     schemaDef->Messages.emplace_back(messageDef);
     if (!IsTargetFile(*file)) {
         return messageDef;

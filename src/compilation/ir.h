@@ -104,7 +104,9 @@ struct MessageDef : public BaseDef {
 
     const SchemaDef* Schema = nullptr;
 
-    std::vector<const BaseDef*> NestedTypes;
+    // These fields are filled during traversal, right after this MessageDef is registered.
+    std::vector<const EnumDef*> NestedEnums;
+    std::vector<const MessageDef*> NestedMessages;
 
     MessageLayout Layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN;
     std::vector<FieldDef> Fields;
@@ -114,7 +116,7 @@ struct MessageDef : public BaseDef {
     bool AssociativePair = false;
     std::map<std::string, OneOfDef> OneOfs;
 
-    MessageDef(std::string name, const SchemaDef* schema, std::vector<const BaseDef*> nestedTypes = {},
+    MessageDef(std::string name, const SchemaDef* schema,
                MessageLayout layout = MessageLayout::MESSAGE_LAYOUT_UNKNOWN);
     std::string ToString() const;
 };

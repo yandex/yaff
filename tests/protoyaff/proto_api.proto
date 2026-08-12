@@ -54,3 +54,15 @@ message UniversalMessage {
         EmbeddedMessage oneof_embedded_message_field = 26;
     }
 }
+
+// Covers nested-type alias generation at nesting depth >= 2.
+message DeepNesting {
+    message Level2 {
+        message Level3 { }
+    }
+}
+
+// Covers nested-type alias generation when the enclosing message's own flattened name contains an underscore.
+message My_UnderscoredMessage {
+    message Inner { }
+}
