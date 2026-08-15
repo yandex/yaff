@@ -11,6 +11,10 @@ public:
     bool Check(const ir::IR& base, const ir::IR& patched) &&;
 
 private:
+    struct TypeCheckOptions {
+        bool CheckDefault = true;
+    };
+
     struct CheckedMessagesHash {
         inline size_t operator()(const std::pair<const ir::MessageDef*, const ir::MessageDef*>& p) const noexcept {
             return std::hash<const void*>{}(p.first) ^ std::hash<const void*>{}(p.second);
@@ -28,7 +32,8 @@ private:
     void CheckMessage(const ir::MessageDef& base, const ir::MessageDef& patched);
     void CheckField(const std::string& msgName, const ir::MessageDef::FieldDef& base,
                     const ir::MessageDef::FieldDef& patched);
-    void CheckTypes(const std::string& fieldName, const ir::TypeDef& base, const ir::TypeDef& patched);
+    void CheckTypes(const std::string& fieldName, const ir::TypeDef& base, const ir::TypeDef& patched,
+                    const TypeCheckOptions& options);
 
     CheckedMessagesSet CheckedMessages_;
     std::unique_ptr<AbstractErrorHandler> Errors_;
@@ -90,17 +95,19 @@ void IRCompatibilityChecker::CheckField(const std::string& msgName, const ir::Me
         MarkCritical();
     }
 
-    CheckTypes(fullName, *base.Type, *patched.Type);
+    CheckTypes(fullName, *base.Type, *patched.Type, {.CheckDefault = !patched.Deprecated});
 }
 
 void IRCompatibilityChecker::CheckTypes(const std::string& fieldName, const ir::TypeDef& base,
-                                        const ir::TypeDef& patched) {
-    const std::string baseDefault = GetTypeDefault(base);
-    const std::string patchedDefault = GetTypeDefault(patched);
-    if (baseDefault != patchedDefault) {
-        Errors_->Error(ErrorType::COMPAT_DEFAULT_MISMATCH, fieldName,
-                       "default value changed from '" + baseDefault + "' to '" + patchedDefault + "'");
-        MarkCritical();
+                                        const ir::TypeDef& patched, const TypeCheckOptions& options) {
+    if (options.CheckDefault) {
+        const std::string baseDefault = GetTypeDefault(base);
+        const std::string patchedDefault = GetTypeDefault(patched);
+        if (baseDefault != patchedDefault) {
+            Errors_->Error(ErrorType::COMPAT_DEFAULT_MISMATCH, fieldName,
+                           "default value changed from '" + baseDefault + "' to '" + patchedDefault + "'");
+            MarkCritical();
+        }
     }
 
     if (!CheckBaseType(base.Type, patched.Type)) {
@@ -116,7 +123,7 @@ void IRCompatibilityChecker::CheckTypes(const std::string& fieldName, const ir::
 
     if (base.Type == Type::TYPE_ARRAY && base.ElementType && patched.ElementType &&
         base.ElementType != patched.ElementType) {
-        CheckTypes(ConcatNames(fieldName, "array_type"), *base.ElementType, *patched.ElementType);
+        CheckTypes(ConcatNames(fieldName, "array_type"), *base.ElementType, *patched.ElementType, options);
     }
 }
 
