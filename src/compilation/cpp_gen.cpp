@@ -272,6 +272,7 @@ private:
     void GenerateEnumIsValidFunc(const ir::EnumDef& enumDef);
     void GenerateEnumNameFunc(const ir::EnumDef& enumDef);
 
+    void GenerateNestedMessageAlias(const ir::MessageDef& msgDef, const ir::MessageDef& childMsgDef);
     void GenerateNestedEnumAliases(const ir::MessageDef& msgDef, const ir::EnumDef& enumDef);
 
     void GenerateMessageParseToProtobuf(const ir::MessageDef& msgDef);
@@ -457,41 +458,45 @@ void CppGenerator::Impl::GenerateEnumNameFunc(const ir::EnumDef& enumDef) {
     Writer_ |= "}\n";
 }
 
+void CppGenerator::Impl::GenerateNestedMessageAlias(const ir::MessageDef& msgDef, const ir::MessageDef& childMsgDef) {
+    const std::string localName = GetNestedLocalName(msgDef.Name, childMsgDef.Name);
+    if (localName.empty()) {
+        return;
+    }
+    const std::string alias = GenerateEscapedName(localName);
+    Writer_ >= "using " + alias + " = " + childMsgDef.Name + ";";
+}
+
 void CppGenerator::Impl::GenerateNestedEnumAliases(const ir::MessageDef& msgDef, const ir::EnumDef& enumDef) {
     const std::string localName = GetNestedLocalName(msgDef.Name, enumDef.Name);
     if (localName.empty()) {
         return;
     }
 
+    const std::string alias = GenerateEscapedName(localName);
     const auto& flatName = enumDef.Name;
-    Writer_ >= "using " + localName + " = " + flatName + ";";
+    Writer_ >= "using " + alias + " = " + flatName + ";";
     ForValues(enumDef, [&](const auto& enumVal) {
         const std::string valueName = GenerateEscapedName(enumVal.Name);
-        Writer_ >= "static constexpr " + localName + " " + valueName + " = " + flatName + "::" + valueName + ";";
+        Writer_ >= "static constexpr " + alias + " " + valueName + " = " + flatName + "::" + valueName + ";";
     });
 
     Writer_.IncrementIdentLevel();
     Writer_ |= "static constexpr bool " + localName + "_IsValid(const int value) {";
-    Writer_.IncrementIdentLevel();
-    Writer_ |= "return " + flatName + "_IsValid(value);";
-    Writer_.DecrementIdentLevel();
+    Writer_ >= "return " + flatName + "_IsValid(value);";
     Writer_ |= "}";
 
-    Writer_ |= "static constexpr std::string_view " + localName + "_Name(" + localName + " value) {";
-    Writer_.IncrementIdentLevel();
-    Writer_ |= "return " + flatName + "_Name(value);";
-    Writer_.DecrementIdentLevel();
+    Writer_ |= "static constexpr std::string_view " + localName + "_Name(" + alias + " value) {";
+    Writer_ >= "return " + flatName + "_Name(value);";
     Writer_ |= "}";
 
-    Writer_ |= "static constexpr bool " + localName + "_Parse(std::string_view name, " + localName + "* value) {";
-    Writer_.IncrementIdentLevel();
-    Writer_ |= "return " + flatName + "_Parse(name, value);";
-    Writer_.DecrementIdentLevel();
+    Writer_ |= "static constexpr bool " + localName + "_Parse(std::string_view name, " + alias + "* value) {";
+    Writer_ >= "return " + flatName + "_Parse(name, value);";
     Writer_ |= "}";
     Writer_.DecrementIdentLevel();
 
-    Writer_ >= "static constexpr " + localName + " " + localName + "_MIN = " + flatName + "_MIN;";
-    Writer_ >= "static constexpr " + localName + " " + localName + "_MAX = " + flatName + "_MAX;";
+    Writer_ >= "static constexpr " + alias + " " + localName + "_MIN = " + flatName + "_MIN;";
+    Writer_ >= "static constexpr " + alias + " " + localName + "_MAX = " + flatName + "_MAX;";
     Writer_ >= "static constexpr int " + localName + "_ARRAYSIZE = " + flatName + "_ARRAYSIZE;";
 }
 
@@ -528,9 +533,7 @@ void CppGenerator::Impl::GenerateMessage(const ir::MessageDef& msgDef) {
 
     // Generate type aliases for nested types
     for (auto&& child : msgDef.NestedMessages) {
-        if (const std::string localName = GetNestedLocalName(msgDef.Name, child->Name); !localName.empty()) {
-            Writer_ >= "using " + localName + " = " + child->Name + ";";
-        }
+        GenerateNestedMessageAlias(msgDef, *child);
     }
     for (auto&& child : msgDef.NestedEnums) {
         GenerateNestedEnumAliases(msgDef, *child);

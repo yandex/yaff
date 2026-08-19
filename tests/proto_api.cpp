@@ -258,3 +258,33 @@ TEST(ProtoAPI, NestedEnumFullParity) {
     EXPECT_EQ(aliasParsed, flatParsed);
     EXPECT_EQ(parsedViaAlias, parsedViaFlat);
 }
+
+TEST(ProtoAPI, NestedAliasEscaping) {
+    using Alias = protoyaff::test::ReservedNameNesting::Default_;
+    using Flat = protoyaff::test::ReservedNameNesting_Default;
+
+    static_assert(std::is_same_v<Alias, Flat>, "Nested alias for a reserved-name enum is not escaped");
+    static_assert(protoyaff::test::ReservedNameNesting::DEFAULT_UNSPECIFIED == Flat::DEFAULT_UNSPECIFIED);
+    static_assert(protoyaff::test::ReservedNameNesting::DEFAULT_ONE == Flat::DEFAULT_ONE);
+    static_assert(protoyaff::test::ReservedNameNesting::Default_MIN ==
+                  protoyaff::test::ReservedNameNesting_Default_MIN);
+    static_assert(protoyaff::test::ReservedNameNesting::Default_MAX ==
+                  protoyaff::test::ReservedNameNesting_Default_MAX);
+    static_assert(protoyaff::test::ReservedNameNesting::Default_ARRAYSIZE ==
+                  protoyaff::test::ReservedNameNesting_Default_ARRAYSIZE);
+
+    for (const int value : {-1, 0, 1, 2}) {
+        EXPECT_EQ(protoyaff::test::ReservedNameNesting::Default_IsValid(value),
+                  protoyaff::test::ReservedNameNesting_Default_IsValid(value));
+    }
+
+    EXPECT_EQ(protoyaff::test::ReservedNameNesting::Default_Name(protoyaff::test::ReservedNameNesting::DEFAULT_ONE),
+              protoyaff::test::ReservedNameNesting_Default_Name(Flat::DEFAULT_ONE));
+
+    Alias parsedViaAlias{};
+    Flat parsedViaFlat{};
+    const bool aliasParsed = protoyaff::test::ReservedNameNesting::Default_Parse("DEFAULT_ONE", &parsedViaAlias);
+    const bool flatParsed = protoyaff::test::ReservedNameNesting_Default_Parse("DEFAULT_ONE", &parsedViaFlat);
+    EXPECT_EQ(aliasParsed, flatParsed);
+    EXPECT_EQ(parsedViaAlias, parsedViaFlat);
+}
