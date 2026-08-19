@@ -245,6 +245,7 @@ private:
     static std::string GenerateMessageBaseClass(const ir::MessageDef& msgDef);
     static std::string GenerateEnumProtobufName(const ir::EnumDef& enumDef);
     static std::string GenerateWithNamespaceName(const std::string& ns, const std::string& name);
+    static std::string GetNestedLocalName(const std::string& parentName, const std::string& childName);
 
     void GenerateHeader();
     void GenerateIncludes(const ir::SchemaDef& schema);
@@ -270,6 +271,9 @@ private:
     void GenerateEnumConst(const ir::EnumDef& enumDef);
     void GenerateEnumIsValidFunc(const ir::EnumDef& enumDef);
     void GenerateEnumNameFunc(const ir::EnumDef& enumDef);
+
+    void GenerateNestedMessageAlias(const ir::MessageDef& msgDef, const ir::MessageDef& childMsgDef);
+    void GenerateNestedEnumAliases(const ir::MessageDef& msgDef, const ir::EnumDef& enumDef);
 
     void GenerateMessageParseToProtobuf(const ir::MessageDef& msgDef);
     void GenerateMessageProtobufSerializer(const ir::MessageDef& msgDef, const bool deferred = false);
@@ -454,6 +458,48 @@ void CppGenerator::Impl::GenerateEnumNameFunc(const ir::EnumDef& enumDef) {
     Writer_ |= "}\n";
 }
 
+void CppGenerator::Impl::GenerateNestedMessageAlias(const ir::MessageDef& msgDef, const ir::MessageDef& childMsgDef) {
+    const std::string localName = GetNestedLocalName(msgDef.Name, childMsgDef.Name);
+    if (localName.empty()) {
+        return;
+    }
+    const std::string alias = GenerateEscapedName(localName);
+    Writer_ >= "using " + alias + " = " + childMsgDef.Name + ";";
+}
+
+void CppGenerator::Impl::GenerateNestedEnumAliases(const ir::MessageDef& msgDef, const ir::EnumDef& enumDef) {
+    const std::string localName = GetNestedLocalName(msgDef.Name, enumDef.Name);
+    if (localName.empty()) {
+        return;
+    }
+
+    const std::string alias = GenerateEscapedName(localName);
+    const auto& flatName = enumDef.Name;
+    Writer_ >= "using " + alias + " = " + flatName + ";";
+    ForValues(enumDef, [&](const auto& enumVal) {
+        const std::string valueName = GenerateEscapedName(enumVal.Name);
+        Writer_ >= "static constexpr " + alias + " " + valueName + " = " + flatName + "::" + valueName + ";";
+    });
+
+    Writer_.IncrementIdentLevel();
+    Writer_ |= "static constexpr bool " + localName + "_IsValid(const int value) {";
+    Writer_ >= "return " + flatName + "_IsValid(value);";
+    Writer_ |= "}";
+
+    Writer_ |= "static constexpr std::string_view " + localName + "_Name(" + alias + " value) {";
+    Writer_ >= "return " + flatName + "_Name(value);";
+    Writer_ |= "}";
+
+    Writer_ |= "static constexpr bool " + localName + "_Parse(std::string_view name, " + alias + "* value) {";
+    Writer_ >= "return " + flatName + "_Parse(name, value);";
+    Writer_ |= "}";
+    Writer_.DecrementIdentLevel();
+
+    Writer_ >= "static constexpr " + alias + " " + localName + "_MIN = " + flatName + "_MIN;";
+    Writer_ >= "static constexpr " + alias + " " + localName + "_MAX = " + flatName + "_MAX;";
+    Writer_ >= "static constexpr int " + localName + "_ARRAYSIZE = " + flatName + "_ARRAYSIZE;";
+}
+
 void CppGenerator::Impl::GenerateEnumPre(const ir::EnumDef& enumDef) {
     Writer_ |= "enum class " + enumDef.Name + " : int32_t;";
 
@@ -484,6 +530,15 @@ void CppGenerator::Impl::GenerateMessage(const ir::MessageDef& msgDef) {
     if (Opts_.GenerateProtobufApi) {
         Writer_ >= "using ProtobufType = " + GenerateMessageProtobufType(msgDef) + ";";
     }
+
+    // Generate type aliases for nested types
+    for (auto&& child : msgDef.NestedMessages) {
+        GenerateNestedMessageAlias(msgDef, *child);
+    }
+    for (auto&& child : msgDef.NestedEnums) {
+        GenerateNestedEnumAliases(msgDef, *child);
+    }
+
     if (Writer_.TextWritten()) {
         Writer_ |= "";
     }
@@ -1763,6 +1818,14 @@ std::string CppGenerator::Impl::GenerateMessageSerializerName(MessageType msgTyp
 
 std::string CppGenerator::Impl::GenerateWithNamespaceName(const std::string& ns, const std::string& name) {
     return ns + "::" + name;
+}
+
+std::string CppGenerator::Impl::GetNestedLocalName(const std::string& parentName, const std::string& childName) {
+    const std::string prefix = parentName + "_";
+    if (childName.size() > prefix.size() && childName.compare(0, prefix.size(), prefix) == 0) {
+        return childName.substr(prefix.size());
+    }
+    return {};
 }
 
 CppGenerator::Impl::MessageMeta CppGenerator::Impl::GenerateMessageMeta(const ir::MessageDef& msg) {

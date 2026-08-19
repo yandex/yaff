@@ -10,6 +10,10 @@ enum Enumeration {
 }
 
 message UniversalMessage {
+    enum EmbeddedEnumeration {
+        EMBEDDED_ENUMERATION_UNSPECIFIED = 0;
+        EMBEDDED_ENUMERATION_SPECIFIED = 1;
+    }
     message EmbeddedMessage { }
 
     int32 implicit_numeric_field = 1;
@@ -48,5 +52,27 @@ message UniversalMessage {
         bytes oneof_bytes_field = 24;
         Enumeration oneof_enum_field = 25;
         EmbeddedMessage oneof_embedded_message_field = 26;
+    }
+}
+
+// Covers nested-type alias generation at nesting depth >= 2.
+message DeepNesting {
+    message Level2 {
+        message Level3 { }
+    }
+}
+
+// Covers nested-type alias generation when the enclosing message's own flattened name contains an underscore.
+message My_UnderscoredMessage {
+    message Inner { }
+}
+
+// Covers nested-alias escaping when the nested type's local name collides with a
+// generator-reserved name. "Default" is reserved because every generated message
+// exposes a static Default() accessor; without escaping the alias would collide.
+message ReservedNameNesting {
+    enum Default {
+        DEFAULT_UNSPECIFIED = 0;
+        DEFAULT_ONE = 1;
     }
 }
