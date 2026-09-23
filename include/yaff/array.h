@@ -234,7 +234,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const String& str) {
-        return os << static_cast<std::string_view>(str);
+        return os << str.AsStringView();
     }
 };
 YAFF_LAYOUT_END

@@ -35,7 +35,7 @@ public:
     //
     // Since the default scalar value written in YaFF is always 0 due to xor with the default value,
     // and any initialized embedded message is written through a non-zero offset,
-    // checking for non-zero values is sufficient to ensure the semantics described above.
+    // checking for non-zero bytes is sufficient to ensure the semantics described above.
     template <typename T>
     YAFF_PURE bool ReadPresence(const FieldId id) const noexcept {
         return ReadPresenceUnsafe<T>(ResolveField(id));
@@ -82,8 +82,18 @@ private:
 
     template <typename T>
     YAFF_PURE bool ReadPresenceUnsafe(const FieldOffset offset) const noexcept {
-        using TPresenceType = typename std::conditional_t<std::is_scalar<T>::value, T, Offset>;
-        return yaff::ReadValue<TPresenceType>(Message() + offset) != 0;
+        using PresenceType = std::conditional_t<std::is_scalar_v<T>, T, Offset>;
+        return yaff::ReadValue<PresenceType>(Message() + offset) != 0;
+    }
+
+    template <>
+    YAFF_PURE bool ReadPresenceUnsafe<float>(const FieldOffset offset) const noexcept {
+        return yaff::ReadValue<uint32_t>(Message() + offset) != 0;
+    }
+
+    template <>
+    YAFF_PURE bool ReadPresenceUnsafe<double>(const FieldOffset offset) const noexcept {
+        return yaff::ReadValue<uint64_t>(Message() + offset) != 0;
     }
 
     std::byte Data_[MetaLimit()];
@@ -279,8 +289,18 @@ private:
 
     template <typename T>
     YAFF_PURE bool ReadImplicitPresenceUnsafe(const FieldOffset offset) const noexcept {
-        using TPresenceType = typename std::conditional_t<std::is_scalar<T>::value, T, Offset>;
-        return yaff::ReadValue<TPresenceType>(Fields() + offset) != 0;
+        using PresenceType = std::conditional_t<std::is_scalar_v<T>, T, Offset>;
+        return yaff::ReadValue<PresenceType>(Fields() + offset) != 0;
+    }
+
+    template <>
+    YAFF_PURE bool ReadImplicitPresenceUnsafe<float>(const FieldOffset offset) const noexcept {
+        return yaff::ReadValue<uint32_t>(Fields() + offset) != 0;
+    }
+
+    template <>
+    YAFF_PURE bool ReadImplicitPresenceUnsafe<double>(const FieldOffset offset) const noexcept {
+        return yaff::ReadValue<uint64_t>(Fields() + offset) != 0;
     }
 
     FieldId TypedLimit_;
