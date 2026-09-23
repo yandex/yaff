@@ -47,3 +47,11 @@ yaff_add_unit_test(proto_api.cpp)
 yaff_add_unit_test(fixed_message.cpp)
 yaff_add_unit_test(flat_message.cpp)
 yaff_add_unit_test(sparse_message.cpp)
+
+add_executable(yaff_ir_processor_test ir_processor.cpp)
+target_link_libraries(yaff_ir_processor_test
+    PRIVATE
+        yaff::compilation
+        GTest::gtest_main
+)
+add_test(NAME yaff_ir_processor_test COMMAND yaff_ir_processor_test)
