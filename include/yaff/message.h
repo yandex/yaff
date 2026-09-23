@@ -1,5 +1,7 @@
 #pragma once
 
+#include <concepts>
+
 #include "base.h"
 
 namespace yaff {
@@ -86,13 +88,13 @@ private:
         return yaff::ReadValue<PresenceType>(Message() + offset) != 0;
     }
 
-    template <>
-    YAFF_PURE bool ReadPresenceUnsafe<float>(const FieldOffset offset) const noexcept {
+    template <std::same_as<float> T>
+    YAFF_PURE bool ReadPresenceUnsafe(const FieldOffset offset) const noexcept {
         return yaff::ReadValue<uint32_t>(Message() + offset) != 0;
     }
 
-    template <>
-    YAFF_PURE bool ReadPresenceUnsafe<double>(const FieldOffset offset) const noexcept {
+    template <std::same_as<double> T>
+    YAFF_PURE bool ReadPresenceUnsafe(const FieldOffset offset) const noexcept {
         return yaff::ReadValue<uint64_t>(Message() + offset) != 0;
     }
 
@@ -293,13 +295,13 @@ private:
         return yaff::ReadValue<PresenceType>(Fields() + offset) != 0;
     }
 
-    template <>
-    YAFF_PURE bool ReadImplicitPresenceUnsafe<float>(const FieldOffset offset) const noexcept {
+    template <std::same_as<float> T>
+    YAFF_PURE bool ReadImplicitPresenceUnsafe(const FieldOffset offset) const noexcept {
         return yaff::ReadValue<uint32_t>(Fields() + offset) != 0;
     }
 
-    template <>
-    YAFF_PURE bool ReadImplicitPresenceUnsafe<double>(const FieldOffset offset) const noexcept {
+    template <std::same_as<double> T>
+    YAFF_PURE bool ReadImplicitPresenceUnsafe(const FieldOffset offset) const noexcept {
         return yaff::ReadValue<uint64_t>(Fields() + offset) != 0;
     }
 
