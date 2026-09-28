@@ -77,12 +77,12 @@ public:
 
     template <typename T>
     YAFF_ALWAYS_INLINE void AddField(FieldId fieldId, T value, T def) {
-        AddFieldDispatch<T>(fieldId, value, def);
+        AddFieldDispatch(fieldId, value, def);
     }
 
     template <typename T>
     YAFF_ALWAYS_INLINE void AddField(FieldId fieldId, InternalOffset<T> offset) {
-        AddFieldDispatch<T>(fieldId, offset);
+        AddFieldDispatch(fieldId, InternalOffset<>{offset.O});
     }
 
     template <typename M>
@@ -356,8 +356,8 @@ private:
     using ObjectOffsetSet = std::unordered_set<ObjectOffset, ObjectOffsetHash, ObjectOffsetEqual>;
 
     struct DummyMessageSerializer {
-        template <typename T, typename... Ps>
-        void AddField(FieldId, Ps&&...) {
+        template <typename... Args>
+        void AddField(FieldId, Args...) {
             YAFF_THROW("no message is being serialized");
         }
         Offset Finish() && {
@@ -383,8 +383,7 @@ private:
             WriteField<T>(id, XorDef(value, def));
         }
 
-        template <typename T>
-        void AddField(FieldId id, InternalOffset<T> offset) {
+        void AddField(FieldId id, InternalOffset<> offset) {
             if (offset.IsNull()) {
                 return;
             }
@@ -494,8 +493,7 @@ private:
             WriteField<T>(offset, XorDef(value, def));
         }
 
-        template <typename T>
-        YAFF_ALWAYS_INLINE void AddField(const FieldId id, const InternalOffset<T> value) {
+        YAFF_ALWAYS_INLINE void AddField(const FieldId id, const InternalOffset<> value) {
             if (value.IsNull()) {
                 return;
             }
@@ -636,8 +634,7 @@ private:
             TrackField(id, Buf.RightSize());
         }
 
-        template <typename T>
-        void AddField(FieldId id, InternalOffset<T> offset) {
+        void AddField(FieldId id, InternalOffset<> offset) {
             if (offset.IsNull()) {
                 return;
             }
@@ -790,21 +787,36 @@ private:
         --Depth_;
     }
 
-    template <typename T, typename... Ps>
-    YAFF_NOINLINE void AddFieldDispatchSlow(FieldId fieldId, Ps... params) {
-        std::visit([&](auto& b) { b.template AddField<T>(fieldId, params...); }, MessageSerializer_);
+    YAFF_NOINLINE void AddFieldDispatchSlow(FieldId fieldId, InternalOffset<> offset) {
+        std::visit([&](auto& b) { b.AddField(fieldId, offset); }, MessageSerializer_);
     }
 
-    template <typename T, typename... Ps>
-    YAFF_ALWAYS_INLINE void AddFieldDispatch(FieldId fieldId, Ps... params) {
+    YAFF_ALWAYS_INLINE void AddFieldDispatch(FieldId fieldId, InternalOffset<> offset) {
         // FlatMessageSerializer<true, true> is the most frequent alternative,
         // being effectively the default one: the dynamic layout requires sized
         // messages, and a message usually has some explicit fields.
         if (auto* flat = std::get_if<FlatMessageSerializer<true, true>>(&MessageSerializer_)) {
-            flat->template AddField<T>(fieldId, params...);
+            flat->AddField(fieldId, offset);
             return;
         }
-        AddFieldDispatchSlow<T>(fieldId, params...);
+        AddFieldDispatchSlow(fieldId, offset);
+    }
+
+    template <typename T>
+    YAFF_NOINLINE void AddFieldDispatchSlow(FieldId fieldId, T value, T def) {
+        std::visit([&](auto& b) { b.AddField(fieldId, value, def); }, MessageSerializer_);
+    }
+
+    template <typename T>
+    YAFF_ALWAYS_INLINE void AddFieldDispatch(FieldId fieldId, T value, T def) {
+        // FlatMessageSerializer<true, true> is the most frequent alternative,
+        // being effectively the default one: the dynamic layout requires sized
+        // messages, and a message usually has some explicit fields.
+        if (auto* flat = std::get_if<FlatMessageSerializer<true, true>>(&MessageSerializer_)) {
+            flat->AddField(fieldId, value, def);
+            return;
+        }
+        AddFieldDispatchSlow<T>(fieldId, value, def);
     }
 
     template <typename T, typename... Ps>
