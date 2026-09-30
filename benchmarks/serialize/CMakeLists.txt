@@ -4,6 +4,7 @@ file(MAKE_DIRECTORY ${YAFF_BENCH_SERIALIZE_GENERATED_DIR}/protoyaff)
 
 add_library(yaff_bench_serialize_protoyaff STATIC
     protoyaff/flat.proto
+    protoyaff/hierarchical.proto
 )
 
 protobuf_generate(
@@ -47,3 +48,4 @@ function(yaff_add_serialize_benchmark _src)
 endfunction()
 
 yaff_add_serialize_benchmark(flat.cpp)
+yaff_add_serialize_benchmark(hierarchical.cpp)

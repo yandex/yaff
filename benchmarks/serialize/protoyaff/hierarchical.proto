@@ -1,0 +1,50 @@
+syntax = "proto2";
+
+package benchmark_serialize;
+
+// Complete small scalar messages exercise the dynamic flat layout.
+message Version {
+    optional uint32 id = 1;
+    optional uint64 revision = 2;
+}
+
+// Gaps select the sparse layout, with explicit presence including default values.
+message Attributes {
+    optional uint32 category = 1;
+    optional uint64 key = 3;
+    optional uint32 kind = 8;
+    optional uint64 source = 17;
+    optional bool enabled = 33;
+}
+
+message Record {
+    optional uint64 id = 1;
+    optional uint64 group = 2;
+    optional uint64 owner = 3;
+    optional uint64 domain = 5;
+    optional uint32 generation = 8;
+    optional uint64 flags = 9;
+    optional uint64 fallback_flags = 10;
+    optional uint32 slot = 11;
+    optional bool deleted = 12;
+    optional bool filtered = 13;
+    optional bool experimental = 14;
+    optional uint32 kind = 15;
+    optional uint32 subtype = 16;
+    optional double score = 20;
+    optional uint32 rank = 21;
+    optional Version version = 25;
+    optional Version query_version = 26;
+    optional Version timestamp = 27;
+    repeated Attributes attributes = 32;
+    optional uint64 subgroup = 40;
+    optional uint64 type_mask = 48;
+    optional uint32 template_id = 63;
+    repeated float values = 80;
+    optional string label = 96;
+}
+
+message Batch {
+    repeated Record records = 1;
+    optional uint64 elapsed = 3;
+}
