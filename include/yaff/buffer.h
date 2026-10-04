@@ -167,7 +167,7 @@ public:
     }
 
     // Right side: grows downward from the end of the buffer.
-    std::byte* RightAllocate(size_t len) {
+    YAFF_ALWAYS_INLINE std::byte* RightAllocate(size_t len) {
         if (len) {
             EnsureSpace(len);
             Right_ -= len;
@@ -188,7 +188,7 @@ public:
         YAFF_MEMCPY(RightAllocate(sizeof(T)), &value, sizeof(T));
     }
 
-    void RightFill(size_t len) {
+    YAFF_ALWAYS_INLINE void RightFill(size_t len) {
         if (len) {
             std::memset(RightAllocate(len), 0, len);
         }
