@@ -71,10 +71,34 @@
 
 #define YAFF_ASSERT(Cond) assert(Cond)
 
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_assume_separate_storage)
+#define YAFF_ASSUME_SEPARATE_STORAGE(A, B) __builtin_assume_separate_storage(A, B)
+#endif
+#endif
+#ifndef YAFF_ASSUME_SEPARATE_STORAGE
+#define YAFF_ASSUME_SEPARATE_STORAGE(A, B) ((void)0)
+#endif
+
+#if defined(__clang__)
+#define YAFF_ASSUME(Cond) __builtin_assume(Cond)
+#elif defined(__GNUC__)
+#define YAFF_ASSUME(Cond)            \
+    do {                             \
+        if (!(Cond)) {               \
+            __builtin_unreachable(); \
+        }                            \
+    } while (false)
+#elif defined(_MSC_VER)
+#define YAFF_ASSUME(Cond) __assume(Cond)
+#else
+#define YAFF_ASSUME(Cond) static_cast<void>(Cond)
+#endif
+
 #define YAFF_THROW(Msg)                                                                         \
     do {                                                                                        \
         static constexpr const char* msg = __FILE__ ":" YAFF_STRINGIFY(__LINE__) " : " Msg "'"; \
-        throw std::runtime_error(msg);                                                          \
+        ::yaff::Throw(msg);                                                                     \
     } while (false)
 
 #define YAFF_REQUIRE(Cond)                                                \
@@ -115,6 +139,10 @@ enum class Presence : int32_t {
     PRESENCE_EXPLICIT = 2,
 };
 
+[[noreturn]] YAFF_NOINLINE inline void Throw(const char* message) {
+    throw std::runtime_error(message);
+}
+
 template <typename T>
 inline constexpr T XorDef(T v, T d) noexcept {
     return v ^ d;
@@ -129,22 +157,6 @@ inline constexpr float XorDef(float v, float d) noexcept {
 template <>
 inline constexpr double XorDef(double v, double d) noexcept {
     return std::bit_cast<double>(std::bit_cast<uint64_t>(v) ^ std::bit_cast<uint64_t>(d));
-}
-
-template <typename T>
-inline constexpr bool IsEqual(T a, T b) noexcept {
-    return a == b;
-}
-
-// Float specializations with proper comparison;
-template <>
-inline bool IsEqual(float a, float b) noexcept {
-    return std::fabs(a - b) <= (std::min(std::fabs(a), std::fabs(b)) * std::numeric_limits<float>::epsilon());
-}
-
-template <>
-inline bool IsEqual(double a, double b) noexcept {
-    return std::fabs(a - b) <= (std::min(std::fabs(a), std::fabs(b)) * std::numeric_limits<double>::epsilon());
 }
 
 using Offset = uint32_t;
@@ -186,6 +198,43 @@ YAFF_PURE inline T ReadValue(const void* ptr, const void** next) noexcept {
 template <typename T>
 inline void WriteValue(void* ptr, T value) noexcept {
     YAFF_MEMCPY(ptr, &value, sizeof(T));
+}
+
+template <typename T>
+inline constexpr bool IsEqual(T a, T b) noexcept {
+    return a == b;
+}
+
+// Float specializations with proper comparison;
+template <>
+inline bool IsEqual(float a, float b) noexcept {
+    return std::fabs(a - b) <= (std::min(std::fabs(a), std::fabs(b)) * std::numeric_limits<float>::epsilon());
+}
+
+template <>
+inline bool IsEqual(double a, double b) noexcept {
+    return std::fabs(a - b) <= (std::min(std::fabs(a), std::fabs(b)) * std::numeric_limits<double>::epsilon());
+}
+
+YAFF_ALWAYS_INLINE bool IsMemoryEqual(const void* a, const void* b, size_t s) noexcept {
+    const auto* l = static_cast<const std::byte*>(a);
+    const auto* r = static_cast<const std::byte*>(b);
+    if (s < sizeof(uint16_t)) {
+        return s == 0 || *l == *r;
+    }
+    if (s < sizeof(uint32_t)) {
+        return ReadValue<uint16_t>(l) == ReadValue<uint16_t>(r) &&
+               ReadValue<uint16_t>(l + s - sizeof(uint16_t)) == ReadValue<uint16_t>(r + s - sizeof(uint16_t));
+    }
+    if (s < sizeof(uint64_t)) {
+        return ReadValue<uint32_t>(l) == ReadValue<uint32_t>(r) &&
+               ReadValue<uint32_t>(l + s - sizeof(uint32_t)) == ReadValue<uint32_t>(r + s - sizeof(uint32_t));
+    }
+    if (s <= 2 * sizeof(uint64_t)) {
+        return ReadValue<uint64_t>(l) == ReadValue<uint64_t>(r) &&
+               ReadValue<uint64_t>(l + s - sizeof(uint64_t)) == ReadValue<uint64_t>(r + s - sizeof(uint64_t));
+    }
+    return std::memcmp(a, b, s) == 0;
 }
 
 template <typename T, typename O = Offset>

@@ -280,7 +280,9 @@ private:
     void GenerateMessageAliasSerializeFunc(const ir::MessageDef& msgDef);
     void GenerateMessageAliasDeferredSerializeFunc(const ir::MessageDef& msgDef);
     void GenerateMessageAliasParseFunc(const ir::MessageDef& msgDef);
-    void GenerateMessageBasicSerializeFunc(const ir::MessageDef& msgDef);
+    void GenerateMessageBasicSerializeFunc(MessageType msgType, const ir::MessageDef& msgDef);
+    void GenerateMessageAssume(MessageType msgType, const ir::MessageDef& msgDef);
+    void GenerateMessageSparseAssume(const ir::MessageDef& msgDef);
     void GenerateMessageDynamicSerializeFunc(const ir::MessageDef& msgDef);
     void GenerateMessageSerializer(MessageType msgType, const ir::MessageDef& msgDef);
     void GenerateMessageIdsEnum(const ir::MessageDef& msgDef);
@@ -607,8 +609,8 @@ void CppGenerator::Impl::GenerateMessage(const ir::MessageDef& msgDef) {
     Writer_ |= "YAFF_LAYOUT_END\n";
 
     GenerateByMessageLayout(msgDef, std::bind(&CppGenerator::Impl::GenerateMessageSerializer, this, _1, _2));
+    GenerateByMessageLayout(msgDef, std::bind(&CppGenerator::Impl::GenerateMessageBasicSerializeFunc, this, _1, _2));
 
-    GenerateMessageBasicSerializeFunc(msgDef);
     if (ir::IsDynamicMessage(msgDef) && !ir::IsGapMessage(msgDef)) {
         GenerateMessageDynamicSerializeFunc(msgDef);
     }
@@ -710,17 +712,20 @@ void CppGenerator::Impl::GenerateMessageSerializer(MessageType msgType, const ir
     const std::string messageSuffix = GenerateMessageType(msgType);
     const std::string serializerName = GenerateMessageSerializerName(msgType, msgDef);
 
+    Writer_ |= "template <bool G = true>";
     Writer_ |= "struct " + serializerName + " {";
     Writer_.IncrementIdentLevel();
 
     Writer_ |= "::yaff::Serializer& S;\n";
 
-    Writer_ |= "explicit " + serializerName + "(::yaff::Serializer& ys)";
+    Writer_ |= "YAFF_ALWAYS_INLINE explicit " + serializerName + "(::yaff::Serializer& ys)";
     Writer_ >= ": S(ys)";
     Writer_ |= "{";
     Writer_ >= "S.Start" + messageSuffix + "Message\\";
     if (msgType == MessageType::MESSAGE_TYPE_FIXED || msgType == MessageType::MESSAGE_TYPE_FLAT) {
-        Writer_ |= "<" + msgDef.Name + "::MetaType" + ">\\";
+        Writer_ |= "<" + msgDef.Name + "::MetaType, G>\\";
+    } else {
+        Writer_ |= "<G>\\";
     }
     Writer_ |= "(\\";
     if (msgType == MessageType::MESSAGE_TYPE_FLAT || msgType == MessageType::MESSAGE_TYPE_SPARSE) {
@@ -734,20 +739,36 @@ void CppGenerator::Impl::GenerateMessageSerializer(MessageType msgType, const ir
     Writer_ |= ");";
     Writer_ |= "}\n";
 
+    if (msgType == MessageType::MESSAGE_TYPE_SPARSE) {
+        Writer_ |=
+            "YAFF_ALWAYS_INLINE " + serializerName + "(::yaff::Serializer& ys, ::yaff::SparseMessageAssume assume)";
+        Writer_ >= ": S(ys)";
+        Writer_ |= "{";
+        Writer_ >= "S.StartSparseMessage<G>(assume);";
+        Writer_ |= "}\n";
+    }
+
     ForRealFields(msgDef, [&](const auto& fieldDef) { GenerateMessageFieldAdd(msgDef.Name, fieldDef); });
 
     const std::string finishType = "::yaff::InternalOffset<" + msgDef.Name + ">";
-    Writer_ |= finishType + " Finish() && {";
-    Writer_ >= "return " + finishType + "(S.Finish" + messageSuffix + "Message());";
+    Writer_ |= "template <::yaff::MessageAssume A = ::yaff::MessageAssume{}>";
+    Writer_ |= "YAFF_ALWAYS_INLINE " + finishType + " Finish() && {";
+    Writer_ >= "return " + finishType + "(S.Finish" + messageSuffix + "Message<A>());";
     Writer_ |= "}";
 
     Writer_.DecrementIdentLevel();
     Writer_ |= "};\n";
 }
 
-void CppGenerator::Impl::GenerateMessageBasicSerializeFunc(const ir::MessageDef& msgDef) {
-    Writer_ |= "template <typename Underlying = " + GenerateMessageBasicSerializeFuncDefault(msgDef) + ">";
-    Writer_ |= "inline ::yaff::InternalOffset<" + msgDef.Name + "> " + GenerateSerializeFuncName(msgDef) + "(";
+void CppGenerator::Impl::GenerateMessageBasicSerializeFunc(MessageType msgType, const ir::MessageDef& msgDef) {
+    const std::string serializer = GenerateMessageSerializerName(msgType, msgDef);
+    const std::string defaultType =
+        (ir::IsDynamicMessage(msgDef) && !ir::IsGapMessage(msgDef) ? "" : " = " + serializer);
+
+    Writer_ |= "template <template <bool> typename Underlying" + defaultType + ", bool G = true>";
+    Writer_ >= "requires std::same_as<Underlying<G>, " + serializer + "<G>>";
+    Writer_ |=
+        "YAFF_ALWAYS_INLINE ::yaff::InternalOffset<" + msgDef.Name + "> " + GenerateSerializeFuncName(msgDef) + "(";
     Writer_ >= "::yaff::Serializer& ys\\";
     ForRealFields(msgDef, [&](const auto& fieldDef) {
         Writer_ >= ",";
@@ -755,25 +776,78 @@ void CppGenerator::Impl::GenerateMessageBasicSerializeFunc(const ir::MessageDef&
     });
     Writer_ |= "";
     Writer_ |= ") {";
-    Writer_ >= "Underlying s(ys);";
-
+    GenerateMessageAssume(msgType, msgDef);
+    if (msgType == MessageType::MESSAGE_TYPE_SPARSE) {
+        GenerateMessageSparseAssume(msgDef);
+        Writer_ >= serializer + "<G> s(ys, assume);";
+    } else {
+        Writer_ >= serializer + "<G> s(ys);";
+    }
     ForReversedRealFields(msgDef, [&](const auto& fieldDef) {
         const bool isOptional = ir::IsScalar(fieldDef.Type->Type) && ir::IsExplicitField(fieldDef);
         const std::string argName = "a_" + GenerateFieldName(fieldDef);
         const std::string argPrefix = (isOptional ? "*" : "");
-        const std::string addCall = "s.add_" + GenerateFieldName(fieldDef) + "(" + argPrefix + argName + ");";
+        const std::string addCall =
+            "s.template add_" + GenerateFieldName(fieldDef) + "<A>(" + argPrefix + argName + ");";
         Writer_ >= (isOptional ? "if (" + argName + ") { " + addCall + " }" : addCall);
     });
-
-    Writer_ >= "return std::move(s).Finish();";
+    Writer_ >= "return std::move(s).template Finish<A>();";
     Writer_ |= "}\n";
+}
+
+void CppGenerator::Impl::GenerateMessageAssume(MessageType msgType, const ir::MessageDef& msgDef) {
+    const std::string explicitFlag = (HasExplicitFields(msgDef) ? "YES" : "NO");
+    Writer_ >= "constexpr ::yaff::MessageAssume A = {";
+    Writer_.IncrementIdentLevel();
+    switch (msgType) {
+        case MessageType::MESSAGE_TYPE_FIXED:
+            Writer_ >= ".Layout = " + GenerateMessageLayoutDescriptor(MessageLayout::MESSAGE_LAYOUT_FIXED) + ",";
+            break;
+        case MessageType::MESSAGE_TYPE_FLAT: {
+            const std::string sizedFlag = (ir::IsDynamicMessage(msgDef) ? "YES" : "NO");
+            Writer_ >= ".Layout = " + GenerateMessageLayoutDescriptor(MessageLayout::MESSAGE_LAYOUT_FLAT) + ",";
+            Writer_ >= ".Explicit = ::yaff::MessageAssume::Flag::" + explicitFlag + ",";
+            Writer_ >= ".Sized = ::yaff::MessageAssume::Flag::" + sizedFlag + ",";
+            break;
+        }
+        case MessageType::MESSAGE_TYPE_SPARSE:
+            Writer_ >= ".Layout = " + GenerateMessageLayoutDescriptor(MessageLayout::MESSAGE_LAYOUT_SPARSE) + ",";
+            Writer_ >= ".Explicit = ::yaff::MessageAssume::Flag::" + explicitFlag + ",";
+            Writer_ >= ".Preallocated = ::yaff::MessageAssume::Flag::YES,";
+            break;
+        default:
+            YAFF_THROW("unknown message type");
+    }
+    Writer_ >= ".Guarded = G ? ::yaff::MessageAssume::Flag::YES : ::yaff::MessageAssume::Flag::NO,";
+    Writer_.DecrementIdentLevel();
+    Writer_ >= "};";
+}
+
+void CppGenerator::Impl::GenerateMessageSparseAssume(const ir::MessageDef& msgDef) {
+    const std::string implicit = (HasExplicitFields(msgDef) ? "false" : "true");
+    Writer_ >= "::yaff::SparseMessageAssume assume(/* implicit */ " + implicit + ");";
+    ForRealFields(msgDef, [&](const auto& fieldDef) {
+        const bool isOptional = ir::IsScalar(fieldDef.Type->Type) && ir::IsExplicitField(fieldDef);
+        const std::string argName = "a_" + GenerateFieldName(fieldDef);
+        const std::string argPrefix = (isOptional ? "*" : "");
+        const std::string type = GenerateTypeInternal(*fieldDef.Type);
+        const std::string id = msgDef.Name + "::" + GenerateIdName(fieldDef);
+        const std::string defaultSuffix =
+            (ir::IsScalar(fieldDef.Type->Type) ? ", " + GenerateDefaultValueInternal(fieldDef) : "");
+        const std::string call = "assume.AccountField<" + type + ">(" + id + ", " +
+                                 GenerateTypeCastInternal(*fieldDef.Type, argPrefix + argName) + defaultSuffix + ");";
+        Writer_ >= (isOptional ? "if (" + argName + ") { " + call + " }" : call);
+    });
+    Writer_ |= "";
 }
 
 void CppGenerator::Impl::GenerateMessageDynamicSerializeFunc(const ir::MessageDef& msgDef) {
     const std::string serializeFuncName = GenerateSerializeFuncName(msgDef);
-    const std::string flatSerializer = GenerateMessageSerializerName(MessageType::MESSAGE_TYPE_FLAT, msgDef);
-    const std::string sparseSerializer = GenerateMessageSerializerName(MessageType::MESSAGE_TYPE_SPARSE, msgDef);
-    Writer_ |= "inline ::yaff::InternalOffset<" + msgDef.Name + "> " + serializeFuncName + "(";
+    const std::string flatSerializer = GenerateMessageSerializerName(MessageType::MESSAGE_TYPE_FLAT, msgDef) + ", G";
+    const std::string sparseSerializer =
+        GenerateMessageSerializerName(MessageType::MESSAGE_TYPE_SPARSE, msgDef) + ", G";
+    Writer_ |= "template <bool G = true>";
+    Writer_ |= "YAFF_ALWAYS_INLINE ::yaff::InternalOffset<" + msgDef.Name + "> " + serializeFuncName + "(";
     Writer_ >= "::yaff::Serializer& ys\\";
     ForRealFields(msgDef, [&](const auto& fieldDef) {
         Writer_ >= ",";
@@ -800,6 +874,7 @@ void CppGenerator::Impl::GenerateMessageFieldAdd(const std::string& msgName, con
     const std::string valueArgType = GenerateTypeExternal(*fieldDef.Type);
     const std::string valueArgName = GenerateFieldName(fieldDef);
 
+    Writer_ |= "template <::yaff::MessageAssume A = ::yaff::MessageAssume{}>";
     Writer_ |=
         "YAFF_ALWAYS_INLINE void add_" + GenerateFieldName(fieldDef) + "(" + valueArgType + " " + valueArgName + ") {";
 
@@ -807,7 +882,7 @@ void CppGenerator::Impl::GenerateMessageFieldAdd(const std::string& msgName, con
     const std::string id = msgName + "::" + GenerateIdName(fieldDef);
     const std::string defaultSuffix =
         (ir::IsScalar(fieldDef.Type->Type) ? ", " + GenerateDefaultValueInternal(fieldDef) : "");
-    Writer_ >= "S.AddField<" + type + ">(" + id + ", " + GenerateTypeCastInternal(*fieldDef.Type, valueArgName) +
+    Writer_ >= "S.AddField<" + type + ", A>(" + id + ", " + GenerateTypeCastInternal(*fieldDef.Type, valueArgName) +
                    defaultSuffix + ");";
 
     Writer_ |= "}\n";
@@ -1132,14 +1207,19 @@ void CppGenerator::Impl::GenerateMessageProtobufSerializer(const ir::MessageDef&
     Writer_ |= declaration + " {";
     Writer_.IncrementIdentLevel();
 
-    ForRealFields(msgDef, [&](const auto& fieldDef) {
+    const auto generateArgument = [&](const auto& fieldDef) {
         const std::string protobufValue =
             (ir::IsAssociativePair(msgDef) ? GenerateProtobufPairValue(fieldDef) : GenerateProtobufValue(fieldDef));
         Writer_ |= "const auto a_" + GenerateFieldName(fieldDef) + " = " + protobufValue + ";";
-    });
+    };
+    ForRealStructureFields(msgDef, generateArgument);
+    ForRealScalarFields(msgDef, generateArgument);
 
+    const std::string templateArg = (ir::IsDynamicMessage(msgDef) && !ir::IsGapMessage(msgDef)
+                                         ? "false"
+                                         : GenerateMessageBasicSerializeFuncDefault(msgDef) + ", false");
     const std::string serializeCall = (deferred ? GenerateMessageBasicSerializeFuncDeferredCall(msgDef)
-                                                : GenerateMessageBasicSerializeFuncCall(msgDef));
+                                                : GenerateMessageBasicSerializeFuncCall(msgDef, templateArg));
     Writer_ |= "return " + serializeCall + ";";
     Writer_.DecrementIdentLevel();
     Writer_ |= "}\n";
