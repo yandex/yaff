@@ -27,7 +27,8 @@ test::UniversalMessage GenerateUniversalMessage() {
         proto.add_repeated_bytes_field(std::to_string(i));
     }
     for (size_t i = 0; i < 9; ++i) {
-        const auto v = (i % 2 ? test::Enumeration::ENUMERATION_VALUE : test::Enumeration::ENUMERATION_OTHER_VALUE);
+        const auto v =
+            (i % 2 ? test::Enumeration::ENUMERATION_VALUE_ALIAS : test::Enumeration::ENUMERATION_OTHER_VALUE);
         proto.add_repeated_enum_field(v);
     }
     for (size_t i = 0; i < 11; ++i) {
@@ -92,6 +93,10 @@ void CheckRepeatedStringFields(const T& obj) {
 template <typename T>
 void CheckRepeatedEnumFields(const T& obj) {
     EXPECT_EQ(obj.repeated_enum_field_size(), 9);
+    for (int i = 0; i < 9; ++i) {
+        EXPECT_EQ(static_cast<int>(obj.repeated_enum_field(i)),
+                  i % 2 ? test::Enumeration::ENUMERATION_VALUE : test::Enumeration::ENUMERATION_OTHER_VALUE);
+    }
 }
 
 template <typename T>
@@ -183,22 +188,21 @@ TEST(ProtoAPI, TemplateTest) {
 }
 
 TEST(ProtoAPI, Enumerations) {
-    const std::array<std::pair<protoyaff::test::Enumeration, test::Enumeration>, 4> testSet = {
-        std::pair{protoyaff::test::Enumeration::ENUMERATION_UNSPECIFIED, test::Enumeration::ENUMERATION_UNSPECIFIED},
-        std::pair{protoyaff::test::Enumeration::ENUMERATION_VALUE, test::Enumeration::ENUMERATION_VALUE},
-        std::pair{protoyaff::test::Enumeration::ENUMERATION_OTHER_VALUE, test::Enumeration::ENUMERATION_OTHER_VALUE},
-        std::pair{protoyaff::test::Enumeration::auto_, test::Enumeration::auto_}};
+    const std::array<std::string_view, 8> testSet = {"ENUMERATION_UNSPECIFIED", "ENUMERATION_UNSPECIFIED_ALIAS",
+                                                     "ENUMERATION_NEGATIVE",    "ENUMERATION_NEGATIVE_ALIAS",
+                                                     "ENUMERATION_VALUE",       "ENUMERATION_VALUE_ALIAS",
+                                                     "ENUMERATION_OTHER_VALUE", "auto"};
 
-    for (auto [v1, v2] : testSet) {
-        auto n1 = protoyaff::test::Enumeration_Name(v1);
-        auto n2 = test::Enumeration_Name(v2);
-        EXPECT_EQ(n1, n2);
-
+    for (const auto name : testSet) {
+        SCOPED_TRACE(name);
         protoyaff::test::Enumeration r1;
         test::Enumeration r2;
-        EXPECT_TRUE(protoyaff::test::Enumeration_Parse(n1, &r1));
-        EXPECT_TRUE(test::Enumeration_Parse(n2, &r2));
+        EXPECT_TRUE(protoyaff::test::Enumeration_Parse(name, &r1));
+        EXPECT_TRUE(test::Enumeration_Parse(name, &r2));
         EXPECT_EQ(static_cast<int>(r1), static_cast<int>(r2));
+        EXPECT_EQ(protoyaff::test::Enumeration_Name(r1), test::Enumeration_Name(r2));
+        EXPECT_EQ(protoyaff::test::Enumeration_IsValid(static_cast<int>(r1)),
+                  test::Enumeration_IsValid(static_cast<int>(r2)));
     }
 
     EXPECT_EQ(static_cast<int>(protoyaff::test::Enumeration_MIN), static_cast<int>(test::Enumeration_MIN));
@@ -245,18 +249,21 @@ TEST(ProtoAPI, NestedEnumFullParity) {
                   protoyaff::test::UniversalMessage_EmbeddedEnumeration_IsValid(value));
     }
 
-    EXPECT_EQ(protoyaff::test::UniversalMessage::EmbeddedEnumeration_Name(
-                  protoyaff::test::UniversalMessage::EMBEDDED_ENUMERATION_SPECIFIED),
-              protoyaff::test::UniversalMessage_EmbeddedEnumeration_Name(Flat::EMBEDDED_ENUMERATION_SPECIFIED));
+    EXPECT_EQ(
+        protoyaff::test::UniversalMessage::EmbeddedEnumeration_Name(
+            protoyaff::test::UniversalMessage::EMBEDDED_ENUMERATION_SPECIFIED_ALIAS),
+        test::UniversalMessage::EmbeddedEnumeration_Name(test::UniversalMessage::EMBEDDED_ENUMERATION_SPECIFIED_ALIAS));
 
     Alias parsedViaAlias{};
     Flat parsedViaFlat{};
-    const bool aliasParsed =
-        protoyaff::test::UniversalMessage::EmbeddedEnumeration_Parse("EMBEDDED_ENUMERATION_SPECIFIED", &parsedViaAlias);
+    const bool aliasParsed = protoyaff::test::UniversalMessage::EmbeddedEnumeration_Parse(
+        "EMBEDDED_ENUMERATION_SPECIFIED_ALIAS", &parsedViaAlias);
     const bool flatParsed = protoyaff::test::UniversalMessage_EmbeddedEnumeration_Parse(
-        "EMBEDDED_ENUMERATION_SPECIFIED", &parsedViaFlat);
-    EXPECT_EQ(aliasParsed, flatParsed);
+        "EMBEDDED_ENUMERATION_SPECIFIED_ALIAS", &parsedViaFlat);
+    EXPECT_TRUE(aliasParsed);
+    EXPECT_TRUE(flatParsed);
     EXPECT_EQ(parsedViaAlias, parsedViaFlat);
+    EXPECT_EQ(parsedViaAlias, Alias::EMBEDDED_ENUMERATION_SPECIFIED);
 }
 
 TEST(ProtoAPI, NestedAliasEscaping) {

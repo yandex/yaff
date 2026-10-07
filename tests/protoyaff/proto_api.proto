@@ -3,16 +3,25 @@ syntax = "proto3";
 package test;
 
 enum Enumeration {
+    option allow_alias = true;
+
     ENUMERATION_UNSPECIFIED = 0;
+    ENUMERATION_UNSPECIFIED_ALIAS = 0;
+    ENUMERATION_NEGATIVE = -7;
+    ENUMERATION_NEGATIVE_ALIAS = -7;
     ENUMERATION_VALUE = 1;
+    ENUMERATION_VALUE_ALIAS = 1;
     ENUMERATION_OTHER_VALUE = 2;
     auto = 3; // Example of keyword as enum name;
 }
 
 message UniversalMessage {
     enum EmbeddedEnumeration {
+        option allow_alias = true;
+
         EMBEDDED_ENUMERATION_UNSPECIFIED = 0;
         EMBEDDED_ENUMERATION_SPECIFIED = 1;
+        EMBEDDED_ENUMERATION_SPECIFIED_ALIAS = 1;
     }
     message EmbeddedMessage { }
 
