@@ -50,8 +50,8 @@ void IRProcessor::ProcessEnum(ir::IR&, ir::EnumDef& enumDef) {
         return;
     }
 
-    std::sort(enumDef.Values.begin(), enumDef.Values.end(),
-              [](const auto& l, const auto& r) { return l.Value < r.Value; });
+    std::stable_sort(enumDef.Values.begin(), enumDef.Values.end(),
+                     [](const auto& l, const auto& r) { return l.Value < r.Value; });
 }
 
 void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {

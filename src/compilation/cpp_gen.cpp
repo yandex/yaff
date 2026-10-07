@@ -121,6 +121,16 @@ static void ForValues(const D& def, F&& cb) {
     }
 }
 
+template <typename D, typename F>
+static void ForUniqueValues(const D& def, F&& cb) {
+    const auto& values = def.Values;
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i == 0 || values[i].Value != values[i - 1].Value) {
+            cb(values[i]);
+        }
+    }
+}
+
 class CppGenerator::Impl {
 public:
     Impl(std::ostream& out, CppGenerationOptions opts = {});
@@ -424,7 +434,7 @@ void CppGenerator::Impl::GenerateEnumIsValidFunc(const ir::EnumDef& enumDef) {
     Writer_ |= "inline constexpr bool " + enumDef.Name + "_IsValid(const int value) {";
     Writer_.IncrementIdentLevel();
     Writer_ |= "switch (value) {";
-    ForValues(enumDef, [&](const auto& enumVal) { Writer_ |= "case " + std::to_string(enumVal.Value) + ":"; });
+    ForUniqueValues(enumDef, [&](const auto& enumVal) { Writer_ |= "case " + std::to_string(enumVal.Value) + ":"; });
     Writer_ >= "return true;";
     Writer_ |= "default:";
     Writer_ >= "return false;";
@@ -437,7 +447,7 @@ void CppGenerator::Impl::GenerateEnumNameFunc(const ir::EnumDef& enumDef) {
     Writer_ |= "inline constexpr std::string_view " + enumDef.Name + "_Name(" + enumDef.Name + " value) {";
     Writer_.IncrementIdentLevel();
     Writer_ |= "switch (value) {";
-    ForValues(enumDef, [&](const auto& enumVal) {
+    ForUniqueValues(enumDef, [&](const auto& enumVal) {
         Writer_ |= "case " + enumDef.Name + "::" + GenerateEscapedName(enumVal.Name) + ":";
         Writer_ >= "return \"" + enumVal.Name + "\";";
     });
