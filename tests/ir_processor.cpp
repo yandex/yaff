@@ -7,10 +7,8 @@
 namespace yaff::compilation {
 namespace {
 
-using ir::IR;
-
 struct TestIR {
-    IR Ir;
+    ir::IR Ir;
 
     ir::SchemaDef* AddSchema(bool defined = true) {
         auto [schema, inserted] = Ir.Schemas.TryEmplace(ir::SchemaDef("test.proto"));
@@ -52,12 +50,12 @@ struct TestIR {
             .Id = id, .Name = std::move(name), .Type = type, .Presence = Presence::PRESENCE_IMPLICIT});
     }
 
-    void ExpectProcessError(const std::string_view expected) {
+    void ExpectProcessError(std::string_view expected) {
         try {
             ProcessIR(Ir);
             FAIL() << "ProcessIR did not throw";
         } catch (const std::runtime_error& error) {
-            EXPECT_EQ(error.what(), expected);
+            EXPECT_EQ(std::string_view(error.what()), expected);
         }
     }
 };
@@ -66,7 +64,7 @@ TEST(IRProcessorErrorHandling, EnumMustHaveSchema) {
     TestIR t;
     auto* enm = t.AddEnum(t.AddSchema());
     enm->Schema = nullptr;
-    t.ExpectProcessError("enum can not be not connected to schema 'Enum'");
+    t.ExpectProcessError("enum 'Enum' must belong to a schema");
 }
 
 TEST(IRProcessorErrorHandling, EnumDefinitionMustMatchSchema) {
@@ -74,14 +72,14 @@ TEST(IRProcessorErrorHandling, EnumDefinitionMustMatchSchema) {
     auto* schema = t.AddSchema();
     t.AddEnum(schema, false);
     t.AddMessage(schema);
-    t.ExpectProcessError("incomplete definition of enum 'Enum' in defined schema 'test'");
+    t.ExpectProcessError("enum 'Enum' definition status does not match that of schema 'test'");
 }
 
 TEST(IRProcessorErrorHandling, MessageMustHaveSchema) {
     TestIR t;
     auto* message = t.AddMessage(t.AddSchema());
     message->Schema = nullptr;
-    t.ExpectProcessError("message can not be not connected to schema 'Message'");
+    t.ExpectProcessError("message 'Message' must belong to a schema");
 }
 
 TEST(IRProcessorErrorHandling, MessageDefinitionMustMatchSchema) {
@@ -89,7 +87,7 @@ TEST(IRProcessorErrorHandling, MessageDefinitionMustMatchSchema) {
     auto* schema = t.AddSchema(false);
     t.AddMessage(schema, MessageLayout::MESSAGE_LAYOUT_DYNAMIC, "Message", true);
     schema->Messages.clear();
-    t.ExpectProcessError("incomplete definition of message 'Message'");
+    t.ExpectProcessError("message 'Message' definition status does not match that of schema 'test'");
 }
 
 TEST(IRProcessorErrorHandling, FixedAndFlatMessagesMustNotHaveGaps) {
@@ -97,7 +95,7 @@ TEST(IRProcessorErrorHandling, FixedAndFlatMessagesMustNotHaveGaps) {
         TestIR t;
         auto* message = t.AddMessage(t.AddSchema(), layout);
         t.AddField(message, t.AddType(Type::TYPE_INT32), 2);
-        t.ExpectProcessError("message 'Message' can not contain any gaps because it has field size based layout");
+        t.ExpectProcessError("message 'Message' with a field-size-based layout cannot contain gaps");
     }
 }
 
@@ -105,7 +103,7 @@ TEST(IRProcessorErrorHandling, ActiveFieldMustHaveName) {
     TestIR t;
     auto* message = t.AddMessage(t.AddSchema());
     t.AddField(message, t.AddType(Type::TYPE_INT32), 1, "");
-    t.ExpectProcessError("field with id '1' has empty name");
+    t.ExpectProcessError("field with ID '1' has an empty name");
 }
 
 TEST(IRProcessorErrorHandling, DefaultMustBeScalarOrString) {
@@ -114,7 +112,7 @@ TEST(IRProcessorErrorHandling, DefaultMustBeScalarOrString) {
     auto type = ir::TypeDef{.Type = Type::TYPE_MESSAGE};
     type.Modifiers.emplace(ir::DEFAULT_MODIFIER_NAME, "value");
     t.AddField(message, t.Ir.Types.GetOrEmplace(std::move(type)));
-    t.ExpectProcessError("field 'field' (id: 1) not allowed to have default value");
+    t.ExpectProcessError("field 'field' (ID: 1) cannot have a default value");
 }
 
 TEST(IRProcessorErrorHandling, InlineFieldIsRejected) {
@@ -123,7 +121,7 @@ TEST(IRProcessorErrorHandling, InlineFieldIsRejected) {
     auto type = ir::TypeDef{.Type = Type::TYPE_INT32};
     type.Modifiers.emplace(ir::INLINE_MODIFIER_NAME, "");
     t.AddField(message, t.Ir.Types.GetOrEmplace(std::move(type)));
-    t.ExpectProcessError("field 'field' (id: 1) is inlined, but inlined fields are not supported yet");
+    t.ExpectProcessError("field 'field' (ID: 1) is inline, but inline fields are not supported yet");
 }
 
 TEST(IRProcessorErrorHandling, TwoDimensionalArrayIsRejected) {
@@ -132,7 +130,7 @@ TEST(IRProcessorErrorHandling, TwoDimensionalArrayIsRejected) {
     const auto* scalar = t.AddType(Type::TYPE_INT32);
     const auto* inner = t.AddType(Type::TYPE_ARRAY, scalar);
     t.AddField(message, t.AddType(Type::TYPE_ARRAY, inner));
-    t.ExpectProcessError("field 'field' (id: 1) is 2d array, but 2d arrays are not supported");
+    t.ExpectProcessError("field 'field' (ID: 1) is a 2D array, but 2D arrays are not supported");
 }
 
 TEST(IRProcessorErrorHandling, ArrayMustHaveImplicitPresence) {
@@ -140,7 +138,7 @@ TEST(IRProcessorErrorHandling, ArrayMustHaveImplicitPresence) {
     auto* message = t.AddMessage(t.AddSchema());
     auto& field = t.AddField(message, t.AddType(Type::TYPE_ARRAY, t.AddType(Type::TYPE_INT32)));
     field.Presence = Presence::PRESENCE_EXPLICIT;
-    t.ExpectProcessError("field 'field' (id: 1) is array, but has explicit presence");
+    t.ExpectProcessError("array field 'field' (ID: 1) must have implicit presence");
 }
 
 TEST(IRProcessorErrorHandling, MessageMustHaveExplicitPresence) {
@@ -149,7 +147,7 @@ TEST(IRProcessorErrorHandling, MessageMustHaveExplicitPresence) {
     auto* child = t.AddMessage(schema, MessageLayout::MESSAGE_LAYOUT_DYNAMIC, "Child");
     auto* parent = t.AddMessage(schema);
     t.AddField(parent, t.AddType(Type::TYPE_MESSAGE, nullptr, child));
-    t.ExpectProcessError("field 'field' (id: 1) is message, but has implicit presence");
+    t.ExpectProcessError("message field 'field' (ID: 1) must have explicit presence");
 }
 
 TEST(IRProcessorErrorHandling, ActiveIndexMustInitiallyBeZero) {
@@ -157,7 +155,7 @@ TEST(IRProcessorErrorHandling, ActiveIndexMustInitiallyBeZero) {
     auto* message = t.AddMessage(t.AddSchema());
     auto& field = t.AddField(message, t.AddType(Type::TYPE_INT32));
     field.ActiveIndex = 42;
-    t.ExpectProcessError("field 'field' (id: 1) has non-zero active index");
+    t.ExpectProcessError("field 'field' (ID: 1) has a non-zero active index");
 }
 
 const ir::TypeDef* AddKeyType(TestIR& t, Type type) {
@@ -171,7 +169,7 @@ TEST(IRProcessorErrorHandling, DeprecatedFieldMustNotBeKey) {
     auto* message = t.AddMessage(t.AddSchema());
     auto& field = t.AddField(message, AddKeyType(t, Type::TYPE_INT32));
     field.Deprecated = true;
-    t.ExpectProcessError("field (id: 1) is deprecated and can not be key");
+    t.ExpectProcessError("deprecated field (ID: 1) cannot be a key");
 }
 
 TEST(IRProcessorErrorHandling, KeyMustBeScalarOrString) {
@@ -179,7 +177,7 @@ TEST(IRProcessorErrorHandling, KeyMustBeScalarOrString) {
     auto* message = t.AddMessage(t.AddSchema());
     auto& field = t.AddField(message, AddKeyType(t, Type::TYPE_MESSAGE));
     field.Presence = Presence::PRESENCE_EXPLICIT;
-    t.ExpectProcessError("field 'field' (id: 1) is not scalar or string and can not be key");
+    t.ExpectProcessError("key field 'field' (ID: 1) must be scalar or string");
 }
 
 TEST(IRProcessorErrorHandling, MessageMustNotHaveMultipleKeys) {
@@ -188,7 +186,7 @@ TEST(IRProcessorErrorHandling, MessageMustNotHaveMultipleKeys) {
     const auto* key = AddKeyType(t, Type::TYPE_INT32);
     t.AddField(message, key, 1, "first");
     t.AddField(message, key, 2, "second");
-    t.ExpectProcessError("message 'Message' contains multiple key fields");
+    t.ExpectProcessError("message 'Message' cannot contain multiple key fields");
 }
 
 TEST(IRProcessorErrorHandling, FixedMessageMustNotHaveOneof) {
@@ -196,7 +194,7 @@ TEST(IRProcessorErrorHandling, FixedMessageMustNotHaveOneof) {
     auto* message = t.AddMessage(t.AddSchema(), MessageLayout::MESSAGE_LAYOUT_FIXED);
     auto& field = t.AddField(message, t.AddType(Type::TYPE_INT32));
     field.OneOf = "choice";
-    t.ExpectProcessError("message 'Message' is fixed and can not have any oneof fields");
+    t.ExpectProcessError("message 'Message' with a fixed layout cannot contain oneof fields");
 }
 
 TEST(IRProcessorErrorHandling, ArrayMustNotBeOneof) {
@@ -204,7 +202,7 @@ TEST(IRProcessorErrorHandling, ArrayMustNotBeOneof) {
     auto* message = t.AddMessage(t.AddSchema());
     auto& field = t.AddField(message, t.AddType(Type::TYPE_ARRAY, t.AddType(Type::TYPE_INT32)));
     field.OneOf = "choice";
-    t.ExpectProcessError("field 'field' (id: 1) is array and can not be oneof field");
+    t.ExpectProcessError("field 'field' (ID: 1) is an array and cannot be a oneof member");
 }
 
 TEST(IRProcessorErrorHandling, OneofMustHaveExplicitPresence) {
@@ -212,7 +210,7 @@ TEST(IRProcessorErrorHandling, OneofMustHaveExplicitPresence) {
     auto* message = t.AddMessage(t.AddSchema());
     auto& field = t.AddField(message, t.AddType(Type::TYPE_INT32));
     field.OneOf = "choice";
-    t.ExpectProcessError("field 'field' (id: 1) is oneof field, but has implicit presence");
+    t.ExpectProcessError("oneof field 'field' (ID: 1) must have explicit presence");
 }
 
 ir::MessageDef* AddAssociativeField(TestIR& t, ir::MessageDef* parent, MessageLayout childLayout,
@@ -234,14 +232,14 @@ TEST(IRProcessorErrorHandling, AssociativePairMustBeFixed) {
     TestIR t;
     auto* parent = t.AddMessage(t.AddSchema());
     AddAssociativeField(t, parent, MessageLayout::MESSAGE_LAYOUT_DYNAMIC);
-    t.ExpectProcessError("message 'Pair' marked as associative pair, but is not fixed");
+    t.ExpectProcessError("message 'Pair' marked as an associative pair must have a fixed layout");
 }
 
 TEST(IRProcessorErrorHandling, AssociativePairMustHaveTwoFields) {
     TestIR t;
     auto* parent = t.AddMessage(t.AddSchema());
     AddAssociativeField(t, parent, MessageLayout::MESSAGE_LAYOUT_FIXED, 1);
-    t.ExpectProcessError("message 'Pair' marked as associative pair, but contains not 2 fields");
+    t.ExpectProcessError("message 'Pair' marked as an associative pair must contain exactly two fields");
 }
 
 TEST(IRProcessorErrorHandling, MapKeyMustNotBeDeprecated) {
@@ -249,7 +247,7 @@ TEST(IRProcessorErrorHandling, MapKeyMustNotBeDeprecated) {
     auto* parent = t.AddMessage(t.AddSchema());
     auto* pair = AddAssociativeField(t, parent, MessageLayout::MESSAGE_LAYOUT_FIXED);
     pair->Fields[0].Deprecated = true;
-    t.ExpectProcessError("field (id: 1) is deprecated and can not be map key");
+    t.ExpectProcessError("deprecated field 'part0' (ID: 1) cannot be a map key");
 }
 
 TEST(IRProcessorErrorHandling, MapKeyMustBeScalarOrString) {
@@ -258,7 +256,7 @@ TEST(IRProcessorErrorHandling, MapKeyMustBeScalarOrString) {
     auto* pair = AddAssociativeField(t, parent, MessageLayout::MESSAGE_LAYOUT_FIXED);
     pair->Fields[0].Type = t.AddType(Type::TYPE_MESSAGE);
     pair->Fields[0].Presence = Presence::PRESENCE_EXPLICIT;
-    t.ExpectProcessError("field 'part0' (id: 1) is not scalar or string and can not be map key");
+    t.ExpectProcessError("map key field 'part0' (ID: 1) must be scalar or string");
 }
 
 }  // namespace

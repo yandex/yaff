@@ -45,9 +45,9 @@ void IRProcessor::ProcessSchema(ir::IR&, ir::SchemaDef& schemaDef) {
 }
 
 void IRProcessor::ProcessEnum(ir::IR&, ir::EnumDef& enumDef) {
-    Ensure(enumDef.Schema, "enum can not be not connected to schema '", enumDef.Name, "'");
-    Ensure(enumDef.Defined == enumDef.Schema->Defined, "incomplete definition of enum '", enumDef.Name,
-                                                           "' in defined schema '", enumDef.Schema->Namespace, "'");
+    Ensure(enumDef.Schema, "enum '", enumDef.Name, "' must belong to a schema");
+    Ensure(enumDef.Defined == enumDef.Schema->Defined, "enum '", enumDef.Name,
+           "' definition status does not match that of schema '", enumDef.Schema->Namespace, "'");
     if (!enumDef.Defined) {
         return;
     }
@@ -61,11 +61,11 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
         return;
     }
     const auto [_, emplaced] = ProcessedMessages_.emplace(&messageDef);
-    Ensure(emplaced, "duplicated process call for message '", messageDef.Name, "'");
+    Ensure(emplaced, "message '", messageDef.Name, "' was processed more than once");
 
-    Ensure(messageDef.Schema, "message can not be not connected to schema '", messageDef.Name, "'");
-    Ensure(messageDef.Defined == messageDef.Schema->Defined,
-           "incomplete definition of message '", messageDef.Name, "'");
+    Ensure(messageDef.Schema, "message '", messageDef.Name, "' must belong to a schema");
+    Ensure(messageDef.Defined == messageDef.Schema->Defined, "message '", messageDef.Name,
+           "' definition status does not match that of schema '", messageDef.Schema->Namespace, "'");
     if (!messageDef.Defined) {
         return;
     }
@@ -76,67 +76,58 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
     const bool gapped = ir::IsGapMessage(messageDef);
     Ensure(!gapped || (messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FLAT &&
                        messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED),
-           "message '", messageDef.Name, "' can not contain any gaps because it has field size based layout");
+           "message '", messageDef.Name, "' with a field-size-based layout cannot contain gaps");
 
     bool comparable = false;
     uint64_t activeIndex = 1;
     FieldOffset flatOffset = 0;
     for (auto& fieldDef : messageDef.Fields) {
-        Ensure(!fieldDef.Name.empty() || fieldDef.Deprecated,
-               "field with id '", fieldDef.Id, "' has empty name");
+        Ensure(!fieldDef.Name.empty() || fieldDef.Deprecated, "field with ID '", fieldDef.Id, "' has an empty name");
 
         if (fieldDef.Type->Modifiers.contains(ir::DEFAULT_MODIFIER_NAME)) {
-            Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING,
-                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id, ") not allowed to have default value");
+            Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING, "field '",
+                   fieldDef.Name, "' (ID: ", fieldDef.Id, ") cannot have a default value");
         }
 
-        Ensure(!fieldDef.Type->Modifiers.contains(ir::INLINE_MODIFIER_NAME),
-               "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
-                   ") is inlined, but inlined fields are not supported yet");
+        Ensure(!fieldDef.Type->Modifiers.contains(ir::INLINE_MODIFIER_NAME), "field '", fieldDef.Name,
+               "' (ID: ", fieldDef.Id, ") is inline, but inline fields are not supported yet");
 
         if (fieldDef.Type->Type == Type::TYPE_ARRAY) {
             const auto* elementType = fieldDef.Type->ElementType;
-            Ensure(!elementType || elementType->Type != Type::TYPE_ARRAY,
-                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
-                       ") is 2d array, but 2d arrays are not supported");
-            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_IMPLICIT,
-                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
-                       ") is array, but has explicit presence");
+            Ensure(!elementType || elementType->Type != Type::TYPE_ARRAY, "field '", fieldDef.Name,
+                   "' (ID: ", fieldDef.Id, ") is a 2D array, but 2D arrays are not supported");
+            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_IMPLICIT, "array field '",
+                   fieldDef.Name, "' (ID: ", fieldDef.Id, ") must have implicit presence");
         }
 
         if (fieldDef.Type->Type == Type::TYPE_MESSAGE) {
-            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT,
-                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
-                       ") is message, but has implicit presence");
+            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT, "message field '",
+                   fieldDef.Name, "' (ID: ", fieldDef.Id, ") must have explicit presence");
         }
 
-        Ensure(fieldDef.ActiveIndex == 0,
-               "field '", fieldDef.Name, "' (id: ", fieldDef.Id, ") has non-zero active index");
+        Ensure(fieldDef.ActiveIndex == 0, "field '", fieldDef.Name, "' (ID: ", fieldDef.Id,
+               ") has a non-zero active index");
 
         if (!fieldDef.Deprecated) {
             fieldDef.ActiveIndex = activeIndex++;
         }
 
         if (fieldDef.Type->Modifiers.contains(ir::KEY_MODIFIER_NAME)) {
-            Ensure(!fieldDef.Deprecated,
-                   "field (id: ", fieldDef.Id, ") is deprecated and can not be key");
-            Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING,
-                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
-                       ") is not scalar or string and can not be key");
+            Ensure(!fieldDef.Deprecated, "deprecated field (ID: ", fieldDef.Id, ") cannot be a key");
+            Ensure(ir::IsScalar(fieldDef.Type->Type) || fieldDef.Type->Type == Type::TYPE_STRING, "key field '",
+                   fieldDef.Name, "' (ID: ", fieldDef.Id, ") must be scalar or string");
 
-            Ensure(!comparable, "message '", messageDef.Name, "' contains multiple key fields");
+            Ensure(!comparable, "message '", messageDef.Name, "' cannot contain multiple key fields");
             comparable = true;
         }
 
         if (!fieldDef.OneOf.empty()) {
-            Ensure(messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED,
-                   "message '", messageDef.Name, "' is fixed and can not have any oneof fields");
-            Ensure(fieldDef.Type->Type != Type::TYPE_ARRAY, "field '", fieldDef.Name,
-                                                                "' (id: ", fieldDef.Id,
-                                                                ") is array and can not be oneof field");
-            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT,
-                   "field '", fieldDef.Name, "' (id: ", fieldDef.Id,
-                       ") is oneof field, but has implicit presence");
+            Ensure(messageDef.Layout != MessageLayout::MESSAGE_LAYOUT_FIXED, "message '", messageDef.Name,
+                   "' with a fixed layout cannot contain oneof fields");
+            Ensure(fieldDef.Type->Type != Type::TYPE_ARRAY, "field '", fieldDef.Name, "' (ID: ", fieldDef.Id,
+                   ") is an array and cannot be a oneof member");
+            Ensure(fieldDef.Deprecated || fieldDef.Presence == Presence::PRESENCE_EXPLICIT, "oneof field '",
+                   fieldDef.Name, "' (ID: ", fieldDef.Id, ") must have explicit presence");
 
             auto [it, _] =
                 messageDef.OneOfs.try_emplace(fieldDef.OneOf, ir::MessageDef::OneOfDef{.Name = fieldDef.OneOf});
@@ -160,16 +151,15 @@ void IRProcessor::ProcessMessage(ir::IR& ir, ir::MessageDef& messageDef) {
 
         if (ir::IsAssociative(*fieldDef.Type)) {
             message->AssociativePair = true;
-            Ensure(message->Layout == MessageLayout::MESSAGE_LAYOUT_FIXED,
-                   "message '", message->Name, "' marked as associative pair, but is not fixed");
-            Ensure(message->Fields.size() == 2,
-                   "message '", message->Name, "' marked as associative pair, but contains not 2 fields");
+            Ensure(message->Layout == MessageLayout::MESSAGE_LAYOUT_FIXED, "message '", message->Name,
+                   "' marked as an associative pair must have a fixed layout");
+            Ensure(message->Fields.size() == 2, "message '", message->Name,
+                   "' marked as an associative pair must contain exactly two fields");
 
             const auto& key = message->Fields[0];
-            Ensure(!key.Deprecated, "field (id: ", key.Id, ") is deprecated and can not be map key");
-            Ensure(ir::IsScalar(key.Type->Type) || key.Type->Type == Type::TYPE_STRING,
-                   "field '", key.Name, "' (id: ", key.Id,
-                       ") is not scalar or string and can not be map key");
+            Ensure(!key.Deprecated, "deprecated field '", key.Name, "' (ID: ", key.Id, ") cannot be a map key");
+            Ensure(ir::IsScalar(key.Type->Type) || key.Type->Type == Type::TYPE_STRING, "map key field '", key.Name,
+                   "' (ID: ", key.Id, ") must be scalar or string");
         }
     }
 }
