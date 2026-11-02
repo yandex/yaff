@@ -82,6 +82,7 @@ TEST(Array, SimpleVec) {
     EXPECT_TRUE(std::equal(arrayFeild.begin(), arrayFeild.end(), vec.begin()));
     for (uint64_t i = 0; i < arrayFeild.Size(); ++i) {
         EXPECT_EQ(arrayFeild.Get(i), i + 1);
+        EXPECT_EQ(arrayMessage.GetIntegerVec(i), i + 1);
     }
 }
 
