@@ -951,7 +951,7 @@ void CppGenerator::Impl::GenerateMessageFieldGetIdx(const ir::MessageDef::FieldD
     Writer_ >= "return " + fieldName + "()[i];";
     Writer_ |= "}\n";
 
-    Writer_ |= "YAFF_PURE " + returnType + " Get" + fieldName + "(const size_t i) const {";
+    Writer_ |= "YAFF_PURE " + returnType + " Get" + GenerateEscapedName(fieldDef.Name) + "(const size_t i) const {";
     Writer_ >= "YAFF_ASSERT(i < static_cast<size_t>(std::numeric_limits<int>::max()));";
     Writer_ >= "return " + fieldName + "(i);";
     Writer_ |= "}\n";
